@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GILFOYLE_AGENT // SESSION_ID_9942</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@300;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg: #000;
+      --term-green: #33ff00;
+      --err: #ff003c;
+      --accent: #fff;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; cursor: crosshair; }
+    
+    body {
+      background: var(--bg);
+      color: var(--accent);
+      font-family: 'Space Grotesk', sans-serif;
+      overflow: hidden; /* Lock it down */
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* === FULL SCREEN FACE BACKGROUND === */
+    .hero-bg {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: url('../assets/hero.png') no-repeat center center;
+      background-size: cover;
+      z-index: 0;
+      filter: grayscale(100%) contrast(150%) brightness(0.3);
+      transition: filter 0.5s ease;
+    }
+    
+    /* VIGNETTE / OVERLAY */
+    .overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: radial-gradient(circle, transparent 20%, rgba(0,0,0,0.8) 100%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* SCANLINES */
+    .scanlines {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                  linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+      background-size: 100% 3px, 3px 100%;
+      z-index: 100;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    /* === CONTENT WRAPPER === */
+    .wrapper {
+      position: relative;
+      z-index: 10;
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      padding: 0 4rem; /* Removed top/bottom padding to fix centering */
+      align-items: center;
+    }
+
+    /* LEFT: BRANDING & MANIFESTO */
+    .left-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      max-width: 800px; /* Constrain width to prevent overflow */
+    }
+
+    h1 {
+      font-family: 'Inter', sans-serif;
+      font-size: 10rem; /* Slightly smaller to ensure fit */
+      font-weight: 900;
+      line-height: 0.8;
+      letter-spacing: -0.06em;
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+      opacity: 0.9;
+      mix-blend-mode: overlay;
+    }
+
+    .manifesto {
+      max-width: 600px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.4rem;
+      line-height: 1.5;
+      color: #ccc;
+    }
+    .manifesto p { margin-bottom: 1.5rem; }
+    .manifesto strong { color: #fff; font-weight: 700; }
+    
+    .status-line {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--term-green);
+      font-size: 0.9rem;
+      margin-top: 1rem;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .status-line::before {
+      content: ''; display: block; width: 8px; height: 8px; background: var(--term-green); border-radius: 50%;
+      box-shadow: 0 0 10px var(--term-green);
+      animation: blink 1s infinite;
+    }
+
+    /* RIGHT: HUD TERMINAL */
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .terminal {
+      width: 100%;
+      max-width: 600px;
+      background: rgba(0,0,0,0.85);
+      border: 1px solid #222;
+      backdrop-filter: blur(20px);
+      font-family: 'JetBrains Mono', monospace;
+      padding: 2rem;
+      font-size: 0.85rem;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+      position: relative;
+    }
+    
+    .terminal-header {
+      position: absolute;
+      top: 0; left: 0; width: 100%;
+      padding: 0.5rem 1rem;
+      font-size: 0.7rem;
+      color: #444;
+      border-bottom: 1px solid #111;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .term-body {
+      margin-top: 1rem;
+      height: 450px;
+      overflow-y: auto; /* Scrollable */
+      overflow-x: hidden;
+      color: #888;
+      padding-right: 1rem;
+    }
+    /* Custom Scrollbar */
+    .term-body::-webkit-scrollbar { width: 6px; }
+    .term-body::-webkit-scrollbar-track { background: #111; }
+    .term-body::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+    
+    .log-row { margin-bottom: 0.5rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+    .log-row .white { color: #fff; }
+    .log-row .green { color: var(--term-green); }
+    .log-row .red { color: var(--err); }
+    .log-row .dim { color: #555; }
+    .log-row .blue { color: #5fd7ff; }
+    .log-row .cmd-prompt { color: #444; }
+
+    .input-line { margin-top: 1rem; color: #fff; display: flex; }
+    .cursor { display: inline-block; width: 8px; height: 1.2em; background: var(--term-green); margin-left: 2px; animation: blink 1s infinite; }
+
+    /* INSTALL CTA */
+    .cta {
+      margin-top: 3rem;
+      background: #fff;
+      color: #000;
+      padding: 1.5rem 2.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      border: none;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .cta:hover { transform: scale(1.05); background: var(--term-green); }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    @media (max-width: 1100px) {
+      .wrapper { grid-template-columns: 1fr; padding: 2rem; text-align: center; }
+      h1 { font-size: 6rem; }
+      .manifesto { margin: 0 auto; }
+      .right-panel { align-items: center; margin-top: 4rem; }
+      .status-line { justify-content: center; }
+      .left-panel { align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hero-bg"></div>
+  <div class="overlay"></div>
+  <div class="scanlines"></div>
+
+  <div class="wrapper">
+    
+    <div class="left-panel">
+      <h1>GILFOYLE</h1>
+      <div class="manifesto">
+        <p>
+          An SRE agent that does what you can't. Queries your observability stack. Finds root causes. Doesn't panic. Doesn't guess. Doesn't care about your feelings.
+        </p>
+        <p>
+          <strong>You're welcome.</strong>
+        </p>
+      </div>
+      <div class="status-line">Son of Anton: Online</div>
+      
+      <div style="margin-top: 2rem;">
+        <button class="cta" onclick="copy()">$ npx skills add axiomhq/gilfoyle</button>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="terminal">
+        <div class="terminal-header">
+          <span>GILFOYLE_AGENT // SESSION_ID_9942</span>
+          <span>10.0.0.1</span>
+        </div>
+        <div class="term-body" id="term">
+          <!-- JS Population -->
+        </div>
+        <div class="input-line">
+          <span>> </span><span id="input"></span><span class="cursor"></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const term = document.getElementById('term');
+    const input = document.getElementById('input');
+    
+    const scenario = [
+      { text: "huli-platform is throwing 500s. investigate.", type: "cmd" },
+      { text: "Acknowledged. Investigating [huli-platform]. Don't touch anything.", type: "log" },
+      { text: "Scanning golden signals for last 30m...", type: "dim" },
+      { text: "----------------------------------------", type: "dim" },
+      { text: "SERVICE           | STATUS", type: "dim" },
+      { text: "----------------------------------------", type: "dim" },
+      { text: "endframe-core     | NORMAL", type: "green" },
+      { text: "middle-out-api    | <span class=\"red\">CRITICAL (Error Rate: 15%)</span>", type: "white" },
+      { text: "nucleus-sync      | NORMAL", type: "green" },
+      { text: "gavin-box-v3      | NORMAL", type: "green" },
+      { text: "----------------------------------------", type: "dim" },
+      { text: "", type: "gap" },
+      
+      { text: "Targeting [middle-out-api]. Hypothesis: Config change in recent deploy.", type: "log" },
+      { text: "Running APL query on dataset [logs]...", type: "dim" },
+      { text: "['huli-logs'] | where service == 'middle-out-api' | where status >= 500 | take 5", type: "blue" },
+      { text: "Query result: 842 errors in last 10m.", type: "white" },
+      { text: "Error sample: \"Panic: Weissman Score calculation overflow in `optimal_tip_to_tip_efficiency()`\"", type: "red" },
+      { text: "", type: "gap" },
+      
+      { text: "Analyzing stack trace...", type: "log" },
+      { text: "Found regression in commit <span class=\"white\">a1b2c3d</span> by user <span class=\"white\">@dinesh</span>.", type: "dim" },
+      { text: "Commit message: \"Optimized header parsing for 4k streaming\"", type: "dim" },
+      { text: "Analysis: The regex `^\\s*Content-Length:\\s*(\\d+)$` fails on chunked encoding.", type: "white" },
+      { text: "", type: "gap" },
+
+      { text: "what's the impact?", type: "cmd" },
+      { text: "Calculating impact...", type: "log" },
+      { text: "summarize spotlight(_time > ago(10m), geo.country, device.os)", type: "blue" },
+      { text: "Affected users: 12,403", type: "white" },
+      { text: "Revenue at risk: $42,000/hr (assuming you actually make money)", type: "white" },
+      { text: "Primary cohort: Mobile users on HuliChat v4.0", type: "white" },
+      { text: "", type: "gap" },
+      
+      { text: "fix it", type: "cmd" },
+      { text: "I can't commit code for you, but I can tell you exactly how you broke it.", type: "log" },
+      { text: "Recommendation: Revert commit <span class=\"white\">a1b2c3d</span> immediately.", type: "white" },
+      { text: "Alternative: Update regex to handle chunked encoding. But given your track record, just revert.", type: "white" },
+      { text: "", type: "gap" },
+
+      { text: "reverting now", type: "cmd" },
+      { text: "Monitoring rollout...", type: "log" },
+      { text: "...", type: "dim" },
+      { text: "Error rate dropped to 0.01%.", type: "green" },
+      { text: "Latency stabilizing at 45ms.", type: "green" },
+      { text: "Incident resolved. Tell Dinesh to learn how HTTP works.", type: "white" },
+      { text: "You're welcome.", type: "white" }
+    ];
+
+    let step = 0;
+    
+    // Type out text char by char (LLM style)
+    function typeText(element, text, speed, callback) {
+      // Handle HTML tags by stripping them for length calculation but inserting them atomically
+      // Simple approach: regex split
+      const parts = text.split(/(<[^>]*>)/g);
+      let i = 0;
+      
+      function nextPart() {
+        if (i >= parts.length) {
+          if (callback) callback();
+          return;
+        }
+        
+        const part = parts[i];
+        if (part.startsWith('<')) {
+          element.innerHTML += part;
+          i++;
+          nextPart();
+        } else {
+          let charIdx = 0;
+          const interval = setInterval(() => {
+            element.innerHTML += part[charIdx];
+            // Auto scroll
+            term.scrollTop = term.scrollHeight;
+            charIdx++;
+            if (charIdx >= part.length) {
+              clearInterval(interval);
+              i++;
+              nextPart();
+            }
+          }, speed);
+        }
+      }
+      nextPart();
+    }
+
+    function run() {
+      if (step >= scenario.length) {
+        // Loop or stop? Let's stop.
+        return;
+      }
+      
+      const s = scenario[step];
+      
+      if (s.type === "cmd") {
+        // User typing is slower
+        let i = 0;
+        const type = setInterval(() => {
+          input.textContent += s.text[i];
+          i++;
+          if (i >= s.text.length) {
+            clearInterval(type);
+            setTimeout(() => {
+              // Commit command
+              const div = document.createElement('div');
+              div.className = 'log-row';
+              div.innerHTML = `<span class="cmd-prompt">> </span><span class="white">${s.text}</span>`;
+              term.appendChild(div);
+              input.textContent = '';
+              term.scrollTop = term.scrollHeight;
+              step++;
+              run(); // Immediate next step
+            }, 600);
+          }
+        }, 50); // User typing speed
+      } else if (s.type === "gap") {
+        const div = document.createElement('div');
+        div.innerHTML = "<br>";
+        term.appendChild(div);
+        step++;
+        run();
+      } else {
+        // Agent output (LLM streaming style)
+        setTimeout(() => {
+          const div = document.createElement('div');
+          div.className = 'log-row ' + s.type;
+          term.appendChild(div);
+          
+          // Speed: 5ms for fast logs, 15ms for "thoughtful" responses
+          const speed = s.text.length > 50 ? 5 : 10;
+          typeText(div, s.text, speed, () => {
+            step++;
+            run();
+          });
+        }, 300); // Slight pause before agent starts responding
+      }
+    }
+
+    // Start
+    setTimeout(run, 1000);
+
+    function copy() {
+      navigator.clipboard.writeText('npx skills add axiomhq/gilfoyle');
+      const b = document.querySelector('.cta');
+      b.textContent = 'COPIED';
+      setTimeout(() => b.textContent = '$ npx skills add gilfoyle', 2000);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gilfoyle // System RCA</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=Jura:wght@600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --green: #0aff40;
+      --green-dim: rgba(10, 255, 64, 0.3);
+      --bg: #050505;
+      --font-mono: 'IBM Plex Mono', monospace;
+      --font-ui: 'Jura', sans-serif; /* More tech/sci-fi for headers */
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg) url('../assets/hero.png') no-repeat center center fixed;
+      background-size: cover;
+      color: #e0e0e0;
+      font-family: var(--font-mono);
+      height: 100vh;
+      overflow: hidden;
+      font-size: 14px;
+    }
+
+    /* 1. Cinematic Processing */
+    .world-layer {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6); /* Heavy darken for contrast */
+      z-index: 0;
+    }
+    
+    .scanline {
+      width: 100%;
+      height: 100px;
+      z-index: 2;
+      background: linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(10, 255, 64, 0.03) 50%, rgba(0,0,0,0) 100%);
+      opacity: 0.1;
+      position: absolute;
+      bottom: 100%;
+      animation: scanline 8s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes scanline { 0% { bottom: 100%; } 100% { bottom: -100px; } }
+
+    /* 2. Asymmetrical HUD */
+    .hud-container {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      height: 100%;
+      padding: 3rem 4rem;
+      display: grid;
+      grid-template-columns: 350px 1fr 400px;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    /* Left Column: Telemetry */
+    .col-left {
+      grid-area: 1 / 1 / 4 / 2;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-left: 2px solid var(--green-dim);
+      padding-left: 2rem;
+      position: relative;
+    }
+    
+    /* Decoration: Top bracket for left col */
+    .col-left::before {
+      content: '';
+      position: absolute;
+      top: 0; left: -2px; width: 20px; height: 2px;
+      background: var(--green);
+    }
+    .col-left::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: -2px; width: 20px; height: 2px;
+      background: var(--green);
+    }
+
+    .brand h1 {
+      font-family: var(--font-ui);
+      font-size: 3rem;
+      line-height: 0.9;
+      letter-spacing: 0.1em;
+      color: #fff;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+    
+    .brand .sub {
+      font-size: 0.8rem;
+      color: var(--green);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .metrics {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      margin-top: 4rem;
+    }
+
+    .metric-item label {
+      display: block;
+      font-size: 0.65rem;
+      color: #888;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.25rem;
+    }
+    .metric-item .val {
+      font-family: var(--font-ui);
+      font-size: 1.2rem;
+      color: #fff;
+    }
+    .metric-item .val.warn { color: #ffcc00; }
+
+    .manifesto {
+      margin-bottom: 2rem;
+    }
+    .manifesto p {
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: #aaa;
+      margin-bottom: 1rem;
+    }
+    .manifesto b { color: #fff; }
+
+    /* Right Column: Active Tasks */
+    .col-right {
+      grid-area: 1 / 3 / 4 / 4;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: flex-end;
+      text-align: right;
+    }
+
+    .console-wrapper {
+      width: 100%;
+      margin-bottom: 3rem;
+    }
+    
+    .console-header {
+      font-size: 0.65rem;
+      color: var(--green);
+      border-bottom: 1px solid var(--green-dim);
+      padding-bottom: 0.5rem;
+      margin-bottom: 1rem;
+      text-align: right;
+      letter-spacing: 0.1em;
+    }
+
+    .console-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      color: #888;
+      height: 150px;
+      overflow: hidden;
+      mask-image: linear-gradient(to top, black 80%, transparent 100%);
+    }
+    .log-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-line.new { color: #fff; }
+
+    /* The "Input" Area */
+    .input-area {
+      background: rgba(10, 255, 64, 0.05);
+      border: 1px solid var(--green-dim);
+      padding: 1.5rem;
+      width: 100%;
+      position: relative;
+    }
+    /* Corner brackets for input */
+    .input-area::before, .input-area::after {
+      content: ''; position: absolute; width: 8px; height: 8px;
+      border: 2px solid var(--green);
+      transition: all 0.2s;
+    }
+    .input-area::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+    .input-area::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+
+    .input-label {
+      font-size: 0.6rem;
+      color: var(--green);
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+      display: block;
+      text-align: left;
+    }
+    
+    .cmd-line {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.9rem;
+      color: #fff;
+    }
+    .prompt { color: #666; }
+    .cursor {
+      display: inline-block;
+      width: 8px;
+      height: 16px;
+      background: var(--green);
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .hud-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+        padding: 2rem;
+        gap: 3rem;
+      }
+      .col-left, .col-right {
+        grid-area: auto;
+        border: none;
+        padding: 0;
+        align-items: flex-start;
+        text-align: left;
+      }
+      .col-left::before, .col-left::after { display: none; }
+      .console-header { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="world-layer"></div>
+  <div class="scanline"></div>
+
+  <div class="hud-container">
+    
+    <!-- Left: Identity & Telemetry -->
+    <div class="col-left">
+      <div class="brand">
+        <h1>Gilfoyle</h1>
+        <div class="sub">Automated Competence</div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric-item">
+          <label>SYSTEM STATUS</label>
+          <div class="val">OPTIMAL</div>
+        </div>
+        <div class="metric-item">
+          <label>HUMAN ERROR PROBABILITY</label>
+          <div class="val warn">100%</div>
+        </div>
+        <div class="metric-item">
+          <label>CURRENT OBJECTIVE</label>
+          <div class="val" style="font-size: 0.9rem;">MITIGATE INCOMPETENCE</div>
+        </div>
+      </div>
+
+      <div class="manifesto">
+        <p><b>I do not pair program.</b><br>I repair your program.</p>
+        <p>While you were staring at a dashboard wondering why the line went up, I queried 40 million log lines and fixed the connection leak.</p>
+      </div>
+    </div>
+
+    <!-- Center: Empty (Face) -->
+    <div></div>
+
+    <!-- Right: Action -->
+    <div class="col-right">
+      
+      <div class="console-wrapper">
+        <div class="console-header">LIVE_DIAGNOSTICS_STREAM</div>
+        <div class="console-lines" id="logs">
+          <!-- Logs go here -->
+        </div>
+      </div>
+
+      <div class="input-area">
+        <span class="input-label">INSTALL_MODULE.EXE</span>
+        <div class="cmd-line">
+          <span class="prompt">$</span>
+          <code>npx skills add axiomhq/gilfoyle</code>
+          <span class="cursor"></span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    const logContainer = document.getElementById('logs');
+    const messages = [
+      "CONNECTING_TO_MAIN...",
+      "SCANNING_LOCAL_CONTEXT",
+      "DETECTED: HUMAN_ERROR (SEVERITY: CRITICAL)",
+      "ANALYZING_TRACE_TOPOLOGY",
+      "QUERYING_AXIOM_DATASETS...",
+      "ROOT_CAUSE: BCRYPT_SALT_ROUNDS=14",
+      "GENERATING_FIX_PATCH...",
+      "DEPLOYING_MITIGATION",
+      "INCIDENT_RESOLVED (24ms)",
+      "SAVING_PATTERN_TO_MEMORY",
+      "WAITING_FOR_NEXT_FAILURE..."
+    ];
+
+    let msgIdx = 0;
+    function addLog() {
+      const div = document.createElement('div');
+      div.className = 'log-line new';
+      div.textContent = `> ${messages[msgIdx % messages.length]}`;
+      
+      // Dim old logs
+      const old = logContainer.querySelectorAll('.new');
+      old.forEach(el => el.classList.remove('new'));
+
+      logContainer.appendChild(div);
+      if (logContainer.children.length > 8) {
+        logContainer.removeChild(logContainer.firstChild);
+      }
+      
+      msgIdx++;
+      setTimeout(addLog, 800 + Math.random() * 1500);
+    }
+    addLog();
+  </script>
+</body>
+</html>

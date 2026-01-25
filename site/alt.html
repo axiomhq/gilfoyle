@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gilfoyle@anton:~</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg: #000;
+      --term-green: #50fa7b;
+      --term-blue: #bd93f9;
+      --term-red: #ff5555;
+      --term-yellow: #f1fa8c;
+      --term-gray: #6272a4;
+      --term-white: #f8f8f2;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      background: #000;
+      font-family: 'Fira Code', monospace;
+      height: 100vh;
+      overflow: hidden;
+      color: var(--term-white);
+    }
+
+    /* === BACKGROUND === */
+    .bg {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: url('../assets/hero.png') no-repeat center center;
+      background-size: cover;
+      z-index: 0;
+      opacity: 0.4; /* Darkened for readability */
+      filter: contrast(1.2) grayscale(0.2);
+    }
+    
+    /* === CRT EFFECTS === */
+    .crt-scanlines {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(
+        to bottom,
+        rgba(255,255,255,0),
+        rgba(255,255,255,0) 50%,
+        rgba(0,0,0,0.2) 50%,
+        rgba(0,0,0,0.2)
+      );
+      background-size: 100% 4px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    
+    .crt-flicker {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(18, 16, 16, 0.1);
+      opacity: 0;
+      z-index: 10;
+      pointer-events: none;
+      animation: flicker 0.15s infinite;
+    }
+
+    /* === TERMINAL === */
+    .terminal-container {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90vw;
+      max-width: 1000px;
+      height: 80vh;
+      background: rgba(10, 10, 10, 0.85);
+      border: 1px solid #333;
+      box-shadow: 0 0 50px rgba(0,0,0,0.8);
+      border-radius: 6px;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      backdrop-filter: blur(5px);
+    }
+
+    .term-header {
+      background: #191919;
+      padding: 8px 16px;
+      border-bottom: 1px solid #333;
+      border-radius: 6px 6px 0 0;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .red { background: #ff5f56; }
+    .yellow { background: #ffbd2e; }
+    .green { background: #27c93f; }
+    .title { margin-left: 12px; font-size: 12px; color: #888; }
+
+    .term-body {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      font-size: 14px;
+      line-height: 1.6;
+      scrollbar-width: thin;
+      scrollbar-color: #444 transparent;
+    }
+    .term-body::-webkit-scrollbar { width: 8px; }
+    .term-body::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+
+    /* === TYPOGRAPHY & COLORS === */
+    .prompt { color: var(--term-green); font-weight: 600; margin-right: 8px; }
+    .path { color: var(--term-blue); }
+    .cmd { color: var(--term-white); }
+    .arg { color: var(--term-yellow); }
+    .flag { color: var(--term-gray); }
+    
+    .log-info { color: var(--term-white); }
+    .log-warn { color: var(--term-yellow); }
+    .log-err { color: var(--term-red); }
+    .log-dim { color: var(--term-gray); }
+    
+    .cursor {
+      display: inline-block;
+      width: 9px;
+      height: 1.2em;
+      background: var(--term-gray);
+      animation: blink 1s step-end infinite;
+      vertical-align: middle;
+    }
+
+    .line { margin-bottom: 2px; white-space: pre-wrap; word-break: break-all; }
+    .spacer { height: 16px; }
+
+    /* === COPY OVERLAY === */
+    .copy-overlay {
+      position: absolute;
+      bottom: 30px;
+      right: 30px;
+      z-index: 50;
+      text-align: right;
+    }
+    
+    .install-cmd {
+      background: rgba(0,0,0,0.9);
+      border: 1px solid var(--term-green);
+      color: var(--term-green);
+      padding: 12px 20px;
+      font-family: 'Fira Code', monospace;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .install-cmd:hover { background: var(--term-green); color: #000; box-shadow: 0 0 15px var(--term-green); }
+    .install-cmd:active { transform: translateY(2px); }
+    .hint { display: block; margin-top: 8px; font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    @keyframes flicker { 0% { opacity: 0.02; } 50% { opacity: 0.05; } 100% { opacity: 0.02; } }
+
+    @media (max-width: 768px) {
+      .terminal-container { width: 100vw; height: 100vh; top: 0; left: 0; transform: none; border: none; border-radius: 0; }
+      .term-header { border-radius: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg"></div>
+  <div class="crt-scanlines"></div>
+  <div class="crt-flicker"></div>
+
+  <div class="terminal-container">
+    <div class="term-header">
+      <div class="dot red"></div>
+      <div class="dot yellow"></div>
+      <div class="dot green"></div>
+      <div class="title">gilfoyle@anton — -zsh — 80x24</div>
+    </div>
+    <div class="term-body" id="console">
+      <!-- Session injection -->
+    </div>
+  </div>
+
+  <div class="copy-overlay">
+    <button class="install-cmd" onclick="copy()">$ npx skills add axiomhq/gilfoyle</button>
+    <span class="hint">Click to copy install command</span>
+  </div>
+
+  <script>
+    const term = document.getElementById('console');
+    
+    // Simulating delay
+    const delay = ms => new Promise(res => setTimeout(res, ms));
+    
+    // Helper to create elements
+    const ln = (html, classes = "") => {
+      const div = document.createElement('div');
+      div.className = 'line ' + classes;
+      div.innerHTML = html;
+      term.appendChild(div);
+      term.scrollTop = term.scrollHeight;
+      return div;
+    };
+
+    // Typing effect
+    async function type(text, speed = 30) {
+      const div = ln('', 'cmd-line');
+      div.innerHTML = '<span class="prompt">➜</span> <span class="path">~</span> ';
+      const span = document.createElement('span');
+      span.className = 'cmd';
+      div.appendChild(span);
+      
+      // Append cursor
+      const cursor = document.createElement('span');
+      cursor.className = 'cursor';
+      div.appendChild(cursor);
+
+      for (let char of text) {
+        span.textContent += char;
+        term.scrollTop = term.scrollHeight;
+        await delay(Math.random() * speed + 20);
+      }
+      
+      div.removeChild(cursor);
+      return div;
+    }
+
+    const scenario = async () => {
+      // Boot
+      await delay(500);
+      ln('<span class="log-dim">Last login: Sun Jan 25 14:12:01 on ttys001</span>');
+      await delay(800);
+
+      // 1. Check Alerts
+      await type('scripts/grafana-alerts prod firing');
+      await delay(400);
+      ln('<span class="log-info">checking alert rules in [prod]...</span>');
+      await delay(600);
+      ln('NAME                            | STATE    | SEVERITY', 'log-dim');
+      ln('--------------------------------+----------+---------', 'log-dim');
+      ln('API_HighErrorRate               | <span class="log-err">firing</span>   | critical');
+      ln('DB_ConnectionPool_Saturation    | <span class="log-warn">pending</span>  | warning');
+      ln('<span class="log-dim">1 active alert(s) found.</span>');
+      ln('', 'spacer');
+
+      // 2. Query Logs (Axiom)
+      await delay(800);
+      await type(`scripts/axiom-query prod "['huli-logs'] | where status >= 500 | summarize count() by service"`);
+      await delay(600);
+      ln('<span class="log-info">running APL query against dataset [huli-logs]...</span>');
+      await delay(1200);
+      ln('Query ID: <span class="log-dim">Main_3a2b1c</span> | Time: 45ms', 'log-dim');
+      ln('service           | count_', 'log-info');
+      ln('------------------+-------', 'log-dim');
+      ln('middle-out-api    | 14,203');
+      ln('auth-service      | 12');
+      ln('frontend          | 4');
+      ln('', 'spacer');
+      
+      // 3. Comment
+      await type('echo "Classic. Dinesh broke the compression algorithm again."');
+      await delay(200);
+      ln('Classic. Dinesh broke the compression algorithm again.');
+      ln('', 'spacer');
+
+      // 4. Profiling (Pyroscope)
+      await delay(600);
+      await type('scripts/pyroscope-diff prod middle-out-api --base "1h ago" --target "now"');
+      await delay(800);
+      ln('<span class="log-info">fetching profiles for [middle-out-api]...</span>');
+      ln('<span class="log-info">comparing baselines...</span>');
+      await delay(1500);
+      ln('DIFF REPORT', 'log-info');
+      ln('--------------------------------------------', 'log-dim');
+      ln('+ <span class="log-err">runtime.memmove</span> (35% increase)');
+      ln('+ <span class="log-err">pkg/compression.OptimalTipToTip</span> (120% increase)');
+      ln('- net/http.readRequest (10% decrease)');
+      ln('', 'spacer');
+      
+      // 5. Root Cause
+      await type('echo "Memory leak in the new optimal tip-to-tip calculation. Shocking."');
+      await delay(200);
+      ln('Memory leak in the new optimal tip-to-tip calculation. Shocking.');
+      ln('', 'spacer');
+
+      // 6. Fix (Kubectl)
+      await delay(500);
+      await type('kubectl rollout undo deployment/middle-out-api -n prod');
+      await delay(800);
+      ln('deployment.apps/middle-out-api rolled back');
+      ln('', 'spacer');
+
+      // 7. Verify
+      await delay(600);
+      await type('scripts/grafana-query prod prometheus "rate(http_requests_total{status=\'500\'}[1m])"');
+      await delay(1000);
+      ln('<span class="log-info">querying prometheus...</span>');
+      ln('0.00', 'log-info');
+      ln('', 'spacer');
+
+      // 8. Slack
+      await delay(500);
+      await type('scripts/slack work chat.postMessage channel=incidents text="Fixed. You\\'re welcome."');
+      await delay(600);
+      ln('<span class="log-dim">ok: true</span>');
+      ln('', 'spacer');
+
+      // 9. Reset
+      await delay(2000);
+      ln('<span class="prompt">➜</span> <span class="path">~</span> <span class="cursor"></span>');
+    };
+
+    scenario();
+
+    function copy() {
+      navigator.clipboard.writeText('npx skills add axiomhq/gilfoyle');
+      const btn = document.querySelector('.install-cmd');
+      const original = btn.innerText;
+      btn.innerText = 'COPIED';
+      btn.style.background = '#50fa7b';
+      btn.style.color = '#000';
+      setTimeout(() => {
+        btn.innerText = original;
+        btn.style.background = '';
+        btn.style.color = '';
+      }, 2000);
+    }
+  </script>
+</body>
+</html>

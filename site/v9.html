@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GILFOYLE // AXIOM</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@300;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg: #050505;
+      
+      /* Palette */
+      --c-text: #e0e0e0;
+      --c-dim: #555;
+      --c-cmd: #50fa7b;    /* Executables */
+      --c-arg: #8be9fd;    /* Arguments */
+      --c-flag: #ff79c6;   /* Flags */
+      --c-str: #f1fa8c;    /* Strings */
+      --c-num: #bd93f9;    /* Numbers */
+      --c-err: #ff5555;    /* Errors */
+      --c-success: #50fa7b;
+      --c-prompt: #666;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      background: var(--bg);
+      color: var(--c-text);
+      font-family: 'Space Grotesk', sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* === OPTIMIZED LAYERS === */
+    .layer {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      will-change: transform;
+    }
+
+    .hero-bg {
+      background: url('../assets/hero.png') no-repeat center center;
+      background-size: cover;
+      z-index: 0;
+      /* Increased brightness/contrast to pop the overlay text */
+      filter: grayscale(100%) contrast(140%) brightness(0.4);
+    }
+    
+    .vignette {
+      background: radial-gradient(circle, transparent 30%, #000 100%);
+      z-index: 1;
+    }
+
+    .scanlines {
+      background: linear-gradient(rgba(0,0,0,0) 50%, rgba(0,0,0,0.1) 50%);
+      background-size: 100% 4px;
+      z-index: 2;
+      opacity: 0.3;
+    }
+
+    /* === LAYOUT === */
+    .wrapper {
+      position: relative;
+      z-index: 10;
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      padding: 0 4rem;
+      align-items: center;
+      gap: 4rem;
+    }
+
+    /* LEFT PANEL */
+    .left-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    h1 {
+      font-family: 'Inter', sans-serif;
+      font-size: 8rem;
+      font-weight: 900;
+      line-height: 0.8;
+      letter-spacing: -0.06em;
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+      color: #fff;
+      /* Restored opacity and added text-shadow for volume */
+      opacity: 1; 
+      mix-blend-mode: overlay;
+      text-shadow: 0 0 30px rgba(255,255,255,0.1);
+      margin-left: -0.05em; 
+    }
+
+    .manifesto {
+      max-width: 550px;
+      font-size: 1.25rem;
+      line-height: 1.5;
+      color: #ccc;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    }
+    .manifesto p { margin-bottom: 1.5rem; }
+    .manifesto strong { color: #fff; font-weight: 700; }
+
+    .cta {
+      margin-top: 2rem;
+      background: #fff;
+      color: #000;
+      padding: 1rem 2rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 1rem;
+      text-transform: uppercase;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .cta:hover { transform: translateY(-2px); background: var(--c-cmd); }
+
+    /* RIGHT PANEL - TERMINAL */
+    .right-panel {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .terminal {
+      width: 100%;
+      max-width: 850px;
+      background: rgba(10, 10, 10, 0.98);
+      border: 1px solid #333;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.8);
+      display: flex;
+      flex-direction: column;
+      height: 650px;
+    }
+    
+    .terminal-header {
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      color: #555;
+      border-bottom: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      background: #080808;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .term-body {
+      padding: 1.5rem;
+      flex: 1;
+      overflow-y: auto;
+      color: var(--c-text);
+      will-change: scroll-position;
+    }
+    .term-body::-webkit-scrollbar { width: 6px; }
+    .term-body::-webkit-scrollbar-track { background: transparent; }
+    .term-body::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+    /* LOG ROWS */
+    .log-row { 
+      margin-bottom: 0.4rem; 
+      line-height: 1.5; 
+      word-break: break-all;
+      padding: 0.2rem 0;
+    }
+
+    /* USER MESSAGE STYLING */
+    .user-row {
+      background: rgba(255, 255, 255, 0.03);
+      border-left: 2px solid #50fa7b;
+      margin: 1rem 0;
+      padding: 0.75rem 1rem;
+      border-radius: 0 4px 4px 0;
+    }
+
+    /* SYNTAX */
+    .cmd     { color: var(--c-cmd); font-weight: 600; }
+    .arg     { color: var(--c-arg); }
+    .flag    { color: var(--c-flag); }
+    .str     { color: var(--c-str); }
+    .num     { color: var(--c-num); }
+    .dim     { color: var(--c-dim); }
+    .err     { color: var(--c-err); }
+    .success { color: var(--c-success); }
+    
+    /* PROMPTS */
+    .user-prompt  { color: var(--c-cmd); margin-right: 0.5rem; user-select: none; font-weight: bold; }
+    .agent-prompt { color: var(--c-flag); margin-right: 0.5rem; user-select: none; font-weight: bold; }
+
+    /* INPUT LINE */
+    .input-wrapper {
+      padding: 0 1.5rem 1.5rem 1.5rem;
+    }
+    .input-line { display: flex; color: #fff; }
+    .cursor { 
+      display: inline-block; width: 8px; height: 1.2em; 
+      background: var(--c-cmd); margin-left: 2px; 
+      animation: blink 1s step-end infinite; 
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    @media (max-width: 1100px) {
+      .wrapper { grid-template-columns: 1fr; padding: 2rem; text-align: center; gap: 2rem; }
+      h1 { font-size: 5rem; }
+      .manifesto { margin: 0 auto; }
+      .terminal { height: 400px; }
+      .left-panel { align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="layer hero-bg"></div>
+  <div class="layer vignette"></div>
+  <div class="layer scanlines"></div>
+
+  <div class="wrapper">
+    <div class="left-panel">
+      <h1>GILFOYLE</h1>
+      <div class="manifesto">
+        <p>
+          An SRE agent that does what you can't. Queries your observability stack. Finds root causes. Doesn't panic. Doesn't guess. Doesn't care about your feelings.
+        </p>
+        <p><strong>You're welcome.</strong></p>
+      </div>
+      
+      <div>
+        <button class="cta" onclick="copy()">$ npx skills add axiomhq/gilfoyle</button>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="terminal">
+        <div class="terminal-header">
+          <span>GILFOYLE_AGENT // v1.0.4</span>
+          <span>SON_OF_ANTON: ONLINE</span>
+        </div>
+        <div class="term-body" id="term"></div>
+        <div class="input-wrapper">
+            <div class="input-line">
+            <span class="user-prompt">></span><span id="input"></span><span class="cursor"></span>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const term = document.getElementById('term');
+    const input = document.getElementById('input');
+    
+    // HELPERS
+    const h = (t, c) => `<span class="${c}">${t}</span>`;
+    
+    const scenario = [
+      // USER INPUT
+      { text: "huli-platform is throwing 500s. investigate.", type: "user" },
+      
+      // AGENT THOUGHT
+      { text: `Acknowledged. Investigating ${h('[huli-platform]', 'arg')}. Don't touch anything.`, type: "agent" },
+      { text: `Running ${h("'grafana-alerts'", 'dim')} to check status...`, type: "dim" },
+      
+      // AGENT COMMAND
+      { text: `${h('scripts/grafana-alerts', 'cmd')} ${h('prod', 'arg')} ${h('firing', 'arg')}`, type: "exec" },
+      
+      // OUTPUT
+      { text: "--------------------------------------------------", type: "dim" },
+      { text: "ALERT NAME           | SEVERITY | STATE", type: "dim" },
+      { text: "--------------------------------------------------", type: "dim" },
+      { text: `HighErrorRate        | ${h('critical', 'err')} | ${h('firing', 'err')}`, type: "out" },
+      { text: `LatencyDegradation   | ${h('warning', 'num')}  | ${h('firing', 'err')}`, type: "out" },
+      { text: "--------------------------------------------------", type: "dim" },
+      { text: "", type: "gap" },
+      
+      // AGENT THOUGHT
+      { text: "Hypothesis: Config change in recent deploy. Verifying...", type: "agent" },
+      { text: `Running APL query via ${h("'axiom-query'", 'dim')}...`, type: "dim" },
+      
+      // AGENT COMMAND
+      { text: `${h('scripts/axiom-query', 'cmd')} ${h('prod', 'arg')} ${h(`"['huli-logs'] | where service == 'middle-out-api' | where status >= 500 | take 5"`, 'str')}`, type: "exec" },
+      
+      // OUTPUT
+      { text: `Query result: ${h('842', 'num')} errors in last 10m.`, type: "out" },
+      { text: `Error sample: "${h('Panic:', 'err')} Weissman Score calculation overflow in ${h('optimal_tip_to_tip_efficiency()', 'arg')}"`, type: "out" },
+      { text: "", type: "gap" },
+      
+      // AGENT THOUGHT
+      { text: "Profiling code with Pyroscope...", type: "agent" },
+      
+      // AGENT COMMAND
+      { text: `${h('scripts/pyroscope-flamegraph', 'cmd')} ${h('prod', 'arg')} ${h('middle-out-api', 'arg')} ${h('--range', 'flag')} ${h('10m', 'num')}`, type: "exec" },
+      
+      // OUTPUT
+      { text: `Deployment: ${h('prod', 'dim')}`, type: "dim" },
+      { text: `Service: ${h('middle-out-api', 'dim')}`, type: "dim" },
+      { text: `Total samples: ${h('1,402,102', 'num')}`, type: "out" },
+      { text: "Top functions:", type: "out" },
+      { text: `  runtime.scanobject: ${h('12%', 'num')}`, type: "dim" },
+      { text: `  main.optimal_tip_to_tip_efficiency: ${h('45%', 'num')} ${h('(Anomaly detected)', 'err')}`, type: "out" },
+      { text: "", type: "gap" },
+
+      // USER INPUT
+      { text: "what's the impact?", type: "user" },
+      
+      // AGENT THOUGHT
+      { text: "Calculating impact...", type: "agent" },
+      
+      // AGENT COMMAND
+      { text: `${h('scripts/axiom-query', 'cmd')} ${h('prod', 'arg')} ${h(`"['huli-logs'] | where status >= 500 | summarize spotlight(_time > ago(10m), geo.country, device.os)"`, 'str')}`, type: "exec" },
+      
+      // OUTPUT
+      { text: `Affected users: ${h('12,403', 'num')}`, type: "out" },
+      { text: `Revenue at risk: ${h('$42,000/hr', 'err')} ${h('(assuming you actually make money)', 'dim')}`, type: "out" },
+      { text: `Primary cohort: Mobile users on ${h('HuliChat v4.0', 'str')}`, type: "out" },
+      { text: "", type: "gap" },
+      
+      // USER INPUT
+      { text: "fix it", type: "user" },
+      
+      // AGENT THOUGHT
+      { text: "Updating kubernetes deployment to previous revision...", type: "agent" },
+      
+      // AGENT COMMAND
+      { text: `${h('kubectl', 'cmd')} ${h('rollout', 'arg')} ${h('undo', 'arg')} ${h('deployment/middle-out-api', 'arg')}`, type: "exec" },
+      
+      // OUTPUT
+      { text: `deployment.apps/middle-out-api ${h('rolled back', 'success')}`, type: "out" },
+      { text: "Verifying rollback...", type: "dim" },
+      
+      // AGENT COMMAND
+      { text: `${h('scripts/grafana-query', 'cmd')} ${h('prod', 'arg')} ${h('prometheus', 'arg')} ${h(`"rate(http_requests_total{status='500'}[1m])"`, 'str')}`, type: "exec" },
+      
+      // OUTPUT
+      { text: `Error rate dropped to ${h('0.00%', 'success')}.`, type: "out" },
+      { text: `Latency stabilizing at ${h('45ms', 'success')}.`, type: "out" },
+      { text: `Incident resolved. Tell ${h('Dinesh', 'arg')} to learn how HTTP works.`, type: "out" },
+      { text: "You're welcome.", type: "out" }
+    ];
+
+    let step = 0;
+    
+    async function typeWriter(container, html, speed = 10) {
+       if (html.indexOf('<') === -1) {
+          const txt = html;
+          for(let i=0; i<txt.length; i++) {
+             container.textContent += txt[i];
+             if(i % 3 === 0) term.scrollTop = term.scrollHeight;
+             await new Promise(r => setTimeout(r, speed));
+          }
+          return;
+       }
+
+       const temp = document.createElement('div');
+       temp.innerHTML = html;
+       
+       for (let node of Array.from(temp.childNodes)) {
+          if (node.nodeType === Node.TEXT_NODE) {
+             const txt = node.textContent;
+             for(let i=0; i<txt.length; i++) {
+                container.appendChild(document.createTextNode(txt[i]));
+                if(i % 3 === 0) term.scrollTop = term.scrollHeight;
+                await new Promise(r => setTimeout(r, speed));
+             }
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+             const span = document.createElement(node.tagName);
+             for(let attr of node.attributes) span.setAttribute(attr.name, attr.value);
+             container.appendChild(span);
+             const innerTxt = node.textContent;
+             for(let i=0; i<innerTxt.length; i++) {
+                span.textContent += innerTxt[i];
+                if(i % 3 === 0) term.scrollTop = term.scrollHeight;
+                await new Promise(r => setTimeout(r, speed));
+             }
+          }
+       }
+    }
+
+    async function run() {
+      if (step >= scenario.length) return;
+      const s = scenario[step];
+
+      if (s.type === "user") {
+        for (let i = 0; i < s.text.length; i++) {
+          input.textContent += s.text[i];
+          await new Promise(r => setTimeout(r, 40));
+        }
+        await new Promise(r => setTimeout(r, 300));
+        
+        const row = document.createElement('div');
+        row.className = 'log-row user-row';
+        row.innerHTML = `<span class="user-prompt">></span><span class="white">${s.text}</span>`;
+        term.appendChild(row);
+        term.scrollTop = term.scrollHeight;
+        input.textContent = '';
+        step++;
+        run();
+        
+      } 
+      else if (s.type === "gap") {
+        term.appendChild(document.createElement('br'));
+        step++;
+        run();
+      } 
+      else {
+        await new Promise(r => setTimeout(r, 200));
+        
+        const row = document.createElement('div');
+        row.className = 'log-row';
+        
+        if (s.type === 'exec') {
+           const p = document.createElement('span');
+           p.className = 'agent-prompt';
+           p.textContent = '➜';
+           row.appendChild(p);
+        }
+        
+        term.appendChild(row);
+        const speed = (s.type === 'exec' || s.type === 'dim') ? 2 : 10;
+        await typeWriter(row, s.text, speed);
+        
+        step++;
+        run();
+      }
+    }
+
+    setTimeout(run, 800);
+
+    function copy() {
+      navigator.clipboard.writeText('npx skills add axiomhq/gilfoyle');
+      const b = document.querySelector('.cta');
+      const orig = b.innerText;
+      b.innerText = 'COPIED';
+      setTimeout(() => b.innerText = orig, 2000);
+    }
+  </script>
+</body>
+</html>

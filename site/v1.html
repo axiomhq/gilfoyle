@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gilfoyle // Automated Competence</title>
+  <meta name="description" content="SRE agent. Hypothesis-driven. Brutally effective." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #050505;
+      --bg-panel: #0a0a0a;
+      --fg: #e5e5e5;
+      --fg-dim: #666;
+      --accent: #00ff41; /* Classic Terminal Green */
+      --accent-dim: rgba(0, 255, 65, 0.1);
+      --error: #ff3333;
+      --warn: #ffb000;
+      --highlight: #ffffff;
+      --border: #222;
+      
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-display: 'Space Grotesk', sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow-x: hidden;
+      selection-background-color: var(--accent);
+      selection-color: var(--bg);
+    }
+
+    ::selection { background: var(--accent); color: var(--bg); }
+
+    a { color: inherit; text-decoration: none; transition: color 0.2s; }
+    a:hover { color: var(--accent); }
+
+    /* LAYOUT UTILS */
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+    .grid { display: grid; gap: 2rem; }
+    .flex { display: flex; gap: 1rem; }
+    .flex-col { flex-direction: column; }
+    .center { align-items: center; justify-content: center; }
+    .mono { font-family: var(--font-mono); }
+    .display { font-family: var(--font-display); }
+
+    /* TYPOGRAPHY */
+    h1, h2, h3 { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; letter-spacing: -0.02em; }
+    h1 { font-size: clamp(3rem, 8vw, 6rem); line-height: 0.9; color: var(--highlight); }
+    h2 { font-size: 2rem; color: var(--fg); margin-bottom: 1rem; border-left: 2px solid var(--accent); padding-left: 1rem; }
+    p { color: var(--fg-dim); max-width: 60ch; }
+    
+    .accent { color: var(--accent); }
+    .glitch { position: relative; }
+    
+    /* HERO SECTION */
+    header {
+      min-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      background: radial-gradient(circle at 50% 50%, #111 0%, #050505 70%);
+    }
+
+    .hero-content { z-index: 2; position: relative; }
+    
+    .hero-eyebrow {
+      font-size: 0.875rem;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .hero-eyebrow::before { content: ''; width: 8px; height: 8px; background: var(--accent); display: inline-block; animation: blink 1s step-end infinite; }
+
+    .hero-actions { margin-top: 3rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg);
+      padding: 1rem 2rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+      border: 1px solid var(--accent);
+    }
+    .btn-primary:hover { background: transparent; color: var(--accent); }
+
+    .btn-ghost {
+      border: 1px solid var(--border);
+      padding: 1rem 2rem;
+      color: var(--fg-dim);
+    }
+    .btn-ghost:hover { border-color: var(--fg); color: var(--fg); }
+
+    .code-block {
+      background: #000;
+      border: 1px solid var(--border);
+      padding: 0.5rem 1rem;
+      font-family: var(--font-mono);
+      color: var(--fg-dim);
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .code-block code { color: var(--accent); }
+
+    /* TERMINAL */
+    .terminal-window {
+      margin-top: 4rem;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      overflow: hidden;
+      max-width: 900px;
+    }
+    
+    .terminal-bar {
+      background: #111;
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid #222;
+      display: flex;
+      gap: 0.5rem;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.r { background: #333; }
+    .dot.y { background: #333; }
+    .dot.g { background: #333; }
+
+    .terminal-content { padding: 1.5rem; min-height: 300px; }
+    .line { margin-bottom: 0.5rem; display: flex; gap: 1ch; }
+    .prompt { color: #666; user-select: none; }
+    .cmd { color: var(--fg); }
+    .out { color: #888; white-space: pre-wrap; }
+    .out.success { color: var(--accent); }
+    .out.error { color: var(--error); }
+    .out.warn { color: var(--warn); }
+    
+    /* SECTIONS */
+    section { padding: 6rem 0; border-bottom: 1px solid var(--border); }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+    
+    .feature-card {
+      background: var(--bg);
+      padding: 2rem;
+      transition: background 0.2s;
+    }
+    .feature-card:hover { background: var(--bg-panel); }
+    .feature-card h3 { color: var(--highlight); margin-bottom: 0.5rem; font-family: var(--font-mono); font-size: 1.1rem; }
+    .feature-card p { font-size: 0.9rem; }
+
+    /* STATS / MEMORY */
+    .memory-viz {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      align-items: center;
+    }
+    .memory-code {
+      background: #080808;
+      padding: 1.5rem;
+      border-left: 1px solid var(--accent);
+      color: var(--fg-dim);
+      font-size: 0.8rem;
+    }
+    .hl-key { color: var(--fg); }
+    .hl-str { color: var(--accent); }
+    .hl-num { color: var(--warn); }
+
+    /* FOOTER */
+    footer { padding: 4rem 0; text-align: center; color: var(--fg-dim); font-size: 0.8rem; }
+    
+    @keyframes blink { 50% { opacity: 0; } }
+    
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      h1 { font-size: 3rem; }
+      .memory-viz { grid-template-columns: 1fr; }
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.25rem 0.5rem;
+      background: rgba(255, 51, 51, 0.1);
+      border: 1px solid var(--error);
+      color: var(--error);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="container">
+    <div class="hero-content">
+      <div class="hero-eyebrow">SYSTEM STATUS: DEGRADED (HUMAN ERROR DETECTED)</div>
+      <h1>Automated<br><span class="accent">Competence.</span></h1>
+      <p style="margin-top: 2rem; font-size: 1.2rem; color: var(--fg);">
+        An SRE agent that does what you can't. Queries your observability stack. Finds root causes. Doesn't panic. Doesn't guess.
+      </p>
+
+      <div class="hero-actions">
+        <div class="code-block">
+          <span>$</span>
+          <code>npx skills add axiomhq/gilfoyle</code>
+        </div>
+        <a href="https://github.com/axiomhq/gilfoyle" class="btn-ghost">View Source</a>
+      </div>
+
+      <div class="terminal-window">
+        <div class="terminal-bar">
+          <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        </div>
+        <div class="terminal-content" id="term">
+          <!-- JS injects lines here -->
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="container">
+    <div class="grid" style="grid-template-columns: 1fr 2fr;">
+      <div>
+        <h2>THE PROBLEM</h2>
+        <p>You guess.</p>
+      </div>
+      <div>
+        <p style="font-size: 1.5rem; color: var(--highlight); line-height: 1.4;">
+          Your intuition is garbage. You see a 500 error and check the database.
+          I see a 500 error and run a spotlight query on 14 dimensions simultaneously.
+          <br><br>
+          We are not the same.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="container">
+    <div class="grid">
+      <div style="text-align: center; margin-bottom: 2rem;">
+        <h2>CORE CAPABILITIES</h2>
+        <p>A suite of tools designed to replace your manual investigation scripts.</p>
+      </div>
+      
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3>AXIOM INTEGRATION</h3>
+          <p>Direct APL execution. Log analysis. Spotlight correlations. Schema discovery. I don't just read logs; I understand them.</p>
+        </div>
+        <div class="feature-card">
+          <h3>GRAFANA SYNC</h3>
+          <p>Alert checking. Metric analysis. Dashboard inspection. If it's firing, I know why. If it's not, I know why it should be.</p>
+        </div>
+        <div class="feature-card">
+          <h3>PYROSCOPE PROFILING</h3>
+          <p>Flamegraph diffing. Performance regression analysis. I find the exact line of code wasting CPU cycles.</p>
+        </div>
+        <div class="feature-card">
+          <h3>MEMORY SYSTEM</h3>
+          <p>I remember everything. Past incidents, successful queries, team knowledge. I learn from your mistakes.</p>
+        </div>
+        <div class="feature-card">
+          <h3>SLACK OPS</h3>
+          <p>I post findings where you can see them. Concise. Evidence-backed. No "I think," only "I found."</p>
+        </div>
+        <div class="feature-card">
+          <h3>ROOT CAUSE</h3>
+          <p>Hypothesis-driven investigation. I formulate a theory, design a query to disprove it, and iterate.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="container">
+    <div class="memory-viz">
+      <div>
+        <h2>I REMEMBER</h2>
+        <p>
+          Most agents are amnesiacs. I maintain a persistent knowledge base of patterns, facts, and incidents. 
+          <br><br>
+          When I solve a problem, I write a pattern signature. Next time, I don't investigate. I just point at the fix.
+        </p>
+      </div>
+      <div class="memory-code">
+<pre>
+<span class="hl-key">"M-2025-10-12_postgres_conn_limit"</span>: {
+  <span class="hl-key">"type"</span>: <span class="hl-str">"pattern"</span>,
+  <span class="hl-key">"confidence"</span>: <span class="hl-num">0.99</span>,
+  <span class="hl-key">"signature"</span>: {
+    <span class="hl-key">"log_contains"</span>: <span class="hl-str">"remaining connection slots are reserved"</span>,
+    <span class="hl-key">"metric_correlation"</span>: <span class="hl-str">"pg_up &lt; 1"</span>
+  },
+  <span class="hl-key">"root_cause"</span>: <span class="hl-str">"Deployment X usually forgets to set max_conns"</span>,
+  <span class="hl-key">"fix"</span>: <span class="hl-str">"kubectl patch deployment orders --patch..."</span>
+}
+</pre>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>"Every incident is a monument to human overconfidence. I collect them."</p>
+      <div style="margin-top: 1rem; display: flex; gap: 1rem; justify-content: center;">
+        <a href="#">GITHUB</a>
+        <a href="#">DOCS</a>
+        <a href="#">AXIOM</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const term = document.getElementById('term');
+    const lines = [
+      { type: 'prompt', text: 'alert received: production latency spike (p99 > 2s)' },
+      { type: 'out', text: 'Initializing investigation protocol...' },
+      { type: 'out', text: 'Hypothesis 1: Database saturation. Checking metrics.' },
+      { type: 'cmd', text: 'grafana-query prod "rate(node_cpu_seconds_total{mode=\"iowait\"}[5m])"' },
+      { type: 'out', text: 'Result: iowait normal (< 2%). Hypothesis rejected.' },
+      { type: 'out', text: 'Hypothesis 2: Upstream dependency failure. Checking logs.' },
+      { type: 'cmd', text: 'axiom-query prod "["logs"] | where status >= 500 | summarize count() by service"' },
+      { type: 'out', text: 'Result: `payment-gateway` 100% error rate. 0 errors elsewhere.' },
+      { type: 'out', text: 'Correlating deployment events...' },
+      { type: 'cmd', text: 'axiom-query prod "["k8s-events"] | where message has \'payment-gateway\'"' },
+      { type: 'out', text: 'Found: Deployment `payment-gateway-v4` rolled out 3 mins before spike.' },
+      { type: 'out', text: 'Root Cause Identified: Bad deploy v4.' },
+      { type: 'out', text: 'Recommendation: Rollback immediately.', class: 'success' },
+      { type: 'prompt', text: '_' }
+    ];
+
+    let lineIdx = 0;
+    
+    function typeWriter(element, text, cb) {
+      let i = 0;
+      const speed = 20; 
+      function step() {
+        if (i < text.length) {
+          element.textContent += text.charAt(i);
+          i++;
+          setTimeout(step, speed);
+        } else if (cb) {
+          cb();
+        }
+      }
+      step();
+    }
+
+    function runTerminal() {
+      if (lineIdx >= lines.length) return;
+      
+      const lineData = lines[lineIdx];
+      const div = document.createElement('div');
+      div.className = 'line';
+      
+      if (lineData.type === 'prompt') {
+        const p = document.createElement('span');
+        p.className = 'prompt';
+        p.textContent = '> ';
+        const c = document.createElement('span');
+        c.className = 'cmd';
+        div.appendChild(p);
+        div.appendChild(c);
+        term.appendChild(div);
+        
+        typeWriter(c, lineData.text, () => {
+          lineIdx++;
+          setTimeout(runTerminal, 800);
+        });
+      } else if (lineData.type === 'cmd') {
+         const p = document.createElement('span');
+        p.className = 'prompt';
+        p.textContent = '$ ';
+        const c = document.createElement('span');
+        c.className = 'cmd';
+        c.style.color = '#888';
+        div.appendChild(p);
+        div.appendChild(c);
+        term.appendChild(div);
+        
+        typeWriter(c, lineData.text, () => {
+          lineIdx++;
+          setTimeout(runTerminal, 300);
+        });
+      } else {
+        const out = document.createElement('span');
+        out.className = `out ${lineData.class || ''}`;
+        out.textContent = lineData.text;
+        div.appendChild(out);
+        term.appendChild(div);
+        lineIdx++;
+        setTimeout(runTerminal, 400);
+      }
+      
+      term.scrollTop = term.scrollHeight;
+    }
+
+    // Start delay
+    setTimeout(runTerminal, 1000);
+  </script>
+</body>
+</html>

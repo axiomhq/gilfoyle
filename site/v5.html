@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gilfoyle</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --accent: #fff;
+      --dim: #666;
+      --bg: #000;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 1. The Hero Image Layer */
+    .hero-bg {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: url('../assets/hero.png') no-repeat center center;
+      background-size: cover;
+      z-index: 0;
+    }
+
+    /* 2. The Gradient Fade (Essential for readability) */
+    .fade-overlay {
+      position: absolute;
+      bottom: 0; left: 0; width: 100%; height: 70%;
+      background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.8) 50%, #000 100%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* 3. Content Layout (Bottom Heavy) */
+    .content-layer {
+      position: relative;
+      z-index: 10;
+      flex: 1;
+      display: flex;
+      align-items: flex-end;
+      padding: 4rem;
+      gap: 4rem;
+    }
+
+    /* LEFT: The Pitch */
+    .brand-section {
+      flex: 1;
+      padding-bottom: 2rem;
+    }
+
+    h1 {
+      font-size: 5rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin-bottom: 1rem;
+    }
+
+    .subtitle {
+      font-size: 1.25rem;
+      color: #aaa;
+      font-weight: 400;
+      margin-bottom: 2.5rem;
+      max-width: 500px;
+      line-height: 1.5;
+    }
+    
+    .install-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .cmd-pill {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+      padding: 1rem 1.5rem;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      color: #fff;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .cmd-pill:hover {
+      background: rgba(255,255,255,0.15);
+      border-color: #fff;
+    }
+    .cmd-pill span { color: #666; margin-right: 0.5rem; }
+
+    /* RIGHT: The Evidence (Terminal) */
+    .terminal-section {
+      width: 450px;
+      margin-bottom: 2rem;
+    }
+
+    .term-window {
+      background: #0a0a0a;
+      border: 1px solid #333;
+      border-radius: 6px;
+      overflow: hidden;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+
+    .term-header {
+      background: #151515;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #333;
+      display: flex;
+      gap: 6px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #333; }
+    .dot.active { background: #444; }
+
+    .term-body {
+      padding: 1.5rem;
+      height: 200px;
+      color: #ccc;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .log { margin-bottom: 0.5rem; opacity: 0; transform: translateY(5px); animation: fadeUp 0.3s forwards; }
+    .log.success { color: #4caf50; }
+    .log.warn { color: #ffc107; }
+    .log.dim { color: #555; }
+    
+    @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
+    /* Responsive */
+    @media (max-width: 1000px) {
+      .content-layer { flex-direction: column; padding: 2rem; }
+      .brand-section { padding-bottom: 0; }
+      h1 { font-size: 3rem; }
+      .terminal-section { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hero-bg"></div>
+  <div class="fade-overlay"></div>
+
+  <div class="content-layer">
+    
+    <div class="brand-section">
+      <h1>GILFOYLE</h1>
+      <p class="subtitle">
+        Your intuition is a statistical error.<br>
+        I trade in absolute data.
+      </p>
+
+      <div class="install-row">
+        <div class="cmd-pill" onclick="navigator.clipboard.writeText('npx skills add axiomhq/gilfoyle')">
+          <span>$</span> npx skills add axiomhq/gilfoyle
+        </div>
+      </div>
+    </div>
+
+    <div class="terminal-section">
+      <div class="term-window">
+        <div class="term-header">
+          <div class="dot active"></div>
+          <div class="dot"></div>
+          <div class="dot"></div>
+        </div>
+        <div class="term-body" id="term">
+          <!-- Logs -->
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const term = document.getElementById('term');
+    const logs = [
+      { text: "detecting_human_error...", class: "dim" },
+      { text: "found: unindexed_query in billing_service", class: "warn" },
+      { text: "trace_id: 84a92-b12", class: "dim" },
+      { text: "latency_impact: +400ms", class: "dim" },
+      { text: "applying_fix: add_index(customer_id)", class: "" },
+      { text: "deploying_migration...", class: "dim" },
+      { text: "incident_resolved", class: "success" },
+      { text: "you_are_welcome", class: "success" }
+    ];
+
+    let i = 0;
+    function cycle() {
+      // Keep only last 5
+      while(term.children.length > 5) term.removeChild(term.firstChild);
+
+      const data = logs[i % logs.length];
+      const div = document.createElement('div');
+      div.className = `log ${data.class}`;
+      div.textContent = `> ${data.text}`;
+      term.appendChild(div);
+      
+      i++;
+      setTimeout(cycle, 1200);
+    }
+    
+    cycle();
+  </script>
+</body>
+</html>

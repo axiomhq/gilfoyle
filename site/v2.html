@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gilfoyle // Automated Competence</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;600&family=Inter:wght@800;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --neon-green: #0aff40;
+      --neon-dim: rgba(10, 255, 64, 0.15);
+      --neon-shadow: 0 0 15px rgba(10, 255, 64, 0.4);
+      --bg-dark: #020202;
+      --glass: rgba(0, 0, 0, 0.8);
+      --border: rgba(10, 255, 64, 0.2);
+      --font-mono: 'Fira Code', monospace;
+      --font-sans: 'Inter', sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: url('../assets/hero.png');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      color: #fff;
+      font-family: var(--font-mono);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Cinematic Overlays */
+    .overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: radial-gradient(circle at center, transparent 20%, rgba(0,0,0,0.4) 100%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .scanlines {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+      background-size: 100% 4px;
+      z-index: 2;
+      pointer-events: none;
+      opacity: 0.3;
+    }
+
+    /* UI Layer */
+    .ui-layer {
+      position: relative;
+      z-index: 10;
+      display: grid;
+      grid-template-columns: 1fr 480px;
+      gap: 2rem;
+      padding: 3rem;
+      min-height: 100vh;
+      align-items: end; /* Ground the UI at the bottom */
+    }
+
+    /* Left: Branding & Tagline */
+    .branding {
+      max-width: 700px;
+      padding-bottom: 2rem;
+    }
+
+    h1 {
+      font-family: var(--font-sans);
+      font-size: clamp(3.5rem, 7vw, 6rem);
+      line-height: 0.85;
+      text-transform: uppercase;
+      letter-spacing: -0.05em;
+      margin-bottom: 1.5rem;
+      filter: drop-shadow(0 0 30px rgba(0,0,0,1));
+    }
+
+    h1 span { display: block; }
+    .highlight { color: var(--neon-green); text-shadow: var(--neon-shadow); }
+    .dim { color: rgba(255,255,255,0.3); }
+
+    .manifesto {
+      background: var(--glass);
+      border-left: 2px solid var(--neon-green);
+      padding: 2rem;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+      margin-bottom: 2rem;
+    }
+
+    .manifesto p {
+      font-size: 1.1rem;
+      line-height: 1.6;
+      color: #ccc;
+      margin-bottom: 1.5rem;
+    }
+    .manifesto .signature {
+      color: var(--neon-green);
+      font-weight: 600;
+      font-style: italic;
+      font-size: 0.9rem;
+    }
+
+    .cta {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .install-box {
+      background: #000;
+      border: 1px solid var(--border);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.9rem;
+    }
+    .install-box code { color: var(--neon-green); }
+    .install-box .prompt { color: #555; user-select: none; }
+
+    /* Right: Terminal */
+    .terminal {
+      background: rgba(5, 5, 5, 0.9);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+      height: 650px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 80px rgba(0,0,0,0.9);
+      margin-bottom: 2rem;
+    }
+
+    .term-header {
+      background: #111;
+      padding: 0.8rem 1.2rem;
+      border-bottom: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.7rem;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .status-ok { color: var(--neon-green); display: flex; align-items: center; gap: 0.5rem; }
+    .status-ok::before { content: ''; width: 6px; height: 6px; background: var(--neon-green); border-radius: 50%; box-shadow: 0 0 8px var(--neon-green); animation: pulse 1.5s infinite; }
+
+    .term-body {
+      flex: 1;
+      padding: 1.5rem;
+      overflow-y: auto;
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+
+    .line { margin-bottom: 0.6rem; display: flex; gap: 1rem; }
+    .line-ts { color: #333; flex-shrink: 0; user-select: none; }
+    .line-content { word-break: break-all; }
+    
+    .text-green { color: var(--neon-green); }
+    .text-dim { color: #555; }
+    .text-warn { color: #ffb000; }
+    .text-err { color: #ff3333; }
+
+    .cursor {
+      display: inline-block;
+      width: 8px;
+      height: 15px;
+      background: var(--neon-green);
+      margin-left: 5px;
+      animation: blink 1s step-end infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } } 
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #222; }
+
+    @media (max-width: 1100px) {
+      .ui-layer { grid-template-columns: 1fr; align-items: center; padding: 2rem; }
+      .terminal { height: 400px; order: -1; }
+      h1 { font-size: 3.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="overlay"></div>
+  <div class="scanlines"></div>
+
+  <div class="ui-layer">
+    
+    <div class="branding">
+      <h1>
+        <span class="dim">Automated</span>
+        <span class="highlight">Competence.</span>
+      </h1>
+
+      <div class="manifesto">
+        <p>
+          I don't look for bugs. I observe their inevitable failure and deconstruct the incompetence that birthed them.
+        </p>
+        <p>
+          While your "AI assistants" are busy hallucinating apologies, I've already mapped your entire trace topology, identified the database deadlock, and prepared the migration script.
+        </p>
+        <div class="signature">You're welcome.</div>
+      </div>
+
+      <div class="cta">
+        <div class="install-box">
+          <span class="prompt">$</span>
+          <code>npx skills add axiomhq/gilfoyle</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="terminal">
+      <div class="term-header">
+        <div class="status-ok">GILFOYLE_MAIN_v9.0.1</div>
+        <div>DATA: AXIOM_PROD // AUTH: ACTIVE</div>
+      </div>
+      <div class="term-body" id="console">
+        <!-- JS Stream -->
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const consoleEl = document.getElementById('console');
+    
+    const logs = [
+      { ts: '14:32:01', text: 'Monitoring signal: checkout-service.latency > 500ms', color: 'text-dim' },
+      { ts: '14:32:01', text: 'Initializing RCA protocol...', color: 'text-green' },
+      { ts: '14:32:02', text: '> axiom-query "[\'traces\'] | summarize p99(duration) by service"', color: '' },
+      { ts: '14:32:03', text: 'Finding: bottleneck detected in auth-provider-v2', color: 'text-warn' },
+      { ts: '14:32:04', text: '> getschema "auth-provider-logs"', color: '' },
+      { ts: '14:32:05', text: 'Scanning for signatures of human error...', color: 'text-dim' },
+      { ts: '14:32:06', text: 'Signature found: bcrypt_work_factor increased from 10 to 14 by "j_developer"', color: 'text-err' },
+      { ts: '14:32:07', text: 'Hypothesis confirmed. CPU saturation is a choice, not an accident.', color: 'text-green' },
+      { ts: '14:32:08', text: 'Generating fix: revert work_factor to 10.', color: 'text-green' },
+      { ts: '14:32:09', text: 'Rollback complete. p99 latency returning to 45ms.', color: 'text-green' },
+      { ts: '14:32:10', text: 'Recording incident to memory/kb/incidents.md...', color: 'text-dim' },
+      { ts: '14:32:11', text: 'Standby. Try not to break anything for the next 5 minutes.', color: 'text-green' }
+    ];
+
+    let i = 0;
+    function streamLogs() {
+      if (i >= logs.length) {
+        const line = document.createElement('div');
+        line.className = 'line';
+        line.innerHTML = `<span class="line-ts">[${new Date().toLocaleTimeString().split(' ')[0]}]</span><span class="line-content">_</span><span class="cursor"></span>`;
+        consoleEl.appendChild(line);
+        return;
+      }
+      
+      const log = logs[i];
+      const line = document.createElement('div');
+      line.className = 'line';
+      line.innerHTML = 
+        `<span class="line-ts">[${log.ts}]</span>
+        <span class="line-content ${log.color}">${log.text}</span>
+      `;
+      consoleEl.appendChild(line);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+      
+      i++;
+      setTimeout(streamLogs, 800 + (Math.random() * 1000));
+    }
+
+    setTimeout(streamLogs, 1500);
+  </script>
+</body>
+</html>
