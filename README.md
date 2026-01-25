@@ -16,10 +16,6 @@ You're welcome.
 ## Installation
 
 ```bash
-# Amp
-amp skill add axiomhq/gilfoyle
-
-# npx
 npx skills add axiomhq/gilfoyle
 ```
 
