@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GILFOYLE_DAEMON // v1.0.4</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@300;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg: #000;
+      --term-green: #33ff00;
+      --err: #ff003c;
+      --accent: #fff;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; cursor: crosshair; }
+    
+    body {
+      background: var(--bg);
+      color: var(--accent);
+      font-family: 'Space Grotesk', sans-serif;
+      overflow: hidden; /* Lock it down */
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* === FULL SCREEN FACE BACKGROUND === */
+    .hero-bg {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: url('../assets/hero.png') no-repeat center center;
+      background-size: cover;
+      z-index: 0;
+      filter: grayscale(100%) contrast(150%) brightness(0.3);
+      transition: filter 0.5s ease;
+    }
+    
+    /* VIGNETTE / OVERLAY */
+    .overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: radial-gradient(circle, transparent 20%, rgba(0,0,0,0.8) 100%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* SCANLINES */
+    .scanlines {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                  linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+      background-size: 100% 3px, 3px 100%;
+      z-index: 100;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    /* === CONTENT WRAPPER === */
+    .wrapper {
+      position: relative;
+      z-index: 10;
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      padding: 4rem;
+      align-items: center;
+    }
+
+    /* LEFT: BRANDING & MANIFESTO */
+    .left-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    h1 {
+      font-family: 'Inter', sans-serif;
+      font-size: 12rem;
+      font-weight: 900;
+      line-height: 0.8;
+      letter-spacing: -0.06em;
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+      opacity: 0.9;
+      mix-blend-mode: overlay;
+    }
+
+    .manifesto {
+      max-width: 500px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.25rem;
+      line-height: 1.4;
+      color: #ccc;
+    }
+    .manifesto strong { color: #fff; font-weight: 700; }
+    
+    .status-line {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--term-green);
+      font-size: 0.9rem;
+      margin-top: 2rem;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .status-line::before {
+      content: ''; display: block; width: 8px; height: 8px; background: var(--term-green); border-radius: 50%;
+      box-shadow: 0 0 10px var(--term-green);
+      animation: blink 1s infinite;
+    }
+
+    /* RIGHT: HUD TERMINAL */
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .terminal {
+      width: 100%;
+      max-width: 500px;
+      background: rgba(0,0,0,0.85);
+      border: 1px solid #222;
+      backdrop-filter: blur(20px);
+      font-family: 'JetBrains Mono', monospace;
+      padding: 2rem;
+      font-size: 0.85rem;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+      position: relative;
+    }
+    
+    .terminal-header {
+      position: absolute;
+      top: 0; left: 0; width: 100%;
+      padding: 0.5rem 1rem;
+      font-size: 0.7rem;
+      color: #444;
+      border-bottom: 1px solid #111;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .term-body {
+      margin-top: 1rem;
+      height: 300px;
+      overflow: hidden;
+      color: #888;
+    }
+    .log-row { margin-bottom: 0.4rem; }
+    .log-row .white { color: #fff; }
+    .log-row .green { color: var(--term-green); }
+    .log-row .red { color: var(--err); }
+
+    .input-line { margin-top: 1rem; color: #fff; }
+    .cursor { display: inline-block; width: 8px; height: 1.2em; background: var(--term-green); vertical-align: bottom; animation: blink 1s infinite; }
+
+    /* INSTALL CTA */
+    .cta {
+      margin-top: 3rem;
+      background: #fff;
+      color: #000;
+      padding: 1.5rem 2.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      border: none;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .cta:hover { transform: scale(1.05); background: var(--term-green); }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    @media (max-width: 1100px) {
+      .wrapper { grid-template-columns: 1fr; padding: 2rem; text-align: center; }
+      h1 { font-size: 6rem; }
+      .manifesto { margin: 0 auto; }
+      .right-panel { align-items: center; margin-top: 4rem; }
+      .status-line { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hero-bg"></div>
+  <div class="overlay"></div>
+  <div class="scanlines"></div>
+
+  <div class="wrapper">
+    
+    <div class="left-panel">
+      <h1>GILFOYLE</h1>
+      <div class="manifesto">
+        <p>
+          I trade in <strong>absolute data</strong>.<br>
+          Your intuition is a statistical error.<br>
+          Your dashboards are hallucinations.<br>
+          I am the <strong>truth</strong>.
+        </p>
+      </div>
+      <div class="status-line">Daemon Status: Active // Axiom Link Established</div>
+      
+      <div style="margin-top: 2rem;">
+        <button class="cta" onclick="copy()">$ npx skills add gilfoyle</button>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="terminal">
+        <div class="terminal-header">
+          <span>GILFOYLE_INIT // TTY1</span>
+          <span>10.0.0.1</span>
+        </div>
+        <div class="term-body" id="term">
+          <!-- JS Population -->
+        </div>
+        <div class="input-line">
+          <span>root@gilfoyle:~# </span><span id="input"></span><span class="cursor"></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const term = document.getElementById('term');
+    const input = document.getElementById('input');
+    
+    const scenario = [
+      { text: "gilfoyle --audit production", type: "cmd" },
+      { text: "Scanning 400 microservices...", type: "log" },
+      { text: "Anomaly detected: EU-WEST-1 latency spike", type: "log" },
+      { text: "Running Spotlight() on service 'auth'...", type: "log" },
+      { text: "FOUND: UNINDEXED QUERY ON 'USER_SESSIONS'", type: "red" },
+      { text: "Correlating with Incident #2024-11", type: "log" },
+      { text: "Match probability: 99.8%", type: "green" },
+      { text: "FIX: Deploy index sessions_user_id_idx", type: "green" },
+      { text: "You're welcome.", type: "white" }
+    ];
+
+    let step = 0;
+    function run() {
+      if (step >= scenario.length) return;
+      const s = scenario[step];
+      
+      if (s.type === "cmd") {
+        let i = 0;
+        const type = setInterval(() => {
+          input.textContent += s.text[i];
+          i++;
+          if (i >= s.text.length) {
+            clearInterval(type);
+            setTimeout(() => {
+              const div = document.createElement('div');
+              div.className = 'log-row';
+              div.innerHTML = `<span style="color:#444">root@gilfoyle:~# </span><span class="white">${s.text}</span>`;
+              term.appendChild(div);
+              input.textContent = '';
+              step++;
+              run();
+            }, 500);
+          }
+        }, 50);
+      } else {
+        setTimeout(() => {
+          const div = document.createElement('div');
+          div.className = 'log-row ' + s.type;
+          div.textContent = `> ${s.text}`;
+          term.appendChild(div);
+          step++;
+          run();
+        }, 800);
+      }
+    }
+
+    setTimeout(run, 1000);
+
+    function copy() {
+      navigator.clipboard.writeText('npx skills add axiomhq/gilfoyle');
+      const b = document.querySelector('.cta');
+      b.textContent = 'COPIED';
+      setTimeout(() => b.textContent = '$ npx skills add gilfoyle', 2000);
+    }
+  </script>
+</body>
+</html>

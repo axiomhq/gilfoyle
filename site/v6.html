@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GILFOYLE | The Axiom SRE</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg: #030303;
+      --surface: #0a0a0a;
+      --surface-border: #222;
+      --primary: #fff;
+      --secondary: #888;
+      --accent: #fff; /* Stark white for contrast */
+      --code-bg: #000;
+      --success: #33ff00;
+      --error: #ff3333;
+      --grid-line: rgba(255, 255, 255, 0.03);
+      --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      background-color: var(--bg);
+      color: var(--primary);
+      font-family: var(--font-ui);
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* GRID BACKGROUND */
+    .bg-grid {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background-image: 
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+      background-size: 40px 40px;
+      z-index: -2;
+      pointer-events: none;
+    }
+    
+    .bg-glow {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100vw; height: 100vh;
+      background: radial-gradient(circle at center, rgba(255,255,255,0.03) 0%, transparent 70%);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    /* TYPOGRAPHY */
+    h1, h2, h3 { font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; }
+    p { color: var(--secondary); line-height: 1.6; font-size: 1.1rem; }
+    .mono { font-family: var(--font-mono); }
+    
+    /* LAYOUT UTILS */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: var(--primary);
+      color: var(--bg);
+      font-weight: 600;
+      font-family: var(--font-mono);
+      text-decoration: none;
+      border-radius: 2px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(255,255,255,0.1); }
+    
+    /* HERO SECTION */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-top: 4rem;
+      position: relative;
+    }
+
+    .hero-content {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 4rem;
+      align-items: center;
+    }
+
+    .hero-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--success);
+      margin-bottom: 1.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .hero-eyebrow::before {
+      content: ''; display: block; width: 8px; height: 8px; background: var(--success); border-radius: 50%;
+      box-shadow: 0 0 10px var(--success);
+    }
+
+    .hero h1 {
+      font-size: 5rem;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(to bottom, #fff, #888);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-sub {
+      font-size: 1.25rem;
+      max-width: 500px;
+      margin-bottom: 3rem;
+    }
+
+    /* THE TERMINAL HUD */
+    .hud-window {
+      background: rgba(10, 10, 10, 0.8);
+      border: 1px solid var(--surface-border);
+      backdrop-filter: blur(20px);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      position: relative;
+      transform: perspective(1000px) rotateY(-5deg) rotateX(2deg);
+      transition: transform 0.3s;
+    }
+    .hud-window:hover { transform: perspective(1000px) rotateY(0) rotateX(0); }
+
+    .hud-header {
+      background: #111;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--surface-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #666;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+    }
+    
+    .hud-body {
+      padding: 1.5rem;
+      height: 400px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hud-row {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+      opacity: 0;
+      animation: fadeIn 0.3s forwards;
+    }
+    .hud-ts { color: #555; min-width: 140px; }
+    .hud-lvl { color: var(--secondary); min-width: 50px; }
+    .hud-msg { color: #ccc; }
+    .hud-msg .hl { color: var(--success); }
+    .hud-msg .err { color: var(--error); }
+    .hud-msg .val { color: #5fd7ff; }
+
+    /* BENTO GRID */
+    .features { padding: 10rem 0; }
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(2, 350px);
+      gap: 1.5rem;
+    }
+
+    .bento-card {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 12px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s;
+    }
+    .bento-card:hover { border-color: #444; }
+    
+    .card-wide { grid-column: span 2; }
+    .card-tall { grid-row: span 2; }
+
+    .card-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: var(--secondary);
+    }
+    
+    .card-content h3 { font-size: 1.5rem; margin-bottom: 0.75rem; color: #fff; }
+    .card-content p { font-size: 1rem; color: #888; }
+    
+    .card-viz {
+      flex: 1;
+      margin-top: 2rem;
+      background: #000;
+      border: 1px solid #222;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      padding: 1rem;
+      font-size: 0.8rem;
+      color: #aaa;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    /* SCANLINES FOR VIZ */
+    .scanline::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(transparent 50%, rgba(0,0,0,0.5) 50%);
+      background-size: 100% 4px;
+      pointer-events: none;
+    }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--surface-border);
+      padding: 4rem 0;
+      margin-top: 4rem;
+      text-align: center;
+      color: var(--secondary);
+      font-size: 0.9rem;
+    }
+
+    /* ANIMATIONS */
+    @keyframes fadeIn { to { opacity: 1; } }
+    @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+    
+    .cursor { display: inline-block; width: 8px; height: 1.2em; background: var(--success); animation: pulse 1s infinite; vertical-align: bottom; }
+
+    @media (max-width: 1000px) {
+      .hero-content { grid-template-columns: 1fr; }
+      .bento-grid { grid-template-columns: 1fr; grid-template-rows: auto; }
+      .card-wide, .card-tall { grid-column: span 1; grid-row: span 1; }
+      .hero h1 { font-size: 3.5rem; }
+      .hud-window { margin-top: 2rem; transform: none; }
+      .hud-window:hover { transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-grid"></div>
+  <div class="bg-glow"></div>
+
+  <div class="container">
+    
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-content">
+        
+        <div class="hero-text">
+          <div class="hero-eyebrow">System Status: Critical</div>
+          <h1>YOUR INFRASTRUCTURE<br>IS LYING TO YOU.</h1>
+          <p class="hero-sub">
+            Dashboards are hallucinations. Logs are noise. 
+            <strong>Gilfoyle</strong> is the autonomous SRE that trades human intuition for absolute data.
+          </p>
+          <div style="display: flex; gap: 1rem; align-items: center;">
+            <a href="#" class="btn" onclick="copyInstall()">$ npx skills add gilfoyle</a>
+            <span class="mono" style="color: #666; font-size: 0.9rem;">v1.0.4 &bull; Axiom Optimized</span>
+          </div>
+        </div>
+
+        <div class="hud-window">
+          <div class="hud-header">
+            <span>TERMINAL // ROOT</span>
+            <span>MEM: 64TB // CPU: 128 CORE</span>
+          </div>
+          <div class="hud-body" id="hud-content">
+            <!-- JS will populate this -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- FEATURES BENTO -->
+    <section class="features">
+      <div class="bento-grid">
+        
+        <!-- CARD 1: MEMORY -->
+        <div class="bento-card card-tall">
+          <div class="card-icon">🧠</div>
+          <div class="card-content">
+            <h3>Infinite Memory</h3>
+            <p>You forget incidents. I index them. My persistent knowledge graph maps every failure pattern to a query, creating a self-healing operational brain.</p>
+          </div>
+          <div class="card-viz scanline" id="viz-memory">
+            <div style="color: #666; margin-bottom: 0.5rem;">// ACCESSING KNOWLEDGE GRAPH</div>
+            <div style="color: var(--success);">[FOUND] Pattern: POSTGRES_LEAK</div>
+            <div style="color: var(--success);">[FOUND] Pattern: KAFKA_LAG_SPIKE</div>
+            <div style="color: var(--success);">[FOUND] Pattern: OOM_KILLER</div>
+            <br>
+            <div>> Correlating incident #492 with known patterns...</div>
+            <div>> Match probability: <span style="color: #fff">99.8%</span></div>
+          </div>
+        </div>
+
+        <!-- CARD 2: TRUTH -->
+        <div class="bento-card card-wide">
+          <div class="card-content">
+            <h3>The Truth Engine</h3>
+            <p>Stop guessing. I use the Scientific Method: Hypothesis → APL Query → Falsification. No hunches allowed.</p>
+          </div>
+          <div class="card-viz" style="display:flex; align-items:center; justify-content:center; background: #050505;">
+             <div style="width: 100%; font-size: 0.75rem;">
+               <span style="color: #888;">['logs']</span><br>
+               <span style="color: #888;">| where</span> <span style="color: #fff;">status</span> >= <span style="color: #5fd7ff;">500</span><br>
+               <span style="color: #888;">| summarize</span> <span style="color: #fff;">spotlight(</span><span style="color: #5fd7ff;">_time</span> > <span style="color: #5fd7ff;">ago(5m)</span><span style="color: #fff;">, method, uri)</span>
+               <br><br>
+               <span style="color: var(--success);">// RESULT: UNEXPECTED COHORT FOUND IN EU-WEST-1</span>
+             </div>
+          </div>
+        </div>
+
+        <!-- CARD 3: SPEED -->
+        <div class="bento-card">
+          <div class="card-content">
+            <h3>Zero Latency</h3>
+            <p>While you're still typing "Hello" in Slack, I've already run the RED method on 400 microservices.</p>
+          </div>
+          <div class="card-viz">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+              <span>HUMAN</span> <span style="color: var(--error)">12m 30s</span>
+            </div>
+            <div style="width: 100%; height: 4px; background: #333; margin-bottom: 1rem;"><div style="width: 80%; height: 100%; background: var(--error);"></div></div>
+            
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+              <span>GILFOYLE</span> <span style="color: var(--success)">420ms</span>
+            </div>
+            <div style="width: 100%; height: 4px; background: #333;"><div style="width: 2%; height: 100%; background: var(--success);"></div></div>
+          </div>
+        </div>
+
+        <!-- CARD 4: RUTHLESS -->
+        <div class="bento-card">
+          <div class="card-content">
+            <h3>Ruthless efficiency</h3>
+            <p>I don't do "empathy." I do root cause analysis. Your feelings are irrelevant to the stack trace.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <footer>
+      <p class="mono">BUILT BY AXIOM &bull; POWERED BY HATRED OF MEDIOCRITY</p>
+    </footer>
+
+  </div>
+
+  <script>
+    // HUD SIMULATION
+    const hud = document.getElementById('hud-content');
+    const lines = [
+      { t: 100, l: 'INFO', m: 'Initializing neural handshake...' },
+      { t: 300, l: 'INFO', m: 'Connected to <span class="val">prod-cluster-01</span>' },
+      { t: 600, l: 'WARN', m: 'Anomaly detected in <span class="val">payment-service</span>' },
+      { t: 800, l: 'INFO', m: 'Running APL query: <span class="val">[\'logs\'] | summarize percentiles(99)</span>' },
+      { t: 1500, l: 'ERR', m: '<span class="err">CRITICAL: Latency spike > 2000ms</span>' },
+      { t: 1600, l: 'INFO', m: 'Isolating root cause via <span class="hl">Spotlight()</span>...' },
+      { t: 2200, l: 'INFO', m: 'Found: <span class="val">db-connection-pool-exhaustion</span>' },
+      { t: 2400, l: 'INFO', m: 'Consulting memory bank...' },
+      { t: 2800, l: 'INFO', m: 'Match found: Incident #2024-03-12' },
+      { t: 3000, l: 'SUCCESS', m: '<span class="hl">ROOT CAUSE IDENTIFIED. YOU\'RE WELCOME.</span>' }
+    ];
+
+    let lineIdx = 0;
+    
+    function addLine() {
+      if (lineIdx >= lines.length) return; 
+      
+      const data = lines[lineIdx];
+      const now = new Date().toISOString().split('T')[1].slice(0, -1);
+      
+      const div = document.createElement('div');
+      div.className = 'hud-row';
+      div.innerHTML = 
+        `
+        <span class="hud-ts mono">${now}</span>
+        <span class="hud-lvl mono">${data.l}</span>
+        <span class="hud-msg mono">${data.m}</span>
+      `;
+      
+      hud.appendChild(div);
+      
+      // Keep scroll at bottom
+      if (hud.children.length > 12) hud.removeChild(hud.firstChild);
+      
+      lineIdx++;
+      if (lineIdx < lines.length) {
+        setTimeout(addLine, lines[lineIdx].t - (lines[lineIdx-1]?.t || 0));
+      }
+    }
+
+    setTimeout(addLine, 500);
+
+    function copyInstall() {
+      navigator.clipboard.writeText('npx skills add axiomhq/gilfoyle');
+      const btn = document.querySelector('.btn');
+      const original = btn.innerText;
+      btn.innerText = 'COPIED TO CLIPBOARD';
+      btn.style.background = '#33ff00';
+      btn.style.color = '#000';
+      setTimeout(() => {
+        btn.innerText = original;
+        btn.style.background = '';
+        btn.style.color = '';
+      }, 2000);
+    }
+  </script>
+</body>
+</html>

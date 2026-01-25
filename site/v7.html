@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GILFOYLE | The Axiom SRE</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg: #000;
+      --text: #fff;
+      --dim: #666;
+      --accent: #fff;
+      --success: #33ff00;
+      --error: #ff3333;
+      --panel: rgba(20, 20, 20, 0.6);
+      --border: rgba(255, 255, 255, 0.1);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* 1. THE FACE (Background) */
+    .gilfoyle-bg {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      z-index: -1;
+      background: url('../assets/hero.png') no-repeat center center;
+      background-size: cover;
+      filter: grayscale(100%) contrast(120%) brightness(0.4);
+      /* Make him fade into the black at the bottom */
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 100%);
+      -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 100%);
+    }
+
+    /* 2. THE GRAIN (Texture) */
+    .noise-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      z-index: -1;
+      background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    /* LAYOUT */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 2rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* HERO */
+    .hero {
+      height: 90vh; /* Not full 100 to show scroll affordance */
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding-bottom: 6rem;
+    }
+
+    h1 {
+      font-size: 8rem;
+      font-weight: 900;
+      line-height: 0.85;
+      letter-spacing: -0.04em;
+      margin-bottom: 2rem;
+      text-transform: uppercase;
+      /* "Knockout" text effect can be cool, but plain white on dark is cleaner here */
+      color: #fff; 
+      mix-blend-mode: overlay; /* Blends with the face slightly */
+      opacity: 0.9;
+    }
+
+    .tagline {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.2rem;
+      color: var(--success);
+      margin-bottom: 3rem;
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+    .tagline::before {
+      content: ''; display: block; width: 10px; height: 10px; background: var(--success); 
+      box-shadow: 0 0 20px var(--success);
+    }
+
+    .install-bar {
+      display: inline-flex;
+      background: rgba(0,0,0,0.8);
+      border: 1px solid var(--border);
+      padding: 1rem 1.5rem;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      backdrop-filter: blur(10px);
+      gap: 1rem;
+      align-items: center;
+      transition: border-color 0.2s;
+      cursor: pointer;
+    }
+    .install-bar:hover { border-color: var(--success); }
+    .cmd { color: #fff; }
+    .copy-icon { color: #666; font-size: 0.8rem; text-transform: uppercase; }
+
+    /* HUD / TERMINAL WIDGET */
+    .monitor-wrapper {
+      position: absolute;
+      right: 2rem;
+      bottom: 6rem;
+      width: 450px;
+    }
+    
+    .monitor {
+      background: rgba(10, 10, 10, 0.9);
+      border: 1px solid #333;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      overflow: hidden;
+      box-shadow: 0 0 40px rgba(0,0,0,0.8);
+    }
+    
+    .monitor-header {
+      background: #1a1a1a;
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid #333;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #333; }
+    .dot.r { background: #ff5f56; }
+    .dot.y { background: #ffbd2e; }
+    .dot.g { background: #27c93f; }
+
+    .monitor-body {
+      padding: 1.5rem;
+      min-height: 250px;
+      color: #aaa;
+    }
+    .log-row { margin-bottom: 0.5rem; display: flex; gap: 0.5rem; opacity: 0; animation: typeIn 0.2s forwards; }
+    .ts { color: #444; min-width: 80px; }
+    .white { color: #fff; }
+    .green { color: var(--success); }
+    .red { color: var(--error); }
+    
+    @keyframes typeIn { to { opacity: 1; } }
+
+    /* CONTENT GRID */
+    .grid-section {
+      background: #050505;
+      position: relative;
+      z-index: 2; /* Sit on top of the fixed face */
+      padding: 8rem 0;
+      border-top: 1px solid #222;
+    }
+
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2rem;
+    }
+
+    .card {
+      background: linear-gradient(180deg, #111, #0a0a0a);
+      border: 1px solid #222;
+      padding: 3rem;
+      border-radius: 8px;
+    }
+    
+    .card h3 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: #fff;
+    }
+    
+    .card p {
+      color: #888;
+      font-size: 1.1rem;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+
+    .code-snippet {
+      background: #000;
+      padding: 1.5rem;
+      border-radius: 4px;
+      border: 1px solid #222;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      color: #ccc;
+      overflow-x: auto;
+    }
+    .k { color: #cc7832; } /* keyword */
+    .f { color: #ffc66d; } /* function */
+    .s { color: #6a8759; } /* string */
+    .n { color: #6897bb; } /* number */
+
+    @media (max-width: 1000px) {
+      h1 { font-size: 5rem; }
+      .monitor-wrapper { position: relative; width: 100%; right: auto; bottom: auto; margin-top: 2rem; }
+      .bento { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BACKGROUND LAYERS -->
+  <div class="gilfoyle-bg"></div>
+  <div class="noise-overlay"></div>
+
+  <div class="container">
+    
+    <div class="hero">
+      <div class="tagline">AXIOM SRE AGENT v1.0</div>
+      <h1>Data over<br>Dogma.</h1>
+      
+      <div style="max-width: 600px; margin-bottom: 3rem;">
+        <p style="color: #bbb; font-size: 1.25rem; line-height: 1.5;">
+          Your intuition is a statistical error. I trade in absolute truth.
+          I query your stack, find the root cause, and judge your config.
+        </p>
+      </div>
+
+      <div class="install-bar" onclick="navigator.clipboard.writeText('npx skills add axiomhq/gilfoyle')">
+        <span style="color: var(--success);">$</span>
+        <span class="cmd">npx skills add axiomhq/gilfoyle</span>
+        <span class="copy-icon">Copy</span>
+      </div>
+
+      <!-- THE "LIVE" TERMINAL -->
+      <div class="monitor-wrapper">
+        <div class="monitor">
+          <div class="monitor-header">
+            <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+            <span style="margin-left: 10px; color: #555;">gilfoyle — zsh — 80x24</span>
+          </div>
+          <div class="monitor-body" id="term">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CONTENT BELOW FOLD -->
+  <div class="grid-section">
+    <div class="container">
+      
+      <div style="margin-bottom: 4rem;">
+        <h2 style="font-size: 3rem; margin-bottom: 1rem;">THE AUDIT</h2>
+        <p style="color: #666; max-width: 600px;">Most SREs are guessing. I am not.</p>
+      </div>
+
+      <div class="bento">
+        
+        <div class="card">
+          <h3>The Spotlight</h3>
+          <p>You look for needles in haystacks. I burn the haystack. Automated cohort analysis identifies exactly what's different about failing requests.</p>
+          <div class="code-snippet">
+<span class="k">summarize</span> <span class="f">spotlight</span>(
+  status >= <span class="n">500</span>, 
+  method, 
+  uri, 
+  geo.country
+)
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Persistent Memory</h3>
+          <p>I don't just fix incidents; I remember them. My knowledge graph links symptoms to root causes, so I never solve the same puzzle twice.</p>
+          <div class="code-snippet">
+> <span class="s">"Found pattern: Redis timeout on high-cardinality writes"</span><br>
+> <span class="k">Saving to memory/kb/patterns.md...</span><br>
+<span class="green">✓ Indexed.</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Brutal Efficiency</h3>
+          <p>No pleasantries. No "checking on that." Just the query, the data, and the fix. I respect your uptime, not your feelings.</p>
+          <div class="code-snippet">
+<span class="k">where</span> _time > <span class="f">ago</span>(<span class="n">5m</span>)<br>
+| <span class="k">summarize</span> <span class="f">percentiles</span>(duration, <span class="n">99</span>)<br>
+| <span class="k">where</span> p99 > <span class="n">500</span>
+          </div>
+        </div>
+
+        <div class="card" style="display: flex; align-items: center; justify-content: center; text-align: center;">
+          <div>
+            <h3 style="color: #333;">Deploy.</h3>
+            <div class="install-bar" style="display: inline-flex; margin-top: 1rem;" onclick="navigator.clipboard.writeText('npx skills add axiomhq/gilfoyle')">
+              <span class="cmd">npx skills add axiomhq/gilfoyle</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const term = document.getElementById('term');
+    const lines = [
+      { text: "gilfoyle init --force", type: "cmd" },
+      { text: "connected: axiom-prod-01", type: "log" },
+      { text: "connected: grafana-cloud", type: "log" },
+      { text: "detecting_anomalies...", type: "log" },
+      { text: "WARN: latency spike in auth-service", type: "warn" },
+      { text: "hypothesis: db_connection_pool_limit", type: "log" },
+      { text: "running query...", type: "log" },
+      { text: "CONFIRMED: active_connections > max_connections", type: "error" },
+      { text: "recommendation: increase pool_size or fix leak", type: "success" },
+      { text: "you_are_welcome", type: "success" }
+    ];
+
+    let i = 0;
+    function typeLine() {
+      if (i >= lines.length) return;
+      const line = lines[i];
+      
+      const div = document.createElement('div');
+      div.className = 'log-row';
+      
+      const ts = new Date().toISOString().split('T')[1].slice(0,8);
+      
+      if (line.type === 'cmd') {
+        div.innerHTML = `<span class="ts">${ts}</span> <span class="green">$</span> <span class="white">${line.text}</span>`;
+      } else if (line.type === 'warn') {
+        div.innerHTML = `<span class="ts">${ts}</span> <span class="f">${line.text}</span>`;
+      } else if (line.type === 'error') {
+        div.innerHTML = `<span class="ts">${ts}</span> <span class="red">${line.text}</span>`;
+      } else if (line.type === 'success') {
+        div.innerHTML = `<span class="ts">${ts}</span> <span class="green">${line.text}</span>`;
+      } else {
+        div.innerHTML = `<span class="ts">${ts}</span> <span>${line.text}</span>`;
+      }
+      
+      term.appendChild(div);
+      i++;
+      setTimeout(typeLine, Math.random() * 800 + 200);
+    }
+
+    setTimeout(typeLine, 1000);
+  </script>
+</body>
+</html>

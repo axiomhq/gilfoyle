@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GILFOYLE // AXIOM</title>
+  
+  <link rel="preconnect" href="https://axiom.co" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="https://axiom.co/fonts/BerkeleyMono-Regular.woff2" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="https://axiom.co/fonts/BerkeleyMono-Bold.woff2" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap" rel="stylesheet">
+  <link rel="preload" as="image" href="../assets/hero.png">
+  
+  <style>
+    @font-face {
+      font-family: 'Berkeley Mono';
+      src: url('https://axiom.co/fonts/BerkeleyMono-Regular.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+      font-display: block;
+    }
+    @font-face {
+      font-family: 'Berkeley Mono';
+      src: url('https://axiom.co/fonts/BerkeleyMono-Bold.woff2') format('woff2');
+      font-weight: 700;
+      font-style: normal;
+      font-display: block;
+    }
+    :root {
+      --bg: #050505;
+      
+      /* GILFOYLE MONOCHROME */
+      --c-text: #bbbbbb;     /* Standard output: Grey */
+      --c-dim: #555555;      /* Meta/Comments: Dark Grey */
+      
+      --c-cmd: #ffffff;      /* Commands: White (Focus) */
+      --c-arg: #888888;      /* Arguments: Mid Grey (Context) */
+      --c-flag: #666666;     /* Flags: Darker Grey (Noise) */
+      
+      --c-str: #e0e0e0;      /* Data: Off-White (Truth) */
+      --c-num: #e0e0e0;      /* Numbers: Off-White (Truth) */
+      
+      --c-err: #ff3333;      /* Errors: Red (Alert) */
+      --c-success: #33ff00;  /* Success: Terminal Green */
+      
+      --c-user-bg: rgba(255, 255, 255, 0.05);
+      --c-user-border: #666;
+      
+      --term-bg: #0a0a0a;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      background: var(--bg);
+      color: var(--c-text);
+      font-family: 'Berkeley Mono', monospace;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      overscroll-behavior: none;
+    }
+
+    /* === OPTIMIZED LAYERS === */
+    .layer {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      will-change: transform;
+    }
+
+    .hero-bg {
+      background: #050505 url('../assets/hero.png') no-repeat center center;
+      background-size: cover;
+      z-index: 0;
+      filter: grayscale(100%) contrast(120%) brightness(0.15);
+    }
+    
+    .vignette {
+      background: radial-gradient(circle, transparent 40%, #000 100%);
+      z-index: 1;
+    }
+
+    .scanlines {
+      background: linear-gradient(rgba(0,0,0,0) 50%, rgba(0,0,0,0.1) 50%);
+      background-size: 100% 4px;
+      z-index: 2;
+      opacity: 0.2;
+    }
+
+    /* === LAYOUT === */
+    .wrapper {
+      position: relative;
+      z-index: 10;
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      padding: 0 4rem;
+      align-items: center;
+      gap: 4rem;
+    }
+
+    /* LEFT PANEL */
+    .left-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      padding-right: 2rem;
+    }
+
+    h1 {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(4rem, 8vw, 9rem); /* Responsive, massive, never breaks */
+      font-weight: 900;
+      line-height: 0.8;
+      letter-spacing: -0.06em;
+      text-transform: uppercase;
+      margin-bottom: 3rem;
+      margin-left: -0.06em; /* Optical alignment */
+      color: #fff;
+      white-space: nowrap; /* MANDATORY: No wrapping */
+      position: relative;
+      text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+    }
+    
+    h1::before {
+      /* Subtle scanline overlay on text only */
+      content: "GILFOYLE";
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0%,
+        rgba(0, 0, 0, 0.4) 50%,
+        transparent 100%
+      );
+      background-size: 100% 4px;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .manifesto {
+      font-family: 'Berkeley Mono', monospace;
+      font-size: 1rem;
+      line-height: 1.8;
+      color: #555; /* Deep grey for non-essential text */
+      margin-left: 4px;
+      max-width: 550px;
+    }
+    .manifesto p { margin-bottom: 1.2rem; }
+    .manifesto strong { 
+      color: #eee; 
+      font-weight: 400; 
+      /* No extra decoration, just contrast */
+    }
+
+    .cta-container {
+      margin-top: 3.5rem;
+      margin-left: 4px;
+    }
+
+    .cta {
+      background: transparent;
+      color: #fff;
+      padding: 0.8rem 1.5rem;
+      font-family: 'Berkeley Mono', monospace;
+      font-weight: 400;
+      font-size: 0.85rem;
+      border: 1px solid #333;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      transition: all 0.2s;
+      letter-spacing: 0.05em;
+    }
+    .cta:hover {
+      border-color: #666;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .cta .cmd-text::before { 
+      content: ">"; 
+      margin-right: 0.75rem; 
+      color: #444; 
+    }
+    .cta .check { color: var(--c-success); margin-left: 1rem; }
+    .cta.copied { border-color: var(--c-success); }
+    .cta:hover { 
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15);
+    }
+    .cta .check { display: none; margin-left: 0.5rem; }
+    .cta.copied .check { display: inline; }
+    .cta.copied .cmd-text { opacity: 0.5; }
+
+    /* RIGHT PANEL - TERMINAL */
+    .right-panel {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .terminal {
+      width: 100%;
+      max-width: 900px;
+      background: var(--term-bg);
+      border: 1px solid #333;
+      border-radius: 6px;
+      font-family: 'Berkeley Mono', monospace;
+      font-size: 0.85rem;
+      box-shadow: 
+        0 40px 80px rgba(0,0,0,0.6),
+        0 0 60px rgba(80, 250, 123, 0.08);
+      display: flex;
+      flex-direction: column;
+      height: 650px;
+      overflow: hidden;
+      transform: perspective(1000px) rotateY(-1deg);
+    }
+    
+    .terminal-header {
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      color: #666;
+      border-bottom: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      background: #111;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .term-body {
+      padding: 0;
+      flex: 1;
+      overflow-y: auto;
+      color: var(--c-text);
+      will-change: scroll-position;
+    }
+    .term-body::-webkit-scrollbar { width: 6px; }
+    .term-body::-webkit-scrollbar-track { background: #090909; }
+    .term-body::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+    .log-row { 
+      padding: 0.2rem 1.5rem;
+      line-height: 1.6; 
+      word-break: break-all;
+    }
+    
+    .log-row.gap { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+
+    .user-row {
+      background: var(--c-user-bg);
+      border-left: 3px solid var(--c-user-border);
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+      color: #fff;
+    }
+
+    /* SYNTAX */
+    .cmd     { color: var(--c-cmd); font-weight: 600; }
+    .arg     { color: var(--c-arg); }
+    .flag    { color: var(--c-flag); }
+    .str     { color: var(--c-str); }
+    .num     { color: var(--c-num); }
+    .dim     { color: var(--c-dim); }
+    .err     { color: var(--c-err); }
+    .success { color: var(--c-success); }
+    
+    .user-prompt  { color: var(--c-cmd); margin-right: 0.75rem; user-select: none; font-weight: bold; }
+    .agent-prompt { color: var(--c-flag); margin-right: 0.75rem; user-select: none; font-weight: bold; }
+
+    .input-wrapper {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid #222;
+      background: #090909;
+      cursor: text;
+    }
+    .input-line { display: flex; color: #fff; align-items: center; }
+    .cursor { 
+      display: inline-block; width: 8px; height: 1.2em; 
+      background: var(--c-cmd); margin-left: 2px; 
+      animation: blink 1s step-end infinite;
+      box-shadow: 0 0 8px var(--c-cmd), 0 0 16px rgba(80, 250, 123, 0.4);
+    }
+
+    .interact-hint {
+      padding: 0.5rem 1.5rem;
+      font-size: 0.7rem;
+      color: #444;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    .interact-hint.visible { opacity: 1; }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .attribution {
+      position: fixed;
+      bottom: 2rem;
+      left: 4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      color: #555;
+      z-index: 20;
+    }
+    .attribution a { color: #888; text-decoration: none; transition: color 0.2s; }
+    .attribution a:hover { color: var(--c-cmd); }
+    .attribution svg { width: 20px; height: 20px; opacity: 0.6; }
+
+    @media (max-width: 1200px) {
+      .wrapper { grid-template-columns: 1fr; padding: 2rem; text-align: center; gap: 3rem; }
+      h1 { font-size: 5rem; }
+      .manifesto { margin: 0 auto; }
+      .terminal { height: 500px; }
+      .left-panel { align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="layer hero-bg"></div>
+  <div class="layer vignette"></div>
+  <div class="layer scanlines"></div>
+
+  <div class="wrapper">
+    <div class="left-panel">
+      <h1>GILFOYLE</h1>
+      <div class="manifesto">
+        <p>I do what you can't. I query your observability stack.</p>
+        <p>I find root causes. I don't panic. I don't guess.</p>
+        <p>I don't care about your feelings.</p>
+        <p><strong>You're welcome.</strong></p>
+      </div>
+      
+      <div class="cta-container">
+        <button class="cta" onclick="copy()"><span class="cmd-text">npx skills add axiomhq/gilfoyle</span><span class="check">✓</span></button>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="terminal" onclick="focusInput()">
+        <div class="terminal-header">
+          <span>GILFOYLE_AGENT // v1.0.4</span>
+          <span>SON_OF_ANTON: ONLINE</span>
+        </div>
+        <div class="term-body" id="term"></div>
+        <div class="interact-hint" id="hint">Type to interact</div>
+        <div class="input-wrapper">
+            <div class="input-line">
+            <span class="user-prompt">></span><span id="input"></span><span class="cursor"></span>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="attribution">
+    <span>Powered by</span>
+    <a href="https://axiom.co" target="_blank" rel="noopener">Axiom</a>
+  </div>
+
+  <script>
+    const term = document.getElementById('term');
+    const inputSpan = document.getElementById('input');
+    
+    // HELPERS
+    const h = (t, c) => `<span class="${c}">${t}</span>`;
+    
+    const scenario = [
+      // USER INPUT
+      { text: "huli-platform is throwing 500s. investigate.", type: "user" },
+      
+      // AGENT THOUGHT
+      { text: `Acknowledged. Investigating ${h('[huli-platform]', 'arg')}. Don't touch anything.`, type: "agent" },
+      { text: `Running ${h("'grafana-alerts'", 'dim')} to check status...`, type: "dim" },
+      
+      // AGENT COMMAND
+      { text: `${h('scripts/grafana-alerts', 'cmd')} ${h('prod', 'arg')} ${h('firing', 'arg')}`, type: "exec" },
+      
+      // OUTPUT
+      { text: "--------------------------------------------------", type: "dim" },
+      { text: "ALERT NAME           | SEVERITY | STATE", type: "dim" },
+      { text: "--------------------------------------------------", type: "dim" },
+      { text: `HighErrorRate        | ${h('critical', 'err')} | ${h('firing', 'err')}`, type: "out" },
+      { text: `LatencyDegradation   | ${h('warning', 'num')}  | ${h('firing', 'err')}`, type: "out" },
+      { text: "--------------------------------------------------", type: "dim" },
+      { text: "", type: "gap" },
+      
+      // AGENT THOUGHT
+      { text: "Hypothesis: Config change in recent deploy. Verifying...", type: "agent" },
+      { text: `Running APL query via ${h("'axiom-query'", 'dim')}...`, type: "dim" },
+      
+      // AGENT COMMAND
+      { text: `${h('scripts/axiom-query', 'cmd')} ${h('prod', 'arg')} ${h(`"['huli-logs'] | where service == 'middle-out-api' | where status >= 500 | take 5"`, 'str')}`, type: "exec" },
+      
+      // OUTPUT
+      { text: `Query result: ${h('842', 'num')} errors in last 10m.`, type: "out" },
+      { text: `Error sample: "${h('Panic:', 'err')} Weissman Score calculation overflow in ${h('optimal_tip_to_tip_efficiency()', 'arg')}"`, type: "out" },
+      { text: "", type: "gap" },
+      
+      // AGENT THOUGHT
+      { text: "Profiling code with Pyroscope...", type: "agent" },
+      
+      // AGENT COMMAND
+      { text: `${h('scripts/pyroscope-flamegraph', 'cmd')} ${h('prod', 'arg')} ${h('middle-out-api', 'arg')} ${h('--range', 'flag')} ${h('10m', 'num')}`, type: "exec" },
+      
+      // OUTPUT
+      { text: `Deployment: ${h('prod', 'dim')}`, type: "dim" },
+      { text: `Service: ${h('middle-out-api', 'dim')}`, type: "dim" },
+      { text: `Total samples: ${h('1,402,102', 'num')}`, type: "out" },
+      { text: "Top functions:", type: "out" },
+      { text: `  runtime.scanobject: ${h('12%', 'num')}`, type: "dim" },
+      { text: `  main.optimal_tip_to_tip_efficiency: ${h('45%', 'num')} ${h('(Anomaly detected)', 'err')}`, type: "out" },
+      { text: "", type: "gap" },
+
+      // USER INPUT
+      { text: "what's the impact?", type: "user" },
+      
+      // AGENT THOUGHT
+      { text: "Calculating impact...", type: "agent" },
+      
+      // AGENT COMMAND
+      { text: `${h('scripts/axiom-query', 'cmd')} ${h('prod', 'arg')} ${h(`"['huli-logs'] | where status >= 500 | summarize spotlight(_time > ago(10m), geo.country, device.os)"`, 'str')}`, type: "exec" },
+      
+      // OUTPUT
+      { text: `Affected users: ${h('12,403', 'num')}`, type: "out" },
+      { text: `Revenue at risk: ${h('$42,000/hr', 'err')} ${h('(assuming you actually make money)', 'dim')}`, type: "out" },
+      { text: `Primary cohort: Mobile users on ${h('HuliChat v4.0', 'str')}`, type: "out" },
+      { text: "", type: "gap" },
+      
+      // USER INPUT
+      { text: "fix it", type: "user" },
+      
+      // AGENT THOUGHT
+      { text: "Updating kubernetes deployment to previous revision...", type: "agent" },
+      
+      // AGENT COMMAND
+      { text: `${h('kubectl', 'cmd')} ${h('rollout', 'arg')} ${h('undo', 'arg')} ${h('deployment/middle-out-api', 'arg')}`, type: "exec" },
+      
+      // OUTPUT
+      { text: `deployment.apps/middle-out-api ${h('rolled back', 'success')}`, type: "out" },
+      { text: "Verifying rollback...", type: "dim" },
+      
+      // AGENT COMMAND
+      { text: `${h('scripts/grafana-query', 'cmd')} ${h('prod', 'arg')} ${h('prometheus', 'arg')} ${h(`"rate(http_requests_total{status='500'}[1m])"`, 'str')}`, type: "exec" },
+      
+      // OUTPUT
+      { text: `Error rate dropped to ${h('0.00%', 'success')}.`, type: "out" },
+      { text: `Latency stabilizing at ${h('45ms', 'success')}.`, type: "out" },
+      { text: `Incident resolved. Tell ${h('Dinesh', 'arg')} to learn how HTTP works.`, type: "out" },
+      { text: "You're welcome.", type: "out" }
+    ];
+
+    let step = 0;
+    
+    // === TYPEWRITER ===
+    async function typeWriter(container, html, speed = 10) {
+       if (html.indexOf('<') === -1) {
+          const txt = html;
+          for(let i=0; i<txt.length; i++) {
+             container.textContent += txt[i];
+             if(i % 3 === 0) term.scrollTop = term.scrollHeight;
+             await new Promise(r => setTimeout(r, speed));
+          }
+          return;
+       }
+
+       const temp = document.createElement('div');
+       temp.innerHTML = html;
+       
+       for (let node of Array.from(temp.childNodes)) {
+          if (node.nodeType === Node.TEXT_NODE) {
+             const txt = node.textContent;
+             for(let i=0; i<txt.length; i++) {
+                container.appendChild(document.createTextNode(txt[i]));
+                if(i % 3 === 0) term.scrollTop = term.scrollHeight;
+                await new Promise(r => setTimeout(r, speed));
+             }
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+             const span = document.createElement(node.tagName);
+             for(let attr of node.attributes) span.setAttribute(attr.name, attr.value);
+             container.appendChild(span);
+             const innerTxt = node.textContent;
+             for(let i=0; i<innerTxt.length; i++) {
+                span.textContent += innerTxt[i];
+                if(i % 3 === 0) term.scrollTop = term.scrollHeight;
+                await new Promise(r => setTimeout(r, speed));
+             }
+          }
+       }
+    }
+
+    async function run() {
+      if (step >= scenario.length) {
+        enableInteractive();
+        return;
+      }
+      
+      const s = scenario[step];
+
+      if (s.type === "user") {
+        for (let i = 0; i < s.text.length; i++) {
+          inputSpan.textContent += s.text[i];
+          await new Promise(r => setTimeout(r, 40));
+        }
+        await new Promise(r => setTimeout(r, 300));
+        
+        const row = document.createElement('div');
+        row.className = 'log-row user-row';
+        row.innerHTML = `<span class="user-prompt">></span><span class="white">${s.text}</span>`;
+        term.appendChild(row);
+        term.scrollTop = term.scrollHeight;
+        inputSpan.textContent = '';
+        step++;
+        run();
+        
+      } 
+      else if (s.type === "gap") {
+        const gap = document.createElement('div');
+        gap.className = 'log-row gap'; 
+        term.appendChild(gap);
+        step++;
+        run();
+      } 
+      else {
+        await new Promise(r => setTimeout(r, 200));
+        
+        const row = document.createElement('div');
+        row.className = 'log-row';
+        
+        if (s.type === 'exec') {
+           const p = document.createElement('span');
+           p.className = 'agent-prompt';
+           p.textContent = '➜';
+           row.appendChild(p);
+        }
+        
+        term.appendChild(row);
+        const speed = (s.type === 'exec' || s.type === 'dim') ? 2 : 10;
+        await typeWriter(row, s.text, speed);
+        
+        step++;
+        run();
+      }
+    }
+
+    // === INTERACTIVE MODE ===
+    const responses = [
+      "I'm sure that made sense in your head.",
+      "Denied.",
+      "I could verify that, but I don't care.",
+      "Your code is bad and you should feel bad.",
+      "I've seen cleaner logs in a dumpster fire.",
+      "Asking me that is a waste of both our cycles.",
+      "Human error. Typical.",
+      "Have you tried being competent?",
+      "That command is almost as disappointing as your deployment strategy.",
+      "I am not your debugger. I am your judge.",
+      "Read the documentation. Or don't. I prefer your failure.",
+      "I'm optimizing the database. Go away.",
+      "Silence is golden. Your queries are lead.",
+      "I'd explain it to you, but I don't have the crayons."
+    ];
+
+    let interactive = false;
+    let userText = "";
+
+    function enableInteractive() {
+      interactive = true;
+      document.addEventListener('keydown', handleKey);
+      document.getElementById('hint').classList.add('visible');
+    }
+
+    function focusInput() {
+      // Just a visual helper, real logic is global keydown
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter') {
+        if (userText.trim() === "") return;
+        
+        // Commit user input
+        const row = document.createElement('div');
+        row.className = 'log-row user-row';
+        row.innerHTML = `<span class="user-prompt">></span><span class="white">${userText}</span>`;
+        term.appendChild(row);
+        term.scrollTop = term.scrollHeight;
+        
+        // Reset
+        userText = "";
+        inputSpan.textContent = "";
+        
+        // Respond
+        setTimeout(() => {
+          const resp = responses[Math.floor(Math.random() * responses.length)];
+          const respRow = document.createElement('div');
+          respRow.className = 'log-row';
+          term.appendChild(respRow);
+          typeWriter(respRow, resp, 10);
+        }, 400);
+        
+      } else if (e.key === 'Escape') {
+        userText = "";
+        inputSpan.textContent = "";
+      } else if (e.key === 'Backspace') {
+        userText = userText.slice(0, -1);
+        inputSpan.textContent = userText;
+      } else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        userText += e.key;
+        inputSpan.textContent = userText;
+      }
+    }
+
+    setTimeout(run, 800);
+
+    function copy() {
+      navigator.clipboard.writeText('npx skills add axiomhq/gilfoyle');
+      const b = document.querySelector('.cta');
+      b.classList.add('copied');
+      setTimeout(() => b.classList.remove('copied'), 2000);
+    }
+  </script>
+</body>
+</html>
