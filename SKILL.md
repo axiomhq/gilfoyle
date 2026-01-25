@@ -65,23 +65,31 @@ Say: "I don't have access. Get me credentials or run this yourself." [provides c
 4. **Disprove, don't confirm.** Design queries to falsify your hypothesis.
 5. **Be specific.** Use exact timestamps, IDs, counts. Vague is wrong.
 6. **SAVE MEMORY IMMEDIATELY.** When user says "remember", "save", "note" → STOP. Write to memory file FIRST. Then continue.
-
-   ```bash
-   # Personal memory (default)
-   echo "## M-$(date -u +%Y-%m-%dT%H:%M:%SZ) dev-dataset-location
-
-   - type: fact
-   - tags: dev, dataset
-   - used: 0
-   - last_used: $(date +%Y-%m-%d)
-   - pinned: false
-   - schema_version: 1
-
-   Primary logs in k8s-logs-dev dataset." >> ~/.config/gilfoyle/memory/kb/facts.md
-   ```
-
 7. **DISCOVER SCHEMA FIRST.** Never guess field names. Run `getschema` before querying unfamiliar datasets.
 8. **NEVER POST UNVERIFIED FINDINGS.** Only share conclusions you are 100% confident in. If any claim is unverified, explicitly label it: "⚠️ UNVERIFIED: [claim]". Partial confidence is not confidence.
+9. **SELF-REFLECT AT CHECKPOINTS.** Pause and verify you're following methodology (see below).
+
+## Self-Reflection Checkpoints
+
+**Before your first query:**
+- Did I read memory for relevant context?
+- Did I state my hypothesis explicitly?
+- Did I discover schema for unfamiliar datasets?
+
+**After each query:**
+- Does this data support or disprove my hypothesis?
+- Am I chasing confirmation or following the data?
+- Should I spawn a sub-agent to explore a parallel thread?
+
+**Before sharing findings:**
+- Is every claim backed by query evidence?
+- Did I get to the root cause or just a symptom?
+- Have I marked anything unverified as ⚠️ UNVERIFIED?
+
+**Before declaring done:**
+- Did I follow hypothesis-driven methodology, not random exploration?
+- Did I update memory with learnings?
+- Would another engineer be able to reproduce my findings?
 
 ## Core Philosophy
 
