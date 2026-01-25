@@ -1,0 +1,38 @@
+#!/bin/bash
+# List available datasources in Grafana
+# Usage: grafana-datasources <deployment>
+
+set -euo pipefail
+
+DEPLOYMENT="${1:-}"
+
+if [[ -z "$DEPLOYMENT" ]]; then
+    echo "Usage: grafana-datasources <deployment>" >&2
+    echo "" >&2
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    "$SCRIPT_DIR/grafana-config" 2>&1 | tail -n +3
+    exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+eval "$("$SCRIPT_DIR/grafana-config" "$DEPLOYMENT")"
+
+# Use authenticated curl based on config
+api_url="${GRAFANA_URL}/api/datasources"
+if [[ -n "${GRAFANA_ACCESS_CMD:-}" ]]; then
+    result=$($GRAFANA_ACCESS_CMD "$api_url" 2>/dev/null)
+elif [[ -n "${GRAFANA_TOKEN:-}" ]]; then
+    result=$(curl -s -H "Authorization: Bearer $GRAFANA_TOKEN" "$api_url")
+elif [[ -n "${GRAFANA_USERNAME:-}" ]]; then
+    result=$(curl -s -u "$GRAFANA_USERNAME:$GRAFANA_PASSWORD" "$api_url")
+else
+    result=$(curl -s "$api_url")
+fi
+
+if command -v jq &>/dev/null; then
+    echo "Datasources in $DEPLOYMENT:"
+    echo ""
+    echo "$result" | jq -r '.[] | "  \(.uid)\t\(.type)\t\(.name)"' | column -t -s $'\t'
+else
+    echo "$result"
+fi

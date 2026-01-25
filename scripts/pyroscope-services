@@ -1,0 +1,56 @@
+#!/bin/bash
+# List available services in Pyroscope
+# Usage: pyroscope-services <deployment> [duration]
+#
+# Examples:
+#   pyroscope-services prod
+#   pyroscope-services prod 24h
+
+set -euo pipefail
+
+DEPLOYMENT="${1:-}"
+duration="${2:-1h}"
+
+if [[ -z "$DEPLOYMENT" ]]; then
+    echo "Usage: pyroscope-services <deployment> [duration]" >&2
+    echo "" >&2
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    "$SCRIPT_DIR/pyroscope-config" 2>&1 | tail -n +3
+    exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+eval "$("$SCRIPT_DIR/pyroscope-config" "$DEPLOYMENT")"
+
+# Parse duration to milliseconds
+parse_duration() {
+    local dur="$1"
+    local num="${dur%[smhd]*}"
+    local unit="${dur#$num}"
+    case "$unit" in
+        s) echo $((num * 1000)) ;;
+        m) echo $((num * 60 * 1000)) ;;
+        h) echo $((num * 3600 * 1000)) ;;
+        d) echo $((num * 86400 * 1000)) ;;
+        *) echo $((num * 60 * 1000)) ;;
+    esac
+}
+
+now_ms=$(($(date +%s) * 1000))
+duration_ms=$(parse_duration "$duration")
+start_ms=$((now_ms - duration_ms))
+
+# Use authenticated curl based on config
+api_url="${PYROSCOPE_URL}/querier.v1.QuerierService/LabelValues"
+body="{\"name\": \"service_name\", \"start\": $start_ms, \"end\": $now_ms}"
+if [[ -n "${PYROSCOPE_ACCESS_CMD:-}" ]]; then
+    result=$($PYROSCOPE_ACCESS_CMD "$api_url" -X POST -H "Content-Type: application/json" -d "$body" 2>/dev/null)
+elif [[ -n "${PYROSCOPE_TOKEN:-}" ]]; then
+    result=$(curl -s -H "Authorization: Bearer $PYROSCOPE_TOKEN" -X POST -H "Content-Type: application/json" -d "$body" "$api_url")
+elif [[ -n "${PYROSCOPE_USERNAME:-}" ]]; then
+    result=$(curl -s -u "$PYROSCOPE_USERNAME:$PYROSCOPE_PASSWORD" -X POST -H "Content-Type: application/json" -d "$body" "$api_url")
+else
+    result=$(curl -s -X POST -H "Content-Type: application/json" -d "$body" "$api_url")
+fi
+
+echo "$result" | jq -r '.names[]' 2>/dev/null | sort
