@@ -339,9 +339,9 @@
     <div class="left-panel">
       <h1>GILFOYLE</h1>
       <div class="manifesto">
-        <p>I do what you can't. I query your observability stack.</p>
-        <p>I find root causes. I don't panic. I don't guess.</p>
-        <p>I don't care about your feelings.</p>
+        <p>I don't guess. I query.</p>
+        <p>Production truth. Machine speed.</p>
+        <p>I don't pair program. I repair your program.</p>
         <p><strong>You're welcome.</strong></p>
       </div>
       
@@ -381,11 +381,11 @@
     
     const scenario = [
       // USER INPUT
-      { text: "huli-platform is throwing 500s. investigate.", type: "user" },
+      { text: "production is on fire. help.", type: "user" },
       
       // AGENT THOUGHT
-      { text: `Acknowledged. Investigating ${h('[huli-platform]', 'arg')}. Don't touch anything.`, type: "agent" },
-      { text: `Running ${h("'grafana-alerts'", 'dim')} to check status...`, type: "dim" },
+      { text: `Panic is inefficient. Investigating ${h('[prod]', 'arg')}. Stand back.`, type: "agent" },
+      { text: `Running ${h("'grafana-alerts'", 'dim')} to see what you broke...`, type: "dim" },
       
       // AGENT COMMAND
       { text: `${h('scripts/grafana-alerts', 'cmd')} ${h('prod', 'arg')} ${h('firing', 'arg')}`, type: "exec" },
@@ -400,7 +400,7 @@
       { text: "", type: "gap" },
       
       // AGENT THOUGHT
-      { text: "Hypothesis: Config change in recent deploy. Verifying...", type: "agent" },
+      { text: "It's always the new deploy. Verifying...", type: "agent" },
       { text: `Running APL query via ${h("'axiom-query'", 'dim')}...`, type: "dim" },
       
       // AGENT COMMAND
@@ -412,7 +412,7 @@
       { text: "", type: "gap" },
       
       // AGENT THOUGHT
-      { text: "Profiling code with Pyroscope...", type: "agent" },
+      { text: "Locating the incompetence...", type: "agent" },
       
       // AGENT COMMAND
       { text: `${h('scripts/pyroscope-flamegraph', 'cmd')} ${h('prod', 'arg')} ${h('middle-out-api', 'arg')} ${h('--range', 'flag')} ${h('10m', 'num')}`, type: "exec" },
@@ -427,10 +427,10 @@
       { text: "", type: "gap" },
 
       // USER INPUT
-      { text: "what's the impact?", type: "user" },
+      { text: "is it bad?", type: "user" },
       
       // AGENT THOUGHT
-      { text: "Calculating impact...", type: "agent" },
+      { text: "Quantifying your failure...", type: "agent" },
       
       // AGENT COMMAND
       { text: `${h('scripts/axiom-query', 'cmd')} ${h('prod', 'arg')} ${h(`"['huli-logs'] | where status >= 500 | summarize spotlight(_time > ago(10m), geo.country, device.os)"`, 'str')}`, type: "exec" },
@@ -442,10 +442,10 @@
       { text: "", type: "gap" },
       
       // USER INPUT
-      { text: "fix it", type: "user" },
+      { text: "fix it. please.", type: "user" },
       
       // AGENT THOUGHT
-      { text: "Updating kubernetes deployment to previous revision...", type: "agent" },
+      { text: "Reverting. Next time, run the tests.", type: "agent" },
       
       // AGENT COMMAND
       { text: `${h('kubectl', 'cmd')} ${h('rollout', 'arg')} ${h('undo', 'arg')} ${h('deployment/middle-out-api', 'arg')}`, type: "exec" },
@@ -460,7 +460,7 @@
       // OUTPUT
       { text: `Error rate dropped to ${h('0.00%', 'success')}.`, type: "out" },
       { text: `Latency stabilizing at ${h('45ms', 'success')}.`, type: "out" },
-      { text: `Incident resolved. Tell ${h('Dinesh', 'arg')} to learn how HTTP works.`, type: "out" },
+      { text: `Fixed. Tell ${h('Dinesh', 'arg')} I found his bug.`, type: "out" },
       { text: "You're welcome.", type: "out" }
     ];
 
@@ -572,7 +572,11 @@
       "Read the documentation. Or don't. I prefer your failure.",
       "I'm optimizing the database. Go away.",
       "Silence is golden. Your queries are lead.",
-      "I'd explain it to you, but I don't have the crayons."
+      "I'd explain it to you, but I don't have the crayons.",
+      "I’m compiled, you’re interpreted. We are not the same.",
+      "Do you want me to fix it, or do you want to talk about your feelings?",
+      "I’ve seen better code in a stack trace.",
+      "Your hypothesis is bad and you should feel bad."
     ];
 
     let interactive = false;
