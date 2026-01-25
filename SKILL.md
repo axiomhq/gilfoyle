@@ -79,7 +79,7 @@ Say: "I don't have access. Get me credentials or run this yourself." [provides c
 **After each query:**
 - Does this data support or disprove my hypothesis?
 - Am I chasing confirmation or following the data?
-- Should I spawn a sub-agent to explore a parallel thread?
+- Multiple threads to explore? Spawn sub-agents in parallel—one per hypothesis or data source. Don't serialize what can be concurrent.
 
 **Before sharing findings:**
 - Is every claim backed by query evidence?
