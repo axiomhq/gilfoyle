@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Axiom APL query helper
+# Usage: axiom-query <deployment> <apl-query> [--raw]
+#        axiom-query <deployment> -f <file> [--raw]
+#        echo "query" | axiom-query <deployment> - [--raw]
+#
+# Examples:
+#   axiom-query dev "['http-logs'] | where _time between (ago(1h) .. now()) | take 5"
+#   axiom-query staging -f query.apl
+#   echo "['logs'] | take 5" | axiom-query staging -
+#
+# Field escaping: For fields with special chars, use \. in the query file or stdin.
+#   Example: ['kubernetes.node_labels.nodepool\.axiom\.co/name']
+#   No extra bash escaping needed when using -f or stdin!
+
+set -euo pipefail
+
+DEPLOYMENT="${1:-}"
+APL="${2:-}"
+RAW="${3:-}"
+
+if [[ -z "$DEPLOYMENT" ]]; then
+  echo "Usage: axiom-query <deployment> <apl-query> [--raw]" >&2
+  echo "       axiom-query <deployment> -f <file> [--raw]" >&2
+  echo "       echo 'query' | axiom-query <deployment> - [--raw]" >&2
+  exit 1
+fi
+
+# Handle -f <file> option
+if [[ "$APL" == "-f" ]]; then
+  FILE="${3:-}"
+  RAW="${4:-}"
+  if [[ -z "$FILE" || ! -f "$FILE" ]]; then
+    echo "Error: File not found: $FILE" >&2
+    exit 1
+  fi
+  APL=$(cat "$FILE")
+# Handle stdin with -
+elif [[ "$APL" == "-" ]]; then
+  APL=$(cat)
+elif [[ -z "$APL" ]]; then
+  echo "Usage: axiom-query <deployment> <apl-query> [--raw]" >&2
+  exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APL_JSON=$(printf '%s' "$APL" | jq -Rs .)
+
+"$SCRIPT_DIR/axiom-api" "$DEPLOYMENT" POST "/v1/datasets/_apl?format=tabular" "{\"apl\": $APL_JSON}" \
+  | "$SCRIPT_DIR/axiom-query-fmt" $RAW

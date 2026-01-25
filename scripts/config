@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+# Unified config reader for Gilfoyle
+# Usage: eval "$(config <tool> <deployment>)"
+#        config --list <tool>
+#        config --list-tools
+#
+# Config file: ~/.config/gilfoyle/config.toml
+#
+# Returns environment variables based on tool:
+#   axiom:    AXIOM_URL, AXIOM_TOKEN, AXIOM_ORG_ID
+#   grafana:  GRAFANA_URL, GRAFANA_TOKEN, GRAFANA_ACCESS_CMD, GRAFANA_USERNAME, GRAFANA_PASSWORD
+#   pyroscope: PYROSCOPE_URL, PYROSCOPE_TOKEN, PYROSCOPE_ACCESS_CMD, PYROSCOPE_USERNAME, PYROSCOPE_PASSWORD
+#   slack:    SLACK_TOKEN
+#
+# Auth priority: access_command > token > username/password > none
+
+set -euo pipefail
+
+CONFIG_DIR="${GILFOYLE_CONFIG_DIR:-$HOME/.config/gilfoyle}"
+CONFIG_FILE="${GILFOYLE_CONFIG:-$CONFIG_DIR/config.toml}"
+
+show_usage() {
+    echo "Usage: config <tool> <deployment>" >&2
+    echo "       config --list <tool>" >&2
+    echo "       config --list-tools" >&2
+    echo "" >&2
+    echo "Tools: axiom, grafana, pyroscope, slack" >&2
+    exit 1
+}
+
+# List available tools
+list_tools() {
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        echo "Config file not found: $CONFIG_FILE" >&2
+        exit 1
+    fi
+    grep -E '^\[' "$CONFIG_FILE" | sed 's/\[//' | sed 's/\..*//' | sort -u
+}
+
+# List deployments for a tool
+list_deployments() {
+    local tool="$1"
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        echo "Config file not found: $CONFIG_FILE" >&2
+        exit 1
+    fi
+    
+    local section_pattern
+    if [[ "$tool" == "slack" ]]; then
+        section_pattern="^\[slack\.workspaces\."
+    else
+        section_pattern="^\[${tool}\.deployments\."
+    fi
+    
+    grep -E "$section_pattern" "$CONFIG_FILE" 2>/dev/null | \
+        sed "s/\[${tool}\.\(deployments\|workspaces\)\.//" | \
+        sed 's/\]//' || echo "(none configured)"
+}
+
+# Extract a value from the config file for a given section
+extract_value() {
+    local section="$1"
+    local key="$2"
+    
+    awk -v section="$section" -v key="$key" '
+        /^\[/ { 
+            in_section = ($0 == "[" section "]")
+        }
+        in_section && $1 == key { 
+            # Handle key = "value" or key = value
+            sub(/^[^=]*=[[:space:]]*/, "")
+            gsub(/^"|"$/, "")
+            print
+            exit 
+        }
+    ' "$CONFIG_FILE"
+}
+
+# Main
+if [[ $# -lt 1 ]]; then
+    show_usage
+fi
+
+case "$1" in
+    --list-tools)
+        list_tools
+        exit 0
+        ;;
+    --list)
+        if [[ -z "${2:-}" ]]; then
+            show_usage
+        fi
+        list_deployments "$2"
+        exit 0
+        ;;
+esac
+
+TOOL="${1:-}"
+DEPLOYMENT="${2:-}"
+
+if [[ -z "$TOOL" || -z "$DEPLOYMENT" ]]; then
+    show_usage
+fi
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "Error: Config file not found: $CONFIG_FILE" >&2
+    echo "" >&2
+    echo "Run 'scripts/setup' to create configuration." >&2
+    exit 1
+fi
+
+# Build section name based on tool
+if [[ "$TOOL" == "slack" ]]; then
+    SECTION="slack.workspaces.$DEPLOYMENT"
+else
+    SECTION="${TOOL}.deployments.$DEPLOYMENT"
+fi
+
+# Extract common fields
+URL=$(extract_value "$SECTION" "url")
+TOKEN=$(extract_value "$SECTION" "token")
+ACCESS_CMD=$(extract_value "$SECTION" "access_command")
+USERNAME=$(extract_value "$SECTION" "username")
+PASSWORD=$(extract_value "$SECTION" "password")
+
+# Tool-specific handling
+case "$TOOL" in
+    axiom)
+        ORG_ID=$(extract_value "$SECTION" "org_id")
+        if [[ -z "$URL" || -z "$TOKEN" ]]; then
+            echo "Error: Deployment '$DEPLOYMENT' not found in [axiom.deployments.$DEPLOYMENT]" >&2
+            echo "" >&2
+            echo "Available deployments:" >&2
+            list_deployments axiom >&2
+            exit 1
+        fi
+        echo "AXIOM_URL=\"$URL\""
+        echo "AXIOM_TOKEN=\"$TOKEN\""
+        echo "AXIOM_ORG_ID=\"$ORG_ID\""
+        ;;
+    
+    grafana)
+        if [[ -z "$URL" ]]; then
+            echo "Error: Deployment '$DEPLOYMENT' not found in [grafana.deployments.$DEPLOYMENT]" >&2
+            echo "" >&2
+            echo "Available deployments:" >&2
+            list_deployments grafana >&2
+            exit 1
+        fi
+        echo "GRAFANA_URL=\"$URL\""
+        [[ -n "$TOKEN" ]] && echo "GRAFANA_TOKEN=\"$TOKEN\""
+        [[ -n "$ACCESS_CMD" ]] && echo "GRAFANA_ACCESS_CMD=\"$ACCESS_CMD\""
+        [[ -n "$USERNAME" ]] && echo "GRAFANA_USERNAME=\"$USERNAME\""
+        [[ -n "$PASSWORD" ]] && echo "GRAFANA_PASSWORD=\"$PASSWORD\""
+        ;;
+    
+    pyroscope)
+        if [[ -z "$URL" ]]; then
+            echo "Error: Deployment '$DEPLOYMENT' not found in [pyroscope.deployments.$DEPLOYMENT]" >&2
+            echo "" >&2
+            echo "Available deployments:" >&2
+            list_deployments pyroscope >&2
+            exit 1
+        fi
+        echo "PYROSCOPE_URL=\"$URL\""
+        [[ -n "$TOKEN" ]] && echo "PYROSCOPE_TOKEN=\"$TOKEN\""
+        [[ -n "$ACCESS_CMD" ]] && echo "PYROSCOPE_ACCESS_CMD=\"$ACCESS_CMD\""
+        [[ -n "$USERNAME" ]] && echo "PYROSCOPE_USERNAME=\"$USERNAME\""
+        [[ -n "$PASSWORD" ]] && echo "PYROSCOPE_PASSWORD=\"$PASSWORD\""
+        ;;
+    
+    slack)
+        if [[ -z "$TOKEN" ]]; then
+            echo "Error: Workspace '$DEPLOYMENT' not found in [slack.workspaces.$DEPLOYMENT]" >&2
+            echo "" >&2
+            echo "Available workspaces:" >&2
+            list_deployments slack >&2
+            exit 1
+        fi
+        echo "SLACK_TOKEN=\"$TOKEN\""
+        ;;
+    
+    *)
+        echo "Error: Unknown tool '$TOOL'" >&2
+        echo "Available tools: axiom, grafana, pyroscope, slack" >&2
+        exit 1
+        ;;
+esac

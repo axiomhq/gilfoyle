@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Authenticated curl wrapper - handles multiple auth methods
+# Usage: curl-auth <tool> <deployment> <url> [curl-args...]
+#
+# Auth priority:
+#   1. access_command (e.g., cloudflared access curl)
+#   2. token (Bearer auth)
+#   3. username/password (Basic auth)
+#   4. No auth
+
+set -euo pipefail
+
+TOOL="${1:-}"
+DEPLOYMENT="${2:-}"
+URL="${3:-}"
+shift 3 2>/dev/null || true
+
+if [[ -z "$TOOL" || -z "$DEPLOYMENT" || -z "$URL" ]]; then
+    echo "Usage: curl-auth <tool> <deployment> <url> [curl-args...]" >&2
+    exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load config
+eval "$("$SCRIPT_DIR/config" "$TOOL" "$DEPLOYMENT")"
+
+# Determine auth method and build curl command
+case "$TOOL" in
+    grafana)
+        if [[ -n "${GRAFANA_ACCESS_CMD:-}" ]]; then
+            $GRAFANA_ACCESS_CMD "$URL" "$@"
+        elif [[ -n "${GRAFANA_TOKEN:-}" ]]; then
+            curl -s -H "Authorization: Bearer $GRAFANA_TOKEN" "$URL" "$@"
+        elif [[ -n "${GRAFANA_USERNAME:-}" ]]; then
+            curl -s -u "$GRAFANA_USERNAME:$GRAFANA_PASSWORD" "$URL" "$@"
+        else
+            curl -s "$URL" "$@"
+        fi
+        ;;
+    
+    pyroscope)
+        if [[ -n "${PYROSCOPE_ACCESS_CMD:-}" ]]; then
+            $PYROSCOPE_ACCESS_CMD "$URL" "$@"
+        elif [[ -n "${PYROSCOPE_TOKEN:-}" ]]; then
+            curl -s -H "Authorization: Bearer $PYROSCOPE_TOKEN" "$URL" "$@"
+        elif [[ -n "${PYROSCOPE_USERNAME:-}" ]]; then
+            curl -s -u "$PYROSCOPE_USERNAME:$PYROSCOPE_PASSWORD" "$URL" "$@"
+        else
+            curl -s "$URL" "$@"
+        fi
+        ;;
+    
+    axiom)
+        # Axiom always uses token auth
+        curl -s \
+            -H "Authorization: Bearer $AXIOM_TOKEN" \
+            -H "X-Axiom-Org-Id: $AXIOM_ORG_ID" \
+            -H "Content-Type: application/json" \
+            "$URL" "$@"
+        ;;
+    
+    slack)
+        # Slack always uses token auth
+        curl -s -H "Authorization: Bearer $SLACK_TOKEN" "$URL" "$@"
+        ;;
+    
+    *)
+        echo "Error: Unknown tool '$TOOL'" >&2
+        exit 1
+        ;;
+esac

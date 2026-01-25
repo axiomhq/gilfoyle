@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# Slack API wrapper - multi-env, token-efficient output
+# Usage: slack <env> <method> [params...] [--raw|--full]
+#
+# Examples:
+#   slack work conversations.list types=public_channel
+#   slack personal chat.postMessage channel=C1234 text="Hello"
+#   echo "multiline msg" | slack work chat.postMessage channel=C1234 text=-
+#   slack work users.list
+#
+# Config: ~/.config/gilfoyle/config.toml
+#   [slack.workspaces.work]
+#   token = "xoxb-..."
+#   
+#   [slack.workspaces.personal]
+#   token = "xoxp-..."
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+ENV="${1:-}"
+METHOD="${2:-}"
+shift 2 2>/dev/null || true
+
+show_usage() {
+  echo "Usage: slack <env> <method> [params...] [--raw|--full]" >&2
+  echo "" >&2
+  echo "Examples:" >&2
+  echo "  slack work conversations.list types=public_channel" >&2
+  echo "  slack work chat.postMessage channel=C1234 text=\"Hello\"" >&2
+  echo "  slack work users.list" >&2
+  echo "" >&2
+  echo "Available workspaces:" >&2
+  "$SCRIPT_DIR/config" --list slack 2>/dev/null | sed 's/^/  /' >&2 || echo "  (run scripts/setup to configure)" >&2
+  exit 1
+}
+
+if [[ -z "$ENV" || -z "$METHOD" ]]; then
+  show_usage
+fi
+
+# Load token from unified config
+eval "$("$SCRIPT_DIR/config" slack "$ENV")"
+
+# Parse remaining args
+RAW=""
+FULL=""
+PARAMS=()
+JSON_BODY=""
+STDIN_KEY=""
+
+for arg in "$@"; do
+  case "$arg" in
+    --raw) RAW="--raw" ;;
+    --full) FULL="--full" ;;
+    {*) JSON_BODY="$arg" ;;
+    *=-) 
+      # key=- means read value from stdin
+      STDIN_KEY="${arg%=-}"
+      ;;
+    *=*) PARAMS+=("$arg") ;;
+  esac
+done
+
+# Read stdin if requested
+if [[ -n "$STDIN_KEY" ]]; then
+  STDIN_VAL=$(cat)
+  PARAMS+=("$STDIN_KEY=$STDIN_VAL")
+fi
+
+# Determine if GET or POST
+POST_METHODS="chat.postMessage chat.update chat.delete chat.postEphemeral chat.scheduleMessage chat.deleteScheduledMessage \
+  conversations.create conversations.archive conversations.unarchive conversations.rename \
+  conversations.invite conversations.kick conversations.join conversations.leave \
+  conversations.open conversations.close conversations.mark conversations.setPurpose conversations.setTopic \
+  users.profile.set users.setPresence users.setPhoto users.deletePhoto \
+  dnd.setSnooze dnd.endSnooze dnd.endDnd \
+  reactions.add reactions.remove \
+  pins.add pins.remove \
+  files.completeUploadExternal files.delete \
+  bookmarks.add bookmarks.edit bookmarks.remove \
+  stars.add stars.remove"
+
+IS_POST=false
+for pm in $POST_METHODS; do
+  if [[ "$METHOD" == "$pm" ]]; then
+    IS_POST=true
+    break
+  fi
+done
+
+URL="https://slack.com/api/$METHOD"
+
+if [[ "$IS_POST" == true ]]; then
+  # Build JSON body from params or use provided JSON
+  if [[ -n "$JSON_BODY" ]]; then
+    BODY="$JSON_BODY"
+  else
+    # Use jq to build JSON properly (handles escaping)
+    BODY="{}"
+    for param in "${PARAMS[@]}"; do
+      key="${param%%=*}"
+      val="${param#*=}"
+      # Check if value is already JSON (object, array, number, boolean)
+      if [[ "$val" =~ ^\{.*\}$ ]] || [[ "$val" =~ ^\[.*\]$ ]] || [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" == "true" ]] || [[ "$val" == "false" ]]; then
+        BODY=$(echo "$BODY" | jq --arg k "$key" --argjson v "$val" '. + {($k): $v}')
+      else
+        BODY=$(echo "$BODY" | jq --arg k "$key" --arg v "$val" '. + {($k): $v}')
+      fi
+    done
+  fi
+  
+  RESPONSE=$(curl -s -X POST "$URL" \
+    -H "Authorization: Bearer $SLACK_TOKEN" \
+    -H "Content-Type: application/json; charset=utf-8" \
+    -d "$BODY")
+else
+  # GET with query params
+  if [[ ${#PARAMS[@]} -gt 0 ]]; then
+    QUERY=$(printf "&%s" "${PARAMS[@]}")
+    URL="$URL?${QUERY:1}"
+  fi
+  
+  RESPONSE=$(curl -s "$URL" \
+    -H "Authorization: Bearer $SLACK_TOKEN")
+fi
+
+# Format output
+echo "$RESPONSE" | "$SCRIPT_DIR/slack-fmt" $RAW $FULL

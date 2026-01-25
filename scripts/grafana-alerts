@@ -1,0 +1,67 @@
+#!/bin/bash
+# List alerts from Grafana
+# Usage: grafana-alerts <deployment> [state]
+#
+# Examples:
+#   grafana-alerts prod
+#   grafana-alerts prod firing
+#   grafana-alerts prod pending
+
+set -euo pipefail
+
+DEPLOYMENT="${1:-}"
+state="${2:-}"
+
+if [[ -z "$DEPLOYMENT" ]]; then
+    echo "Usage: grafana-alerts <deployment> [state]" >&2
+    echo "" >&2
+    echo "Arguments:" >&2
+    echo "  deployment  - Environment (prod, staging, dev, prod-eu)" >&2
+    echo "  state       - Filter: firing, pending, inactive (optional)" >&2
+    echo "" >&2
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    "$SCRIPT_DIR/grafana-config" 2>&1 | tail -n +3
+    exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+eval "$("$SCRIPT_DIR/grafana-config" "$DEPLOYMENT")"
+
+# Try the Alertmanager API first (for firing alerts)
+# Use authenticated curl based on config
+api_url="${GRAFANA_URL}/api/alertmanager/grafana/api/v2/alerts"
+if [[ -n "${GRAFANA_ACCESS_CMD:-}" ]]; then
+    result=$($GRAFANA_ACCESS_CMD "$api_url" 2>/dev/null)
+elif [[ -n "${GRAFANA_TOKEN:-}" ]]; then
+    result=$(curl -s -H "Authorization: Bearer $GRAFANA_TOKEN" "$api_url")
+elif [[ -n "${GRAFANA_USERNAME:-}" ]]; then
+    result=$(curl -s -u "$GRAFANA_USERNAME:$GRAFANA_PASSWORD" "$api_url")
+else
+    result=$(curl -s "$api_url")
+fi
+
+if command -v jq &>/dev/null; then
+    echo "Deployment: $DEPLOYMENT"
+    if [[ -n "$state" ]]; then
+        echo "Filter: $state"
+    fi
+    echo ""
+    
+    # Filter by state if specified
+    if [[ -n "$state" ]]; then
+        alerts=$(echo "$result" | jq --arg state "$state" '[.[] | select(.status.state == $state)]')
+    else
+        alerts="$result"
+    fi
+    
+    num_alerts=$(echo "$alerts" | jq 'length')
+    echo "Alerts: $num_alerts"
+    echo ""
+    
+    if [[ "$num_alerts" -gt 0 ]]; then
+        echo "$alerts" | jq -r '.[] | 
+            "[\(.status.state | ascii_upcase)] \(.labels.alertname // "unknown")\n  Severity: \(.labels.severity // "N/A")\n  Summary: \(.annotations.summary // .annotations.description // "N/A")\n  Started: \(.startsAt // "N/A")\n"'
+    fi
+else
+    echo "$result"
+fi

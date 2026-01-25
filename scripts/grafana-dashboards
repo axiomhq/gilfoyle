@@ -1,0 +1,56 @@
+#!/bin/bash
+# Search dashboards in Grafana
+# Usage: grafana-dashboards <deployment> [search]
+#
+# Examples:
+#   grafana-dashboards prod
+#   grafana-dashboards prod "axiom-db"
+
+set -euo pipefail
+
+DEPLOYMENT="${1:-}"
+search="${2:-}"
+
+if [[ -z "$DEPLOYMENT" ]]; then
+    echo "Usage: grafana-dashboards <deployment> [search]" >&2
+    echo "" >&2
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    "$SCRIPT_DIR/grafana-config" 2>&1 | tail -n +3
+    exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+eval "$("$SCRIPT_DIR/grafana-config" "$DEPLOYMENT")"
+
+# Build search URL
+url="${GRAFANA_URL}/api/search?type=dash-db"
+if [[ -n "$search" ]]; then
+    url="${url}&query=$(printf '%s' "$search" | jq -sRr @uri)"
+fi
+
+# Use authenticated curl based on config
+if [[ -n "${GRAFANA_ACCESS_CMD:-}" ]]; then
+    result=$($GRAFANA_ACCESS_CMD "$url" 2>/dev/null)
+elif [[ -n "${GRAFANA_TOKEN:-}" ]]; then
+    result=$(curl -s -H "Authorization: Bearer $GRAFANA_TOKEN" "$url")
+elif [[ -n "${GRAFANA_USERNAME:-}" ]]; then
+    result=$(curl -s -u "$GRAFANA_USERNAME:$GRAFANA_PASSWORD" "$url")
+else
+    result=$(curl -s "$url")
+fi
+
+if command -v jq &>/dev/null; then
+    echo "Dashboards in $DEPLOYMENT:"
+    if [[ -n "$search" ]]; then
+        echo "Search: $search"
+    fi
+    echo ""
+    
+    num=$(echo "$result" | jq 'length')
+    echo "Found: $num"
+    echo ""
+    
+    echo "$result" | jq -r '.[] | "  \(.title)\n    URL: '"${GRAFANA_URL}"'/d/\(.uid)\n    Folder: \(.folderTitle // "General")\n"'
+else
+    echo "$result"
+fi

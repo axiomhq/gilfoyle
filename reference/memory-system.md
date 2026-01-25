@@ -1,0 +1,162 @@
+# Memory System
+
+Three-tier memory with automatic merging. All tiers use identical structure.
+
+## Tiers
+
+| Tier | Location | Scope | Sync |
+|------|----------|-------|------|
+| Personal | `~/.config/gilfoyle/memory/` | Just me | None |
+| Org | `~/.config/gilfoyle/memory/orgs/{org}/` | Team-wide | Git repo |
+
+## Reading Memory
+
+Before investigating, read all memory tiers:
+
+```bash
+# Personal tier
+cat ~/.config/gilfoyle/memory/kb/*.md
+
+# All org tiers (read each org that exists)
+for org in ~/.config/gilfoyle/memory/orgs/*/kb; do
+  cat "$org"/*.md 2>/dev/null
+done
+```
+
+When displaying entries, tag by source tier so user knows origin:
+```
+[org:axiom] Connection pool pattern: check for leaked connections...
+[personal] I prefer 5m time bins for latency analysis
+```
+
+If same entry exists in multiple tiers: Personal overrides Org.
+
+## Writing Memory
+
+Use `scripts/mem-write` to save entries:
+
+```bash
+# Personal tier (default)
+scripts/mem-write facts "dataset-location" "Primary logs in k8s-logs-dev dataset"
+
+# With type and tags
+scripts/mem-write --type pattern --tags "db,timeout" patterns "conn-pool" "Connection pool exhaustion signature"
+
+# Org tier
+scripts/mem-write --org axiom patterns "timeout-pattern" "How to detect timeouts"
+```
+
+| Trigger | Target | Example |
+|---------|--------|---------|
+| "remember this" | Personal | "Remember I prefer to DM @alice" |
+| "save for the team" | Org | "Save this pattern for the team" |
+| Auto-learning | Personal | Query worked → saved automatically |
+
+After writing to Org tier, push changes:
+```bash
+scripts/mem-share axiom "Added pattern: connection pool exhaustion"
+```
+
+## First-Time Setup
+
+```bash
+scripts/setup    # Personal tier + orgs config
+```
+
+## Org Setup
+
+```bash
+# Add an org (one-time)
+scripts/org-add axiom git@github.com:axiomhq/sre-memory.git
+
+# Sync org memory (pull latest)
+scripts/mem-sync
+
+# Check for uncommitted org changes
+scripts/mem-doctor
+```
+
+## Directory Structure
+
+```
+~/.config/gilfoyle/memory/
+    ├── kb/
+    │   ├── facts.md
+    │   ├── patterns.md
+    │   └── queries.md
+    ├── journal/
+    └── orgs/
+        └── axiom/            # Org tier (git-tracked)
+            └── kb/
+```
+
+## Entry Format
+
+```markdown
+## M-2025-01-05T14:32:10Z connection-pool-exhaustion
+
+- type: pattern
+- tags: database, postgres
+- used: 5
+- last_used: 2025-01-12
+- pinned: false
+- schema_version: 1
+
+**Summary**
+Connection pool exhausted due to leaked connections.
+```
+
+## Learning
+
+**You are always learning.** Every debugging session is an opportunity to get smarter.
+
+**Automatic learning (no user prompt needed):**
+- Query found root cause → record to `kb/queries.md`
+- New failure pattern discovered → record to `kb/patterns.md`
+- User corrects you → record what didn't work AND what did
+- Debugging session succeeds → summarize learnings to `kb/incidents.md`
+
+**User-triggered recording:**
+- "Remember this", "save this" → record immediately to Personal
+- "Save for the team" → record to Org + prompt to push
+
+**Be proactive:** If something is worth remembering, record it.
+
+## During Investigations
+
+**Capture:** Append observations to `journal/journal-YYYY-MM.md`:
+
+```markdown
+## M-2025-01-05T14:32:10Z found-connection-leak
+
+- type: note
+- tags: orders, database
+- schema_version: 1
+
+Connection pool exhausted. Found leak in payment handler.
+```
+
+**End of session:** Create summary in `kb/incidents.md` with key learnings.
+
+## Consolidation (Digest)
+
+Run after incidents or periodically:
+```bash
+scripts/mem-digest              # Review journal, find stale entries
+scripts/mem-digest --prune      # Also archive stale entries
+scripts/mem-digest --days 60    # Custom stale threshold
+```
+
+This will:
+1. Review journal entries for promotion to KB
+2. Find stale entries (unused 90+ days, not pinned)
+3. Archive stale entries (with `--prune`)
+4. Report memory stats
+
+## Health Check
+
+```bash
+scripts/mem-doctor    # Check all tiers, report issues
+```
+
+See `README.memory.md` in any memory directory for full entry format and maintenance instructions.
