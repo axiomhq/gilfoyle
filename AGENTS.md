@@ -9,7 +9,7 @@ You're working on Gilfoyle. Act accordingly.
 ## Commands
 
 ```bash
-# Validate scripts work
+# Validate config works
 scripts/config --list axiom
 
 # Run memory tests
@@ -17,28 +17,6 @@ scripts/memory-test
 
 # Check memory health
 scripts/mem-doctor
-
-# Test axiom queries (use heredoc to avoid escaping)
-scripts/axiom-query dev <<< "['dataset'] | take 1"
-```
-
-## Axiom Queries
-
-Always use stdin for queries. Heredocs avoid escaping hell:
-
-```bash
-# Simple
-scripts/axiom-query prod <<< "['logs'] | take 5"
-
-# Complex (heredoc)
-scripts/axiom-query prod <<'APL'
-['logs']
-| where ['kubernetes.labels.app'] == "my-service"
-| summarize count() by bin(_time, 1m)
-APL
-
-# From file
-scripts/axiom-query prod < query.apl
 ```
 
 ## Code Style
