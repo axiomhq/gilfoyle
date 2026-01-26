@@ -73,9 +73,13 @@
       background: var(--bg);
       color: var(--c-text);
       font-family: 'Berkeley Mono', monospace;
-      overflow-y: auto;
+      overflow: hidden;
       min-height: 100vh;
       width: 100vw;
+    }
+
+    body.interactive {
+      overflow-y: auto;
     }
 
     html {
@@ -792,6 +796,7 @@
 
     function enableInteractive() {
       interactive = true;
+      document.body.classList.add('interactive');
       document.addEventListener('keydown', handleKey);
       document.getElementById('hint').classList.add('visible');
     }
