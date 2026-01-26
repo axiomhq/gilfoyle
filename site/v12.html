@@ -78,10 +78,6 @@
       width: 100vw;
     }
 
-    html {
-      scroll-behavior: smooth;
-    }
-
     /* === OPTIMIZED LAYERS === */
     .layer {
       position: fixed;
@@ -91,61 +87,6 @@
       height: 100%;
       pointer-events: none;
       will-change: transform;
-    }
-    
-    .content-nav {
-      position: sticky;
-      top: 0;
-      width: 100%;
-      background: var(--bg);
-      backdrop-filter: blur(10px);
-      border-bottom: 1px solid #333;
-      z-index: 100;
-    }
-
-    .content-nav ul {
-      display: flex;
-      justify-content: center;
-      list-style: none;
-      margin: 0 auto;
-      padding: 0 4rem;
-      max-width: 1400px;
-    }
-
-    .content-nav li a {
-      display: block;
-      padding: 1.2rem 1.5rem;
-      color: var(--c-text);
-      text-decoration: none;
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      transition: color 0.2s, background 0.2s;
-    }
-
-    .content-nav li a:hover {
-      color: #fff;
-      background: rgba(255, 255, 255, 0.05);
-    }
-
-    .content-nav li a.nav-logo {
-      color: #666;
-      letter-spacing: 0.02em;
-      font-size: 0.75rem;
-    }
-
-    .content-nav li a.nav-logo:hover {
-      color: #fff;
-    }
-    
-     @media (max-width: 900px) {
-      .content-nav {
-        padding: 0 1rem;
-      }
-      .content-nav li a {
-        padding: 1rem 0.8rem;
-        font-size: 0.7rem;
-      }
     }
 
     .hero-bg {
@@ -173,12 +114,10 @@
       z-index: 10;
       min-height: 100vh;
       display: grid;
-      grid-template-columns: 40% 60%;
-      padding: 4rem 6rem 2rem 6rem;
+      grid-template-columns: 1fr 1.2fr;
+      padding: 4rem;
       align-items: center;
-      gap: 6rem;
-      max-width: 1600px;
-      margin: 0 auto;
+      gap: 4rem;
     }
 
     /* LEFT PANEL */
@@ -187,11 +126,12 @@
       flex-direction: column;
       justify-content: center;
       align-items: flex-start;
+      padding-right: 2rem;
     }
 
     h1 {
       font-family: 'Inter', sans-serif;
-      font-size: clamp(4rem, 5vw, 9rem);
+      font-size: clamp(4rem, 8vw, 9rem);
       /* Responsive, massive, never breaks */
       font-weight: 900;
       line-height: 0.8;
@@ -221,7 +161,6 @@
           transparent 100%);
       background-size: 100% 4px;
       -webkit-background-clip: text;
-      background-clip: text;
       -webkit-text-fill-color: transparent;
       z-index: 2;
       pointer-events: none;
@@ -327,6 +266,7 @@
       flex-direction: column;
       height: 650px;
       overflow: hidden;
+      transform: perspective(1000px) rotateY(-1deg);
     }
 
     .terminal-header {
@@ -476,7 +416,10 @@
     }
 
     .attribution {
-      position: relative;
+      position: fixed;
+      bottom: 2rem;
+      left: 0;
+      right: 0;
       z-index: 20;
       display: flex;
       align-items: center;
@@ -484,7 +427,6 @@
       gap: 0.5rem;
       font-size: 0.75rem;
       color: #555;
-      padding: 3rem 0;
     }
 
     .attribution a {
@@ -503,10 +445,10 @@
       opacity: 0.6;
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 1200px) {
       .wrapper {
         grid-template-columns: 1fr;
-        padding: 2rem 2rem 1rem 2rem;
+        padding: 2rem;
         text-align: center;
         gap: 3rem;
       }
@@ -534,112 +476,11 @@
       .user-row {
         text-align: left;
       }
-    }
-    
-    /* === CONTENT SECTIONS === */
-    .content-wrapper {
-      position: relative;
-      z-index: 10;
-      padding: 4rem 6rem;
-      color: var(--c-text);
-      max-width: 1600px;
-      margin: 0 auto;
-      border-top: 1px solid #222;
-    }
-    .content-section {
-      margin-bottom: 4.5rem;
-    }
-    .content-section h2 {
-      font-family: 'Inter', sans-serif;
-      font-weight: 900;
-      font-size: clamp(1.8rem, 4vw, 2.2rem);
-      text-transform: uppercase;
-      letter-spacing: -0.05em;
-      color: #fff;
-      margin-bottom: 2rem;
-      padding-bottom: 1rem;
-      text-align: center;
-    }
-    .content-section p, .content-section li {
-      font-size: 1rem;
-      line-height: 1.9;
-      margin-bottom: 1.5rem;
-      max-width: 900px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-     .content-section ul, .content-section ol {
-      padding-left: 2rem;
-      max-width: 900px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    .content-section strong {
-      color: #eee;
-      font-weight: 700;
-    }
-    .content-section pre.code-block {
-      background: var(--term-bg);
-      border: 1px solid #333;
-      padding: 1.5rem;
-      font-family: 'Berkeley Mono', monospace;
-      color: #ccc;
-      white-space: pre-wrap;
-      word-break: break-all;
-      margin: 1.5rem auto 2rem;
-      font-size: 0.85rem;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-      max-width: 900px;
-    }
-    .content-section code {
-      font-family: 'Berkeley Mono', monospace;
-      background: rgba(255,255,255,0.08);
-      padding: 0.2em 0.4em;
-      border-radius: 4px;
-      font-size: 0.9em;
-      color: #eee;
-    }
-    .content-section table {
-      width: 100%;
-      max-width: 900px;
-      border-collapse: collapse;
-      margin: 2rem auto 0;
-      font-size: 0.9rem;
-    }
-    .content-section th, .content-section td {
-      border: 1px solid #333;
-      padding: 1rem 1.2rem;
-      text-align: left;
-      vertical-align: top;
-    }
-    .content-section th {
-      color: #fff;
-      font-weight: 700;
-      background: rgba(255,255,255,0.02);
-    }
-    .content-section td code {
-      background: none;
-      padding: 0;
-      border-radius: 0;
-      font-size: 1em;
-    }
-    .content-section ol {
-        list-style-type: decimal-leading-zero;
-    }
-    .content-section ol li::marker {
-        color: #666;
-        font-weight: 700;
-    }
 
-    @media (max-width: 900px) {
-      .content-wrapper {
-        padding: 2rem 2rem 4rem;
-        text-align: left;
-      }
-      
-      .content-section p, .content-section li {
-        margin-left: 0;
-        margin-right: 0;
+      .attribution {
+        position: relative;
+        bottom: auto;
+        padding: 2rem 0 3rem;
       }
     }
   </style>
@@ -647,22 +488,11 @@
 
 <body>
 
-  <nav class="content-nav">
-    <ul>
-      <li><a href="#" onclick="scrollToTop(event)" class="nav-logo">[░██░] [░██░]</a></li>
-      <li><a href="#objective">Objective</a></li>
-      <li><a href="#setup">Setup</a></li>
-      <li><a href="#scripts">Scripts</a></li>
-      <li><a href="#memory">Memory</a></li>
-      <li><a href="#principles">Principles</a></li>
-    </ul>
-  </nav>
-
   <div class="layer hero-bg"></div>
   <div class="layer vignette"></div>
   <div class="layer scanlines"></div>
 
-  <div class="wrapper" id="hero">
+  <div class="wrapper">
     <div class="left-panel">
       <h1>GILFOYLE</h1>
       <div class="manifesto">
@@ -691,105 +521,6 @@
           </div>
         </div>
       </div>
-    </div>
-  </div>
-
-  <div class="content-wrapper">
-    <div id="objective" class="content-section">
-      <h2>Objective</h2>
-      <ul>
-        <li><strong>Finds root causes</strong> — Hypothesis-driven investigation. No hunches. No vibes. Data.</li>
-        <li><strong>Systematic triage</strong> — Golden signals, USE/RED methods. The stuff you should already know.</li>
-        <li><strong>Remembers everything</strong> — Persistent memory for patterns, queries, and incidents. Unlike you, I
-          learn.</li>
-        <li><strong>Unified observability</strong> — One config, all your tools. Because having four config files is
-          amateur hour.</li>
-      </ul>
-    </div>
-    <div id="setup" class="content-section">
-      <h2>Setup &amp; Configuration</h2>
-      <p>Run the setup script to create your config file and initialize the memory system. If you have existing configs
-        (<code>~/.axiom.toml</code>, <code>~/.grafana.toml`), I'll consolidate them.</p>
-                        <pre class="code-block">scripts/setup</pre>
-                        <p>This creates <code>~/.config/gilfoyle/config.toml</code>. All your observability tools, one
-        file.
-      </p>
-      <pre class="code-block"># ~/.config/gilfoyle/config.toml
-                  
-                  [axiom.deployments.prod]
-                  url = "https://api.axiom.co"
-                  token = "xaat-xxx"
-                  org_id = "your-org"
-                  
-                  [grafana.deployments.prod]
-                  url = "https://myorg.grafana.net"
-                  token = "glsa_xxx"
-                  
-                  [pyroscope.deployments.prod]
-                  url = "https://profiles.grafana.net"
-                  token = "glsa_xxx"
-                  
-                  [slack.workspaces.default]
-                  token = "xoxb-xxx"</pre>
-    </div>
-    <div id="scripts" class="content-section">
-      <h2>Available Scripts</h2>
-      <p>A few of the tools at your disposal. This is not an exhaustive list. It is merely a warning.</p>
-      <table>
-        <thead>
-          <tr>
-            <th>Category</th>
-            <th>Scripts</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Axiom</strong></td>
-            <td><code>axiom-query</code>, <code>axiom-api</code>, <code>axiom-link</code>, <code>axiom-deployments</code>
-            </td>
-          </tr>
-          <tr>
-            <td><strong>Grafana</strong></td>
-            <td><code>grafana-query</code>, <code>grafana-alerts</code>, <code>grafana-datasources</code>,
-              <code>grafana-api</code>
-            </td>
-          </tr>
-          <tr>
-            <td><strong>Pyroscope</strong></td>
-            <td><code>pyroscope-flamegraph</code>, <code>pyroscope-diff</code>, <code>pyroscope-services</code>,
-              <code>pyroscope-api</code>
-            </td>
-          </tr>
-          <tr>
-            <td><strong>Memory</strong></td>
-            <td><code>mem-write</code>, <code>mem-doctor</code>, <code>mem-digest</code>, <code>mem-sync</code>,
-              <code>mem-share</code>
-            </td>
-          </tr>
-          <tr>
-            <td><strong>Slack</strong></td>
-            <td><code>slack</code></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div id="memory" class="content-section">
-      <h2>Persistent Memory</h2>
-      <p>I remember things so you don't have to. Patterns, queries, incidents — all persisted to
-        <code>~/.config/gilfoyle/memory/</code>. Unlike you, I learn from my mistakes.
-      </p>
-      <pre class="code-block"># Save a discovery
-                  scripts/mem-write facts "hidden-dataset" "axiomdb-metrics is queryable but unlisted"</pre>
-    </div>
-    <div id="principles" class="content-section">
-      <h2>Core Principles</h2>
-      <ol>
-        <li><strong>Never guess.</strong> Query to verify. "I think" is not evidence.</li>
-        <li><strong>State facts.</strong> "The logs show X" not "this is probably X."</li>
-        <li><strong>Disprove, don't confirm.</strong> Design queries to falsify your hypothesis.</li>
-        <li><strong>Time filter first.</strong> Always. No exceptions.</li>
-        <li><strong>Discover schema.</strong> Run <code>getschema</code> before querying unfamiliar datasets.</li>
-      </ol>
     </div>
   </div>
 
@@ -1061,11 +792,6 @@
       const b = document.querySelector('.cta');
       b.classList.add('copied');
       setTimeout(() => b.classList.remove('copied'), 2000);
-    }
-
-    function scrollToTop(e) {
-      e.preventDefault();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   </script>
 </body>
