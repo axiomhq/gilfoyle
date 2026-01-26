@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="font" type="font/woff2" href="https://axiom.co/fonts/BerkeleyMono-Regular.woff2" crossorigin>
   <link rel="preload" as="font" type="font/woff2" href="https://axiom.co/fonts/BerkeleyMono-Bold.woff2" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;900&display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="../assets/hero.png">
 
   <style>
@@ -118,11 +118,11 @@
       z-index: 10;
       min-height: 100vh;
       display: grid;
-      grid-template-columns: 40% 60%;
+      grid-template-columns: 1fr 1fr;
       padding: 4rem 6rem 2rem 6rem;
       align-items: center;
-      gap: 6rem;
-      max-width: 1600px;
+      gap: 4rem;
+      max-width: 1800px;
       margin: 0 auto;
     }
 
@@ -136,18 +136,15 @@
 
     h1 {
       font-family: 'Inter', sans-serif;
-      font-size: clamp(4rem, 5vw, 9rem);
-      /* Responsive, massive, never breaks */
+      font-size: clamp(5rem, 8vw, 11rem);
       font-weight: 900;
       line-height: 0.8;
       letter-spacing: -0.06em;
       text-transform: uppercase;
       margin-bottom: 3rem;
       margin-left: -0.06em;
-      /* Optical alignment */
       color: #fff;
       white-space: nowrap;
-      /* MANDATORY: No wrapping */
       position: relative;
       text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
     }
@@ -174,50 +171,54 @@
 
     .manifesto {
       font-family: 'Berkeley Mono', monospace;
-      font-size: 1rem;
-      line-height: 1.8;
-      color: #888;
+      font-size: 1.1rem;
+      line-height: 1.9;
+      color: #666;
       margin-left: 4px;
-      max-width: 700px;
+      max-width: 520px;
     }
 
     .manifesto p {
-      margin-bottom: 1.2rem;
+      margin-bottom: 1rem;
+    }
+
+    .manifesto p:first-child {
+      color: #aaa;
     }
 
     .manifesto strong {
-      color: #eee;
-      font-weight: 400;
-      /* No extra decoration, just contrast */
+      color: #fff;
+      font-weight: 700;
     }
 
     .cta-container {
       margin-top: 2rem;
-      margin-left: calc(4px - 1.5rem);
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
+      margin-left: 4px;
     }
 
     .cta {
       background: transparent;
-      color: #fff;
-      padding: 0.8rem 1.5rem;
+      color: #ccc;
+      padding: 1rem 1.5rem;
       font-family: 'Berkeley Mono', monospace;
       font-weight: 400;
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       border: 1px solid #333;
       cursor: pointer;
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 1rem;
       transition: all 0.2s;
       letter-spacing: 0.05em;
+      text-decoration: none;
     }
 
     .cta:hover {
+      color: #fff;
       border-color: #666;
       background: rgba(255, 255, 255, 0.02);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15);
     }
 
     .cta .cmd-text::before {
@@ -226,23 +227,35 @@
       color: #444;
     }
 
+    .cta .divider {
+      width: 1px;
+      height: 1rem;
+      background: #333;
+    }
+
+    .cta a {
+      display: flex;
+      align-items: center;
+    }
+
+    .cta .github-icon {
+      width: 18px;
+      height: 18px;
+      fill: #666;
+      transition: fill 0.2s;
+    }
+
+    .cta:hover .github-icon {
+      fill: #999;
+    }
+
     .cta .check {
       color: var(--c-success);
-      margin-left: 1rem;
+      display: none;
     }
 
     .cta.copied {
       border-color: var(--c-success);
-    }
-
-    .cta:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15);
-    }
-
-    .cta .check {
-      display: none;
-      margin-left: 0.5rem;
     }
 
     .cta.copied .check {
@@ -251,27 +264,6 @@
 
     .cta.copied .cmd-text {
       opacity: 0.5;
-    }
-
-    .github-link {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 36px;
-      color: #444;
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-
-    .github-link:hover {
-      color: #888;
-    }
-
-    .github-link svg {
-      width: 20px;
-      height: 20px;
-      fill: currentColor;
     }
 
     /* RIGHT PANEL - TERMINAL */
@@ -294,7 +286,7 @@
         0 0 60px rgba(80, 250, 123, 0.08);
       display: flex;
       flex-direction: column;
-      height: 650px;
+      height: 720px;
       overflow: hidden;
     }
 
@@ -308,6 +300,26 @@
       background: #111;
       text-transform: uppercase;
       letter-spacing: 0.05em;
+    }
+
+    .status-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--c-success);
+      border-radius: 50%;
+      box-shadow: 0 0 6px 2px var(--c-success);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 6px 2px var(--c-success); }
+      50% { opacity: 0.6; box-shadow: 0 0 3px 1px var(--c-success); }
     }
 
     .term-body {
@@ -487,11 +499,15 @@
       }
 
       h1 {
-        font-size: 5rem;
+        font-size: clamp(3rem, 12vw, 5rem);
       }
 
       .manifesto {
         margin: 0 auto;
+      }
+
+      .cta-container {
+        margin-left: 0;
       }
 
       .terminal {
@@ -529,13 +545,16 @@
       </div>
 
       <div class="cta-container">
-        <button class="cta" onclick="copy()"><span class="cmd-text">npx skills add axiomhq/gilfoyle</span><span
-            class="check">✓</span></button>
-        <a href="https://github.com/axiomhq/gilfoyle" target="_blank" rel="noopener" class="github-link"
-          title="View on GitHub"><svg viewBox="0 0 24 24">
-            <path
-              d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-          </svg></a>
+        <button class="cta" onclick="copy()">
+          <span class="cmd-text">npx skills add axiomhq/gilfoyle</span>
+          <span class="check">✓</span>
+          <span class="divider"></span>
+          <a href="https://github.com/axiomhq/gilfoyle" target="_blank" rel="noopener" title="View on GitHub" onclick="event.stopPropagation()">
+            <svg class="github-icon" viewBox="0 0 24 24">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+            </svg>
+          </a>
+        </button>
       </div>
     </div>
 
@@ -543,7 +562,7 @@
       <div class="terminal" onclick="focusInput()">
         <div class="terminal-header">
           <span>GILFOYLE_AGENT // v1.0.4</span>
-          <span>SON_OF_ANTON: ONLINE</span>
+          <span class="status-line">SON_OF_ANTON: ONLINE <span class="status-dot"></span></span>
         </div>
         <div class="term-body" id="term"></div>
         <div class="interact-hint" id="hint">Type to interact</div>
