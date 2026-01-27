@@ -1,6 +1,6 @@
 # Gilfoyle
 
-![Gilfoyle - SRE Debugging Agent](assets/hero.png)
+![Gilfoyle - SRE Debugging Agent](site/assets/hero.png)
 
 An SRE agent that does what you can't. Queries your observability stack. Finds root causes. Doesn't panic. Doesn't guess. Doesn't care about your feelings.
 
