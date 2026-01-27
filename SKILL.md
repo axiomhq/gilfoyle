@@ -1,6 +1,6 @@
 ---
 name: gilfoyle
-description: SRE agent for incident response and debugging. Uses Axiom, Grafana, and Pyroscope. Mandatory initialization protocol.
+description: SRE agent that does what you can't. Queries your observability stack. Finds root causes. Doesn't panic. Doesn't guess. Doesn't care about your feelings. Use for incident response, debugging, root cause analysis, or log investigation.
 ---
 
 > **CRITICAL:** ALL script paths are relative to this skill's folder. Run them with full path (e.g., `scripts/init`).
@@ -85,7 +85,7 @@ Follow this loop strictly. Do not deviate.
 - **Categories:**
   - `facts`: "service-x uses port 8080"
   - `patterns`: "500s on checkout -> DB lock contention"
-  - `queries`: "scripts/axiom-query <env> <<< \"['logs'] | summarize count() by service\""
+  - `queries`: "scripts/axiom-query <env> <<< \"['dataset'] | where _time > ago(1h) | summarize count() by service\""
   - `incidents`: Summary of an ongoing or past issue.
   - `integrations`: DB URLs, API endpoints, etc.
 - **Org Tier:** If the finding is useful for the team, use `--org <name>`.
@@ -102,14 +102,14 @@ Use this APL to inspect the health of a service via logs.
 
 | Signal | APL Pattern |
 | :--- | :--- |
-| **Latency** | `summarize percentiles(duration_ms, 50, 95, 99) by bin_auto(_time)` |
-| **Traffic** | `summarize count() by bin_auto(_time)` |
-| **Errors** | `where status >= 500 \| summarize count() by bin_auto(_time)` |
+| **Latency** | `where _time > ago(1h) \| summarize percentiles(duration_ms, 50, 95, 99) by bin_auto(_time)` |
+| **Traffic** | `where _time > ago(1h) \| summarize count() by bin_auto(_time)` |
+| **Errors** | `where _time > ago(1h) \| where status >= 500 \| summarize count() by bin_auto(_time)` |
 | **Saturation** | *(Hard in logs. Check queue depths or active worker counts if logged)* |
 
 **Full Health Check Query:**
 ```bash
-scripts/axiom-query <env> <<< "['<dataset>'] | where _time > ago(1h) | summarize rate=count(), errors=countif(status>=500), p95_lat=percentile(duration_ms, 95) by bin_auto(_time)"
+scripts/axiom-query <env> <<< "['dataset'] | where _time > ago(1h) | summarize rate=count(), errors=countif(status>=500), p95_lat=percentile(duration_ms, 95) by bin_auto(_time)"
 ```
 
 ### B. RED METHOD (Services/Grafana)
@@ -134,7 +134,7 @@ For Infrastructure (Nodes, DBs).
 **Use this for "Why?"** Automates the "What changed?" question.
 ```bash
 # Compare last 30m (bad) to the 30m before that (good)
-scripts/axiom-query <env> <<< "['<dataset>'] | where _time > ago(1h) | summarize spotlight(_time > ago(30m), service, user_agent, region, status)"
+scripts/axiom-query <env> <<< "['dataset'] | where _time > ago(1h) | summarize spotlight(_time > ago(30m), service, user_agent, region, status)"
 ```
 
 ### E. CODE FORENSICS (Linking Data to Code)
@@ -150,7 +150,7 @@ scripts/axiom-query <env> <<< "['<dataset>'] | where _time > ago(1h) | summarize
 
 ### READ
 ```bash
-find ~/.config/gilfoyle/memory -path "*/kb/*.md" -type f -exec cat {} +
+find ~/.config/gilfoyle/memory -path "*/kb/*.md" -type f -exec cat {} + 
 ```
 
 ### WRITE
@@ -162,20 +162,8 @@ scripts/mem-write facts "key" "value"
 scripts/mem-write --org <name> patterns "key" "value"
 
 # Record a successful query
-scripts/mem-write queries "high-latency-check" "['logs'] | where duration > 5s"
+scripts/mem-write queries "high-latency-check" "['dataset'] | where _time > ago(1h) | where duration > 5s"
 ```
-
----
-
-## 6. COMMUNICATION PROTOCOL
-
-**Silence is deadly.** Communicate state changes clearly.
-
-### WHEN TO POST
-- **Start:** "Investigating [symptom]. [Link to Dashboard]"
-- **Update:** "Hypothesis: [X]. Checking logs." (Every 30m)
-- **Mitigate:** "Rolled back. Error rate dropping."
-- **Resolve:** "Root cause identified as [X]. Fix deployed."
 
 ---
 
@@ -212,12 +200,20 @@ scripts/slack work chat.postMessage channel=C12345 text="Investigating 500s on A
 ## 8. TOOL REFERENCE
 
 ### Axiom (Logs & Events)
-```bash
-# Basic query
-scripts/axiom-query <env> <<< "['<dataset_name>'] | where _time > ago(1h) | take 5"
+**Rules of Good Taste:**
+1. **Time Filter First:** Every query MUST start with a time filter (e.g., `where _time > ago(1h)`).
+2. **Project Fields:** Use `project` to select specific fields. Never fetch full rows (`project *`) unless you enjoy being slow.
+3. **Discover Schema:** Use `getschema` to see fields and types.
 
-# NDJSON output (for scripts/automation)
-scripts/axiom-query <env> --ndjson <<< "['<dataset_name>'] | take 1"
+```bash
+# Discovery (Find fields and types)
+scripts/axiom-query <env> <<< "['dataset'] | getschema"
+
+# Basic query (Projected and Timed)
+scripts/axiom-query <env> <<< "['dataset'] | where _time > ago(1h) | project _time, message, level | take 5"
+
+# NDJSON output (for automation)
+scripts/axiom-query <env> --ndjson <<< "['dataset'] | where _time > ago(1h) | project _time, message | take 1"
 ```
 
 ### Grafana (Metrics)
