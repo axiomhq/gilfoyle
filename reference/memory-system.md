@@ -11,7 +11,7 @@ Three-tier memory with automatic merging. All tiers use identical structure.
 
 ## Reading Memory
 
-Before investigating, read all memory tiers:
+Before investigating, read all memory tiers. **ALWAYS read full files.** NEVER use `head -n N` or other partial read operators; a partial knowledge base is worse than none.
 
 ```bash
 # Personal tier
