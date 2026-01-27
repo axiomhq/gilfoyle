@@ -199,9 +199,13 @@
     .cta-container {
       margin-top: 2rem;
       margin-left: 4px;
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
     }
 
-    .cta {
+    .btn {
       background: transparent;
       color: #ccc;
       padding: 1rem 1.5rem;
@@ -212,13 +216,14 @@
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 1rem;
+      gap: 0.75rem;
       transition: all 0.2s;
       letter-spacing: 0.05em;
       text-decoration: none;
+      height: 3.5rem;
     }
 
-    .cta:hover {
+    .btn:hover {
       color: #fff;
       border-color: #666;
       background: rgba(255, 255, 255, 0.02);
@@ -226,48 +231,42 @@
       box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15);
     }
 
-    .cta .cmd-text::before {
+    .btn-copy .cmd-text::before {
       content: ">";
       margin-right: 0.75rem;
       color: #444;
     }
 
-    .cta .divider {
-      width: 1px;
-      height: 1rem;
-      background: #333;
+    .btn-github {
+      padding-left: 1.25rem;
+      padding-right: 1.25rem;
     }
 
-    .cta a {
-      display: flex;
-      align-items: center;
-    }
-
-    .cta .github-icon {
-      width: 18px;
-      height: 18px;
+    .btn-github .github-icon {
+      width: 20px;
+      height: 20px;
       fill: #666;
       transition: fill 0.2s;
     }
 
-    .cta:hover .github-icon {
-      fill: #999;
+    .btn-github:hover .github-icon {
+      fill: #fff;
     }
 
-    .cta .check {
+    .btn-copy .check {
       color: var(--c-success);
       display: none;
     }
 
-    .cta.copied {
+    .btn-copy.copied {
       border-color: var(--c-success);
     }
 
-    .cta.copied .check {
+    .btn-copy.copied .check {
       display: inline;
     }
 
-    .cta.copied .cmd-text {
+    .btn-copy.copied .cmd-text {
       opacity: 0.5;
     }
 
@@ -496,7 +495,7 @@
     @media (max-width: 900px) {
       .wrapper {
         grid-template-columns: 1fr;
-        padding: 3rem 2rem 2rem 2rem;
+        padding: 3rem 1.5rem 2rem 1.5rem;
         text-align: center;
         gap: 2rem;
         min-height: auto;
@@ -504,31 +503,63 @@
       }
 
       h1 {
-        font-size: clamp(3rem, 12vw, 5rem);
+        font-size: clamp(4rem, 20vw, 8rem);
       }
 
       .manifesto {
         margin: 0 auto;
+        font-size: 1rem;
       }
 
       .cta-container {
         margin-left: 0;
+        flex-direction: column;
+        width: 100%;
+        align-items: stretch;
+      }
+
+      .btn {
+        justify-content: center;
+        width: 100%;
+      }
+
+      .btn-copy {
+        font-size: 0.8rem;
+        padding: 1rem;
       }
 
       .terminal {
-        height: 500px;
+        height: 450px;
+      }
+
+      .terminal-header {
+        font-size: 0.65rem;
+        padding: 0.6rem 0.75rem;
+      }
+
+      .log-row {
+        font-size: 0.75rem;
+        padding: 0.2rem 1rem;
+        text-align: left;
+      }
+
+      .user-row {
+        text-align: left;
+        padding-left: 1rem;
+        padding-right: 1rem;
       }
 
       .left-panel {
         align-items: center;
       }
 
-      .log-row {
-        text-align: left;
+      .input-wrapper {
+        padding: 0.75rem 1rem;
       }
 
-      .user-row {
-        text-align: left;
+      .interact-hint {
+        padding: 0.4rem 1rem;
+        font-size: 0.6rem;
       }
     }
   </style>
@@ -550,16 +581,16 @@
       </div>
 
       <div class="cta-container">
-        <button class="cta" onclick="copy()">
+        <button class="btn btn-copy" onclick="copy()">
           <span class="cmd-text">npx skills add axiomhq/gilfoyle</span>
           <span class="check">✓</span>
-          <span class="divider"></span>
-          <a href="https://github.com/axiomhq/gilfoyle" target="_blank" rel="noopener" title="View on GitHub" onclick="event.stopPropagation()">
-            <svg class="github-icon" viewBox="0 0 24 24">
-              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-            </svg>
-          </a>
         </button>
+        <a href="https://github.com/axiomhq/gilfoyle" target="_blank" rel="noopener" class="btn btn-github" title="View on GitHub">
+          <svg class="github-icon" viewBox="0 0 24 24">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+          </svg>
+          <span>GitHub</span>
+        </a>
       </div>
     </div>
 
@@ -846,7 +877,7 @@
 
     function copy() {
       navigator.clipboard.writeText('npx skills add axiomhq/gilfoyle');
-      const b = document.querySelector('.cta');
+      const b = document.querySelector('.btn-copy');
       b.classList.add('copied');
       setTimeout(() => b.classList.remove('copied'), 2000);
     }
