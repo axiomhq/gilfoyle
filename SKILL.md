@@ -85,7 +85,7 @@ Follow this loop strictly. Do not deviate.
 - **Categories:**
   - `facts`: "service-x uses port 8080"
   - `patterns`: "500s on checkout -> DB lock contention"
-  - `queries`: "['logs'] | summarize count() by service"
+  - `queries`: "scripts/axiom-query <env> <<< \"['logs'] | summarize count() by service\""
   - `incidents`: Summary of an ongoing or past issue.
   - `integrations`: DB URLs, API endpoints, etc.
 - **Org Tier:** If the finding is useful for the team, use `--org <name>`.
@@ -109,7 +109,7 @@ Use this APL to inspect the health of a service via logs.
 
 **Full Health Check Query:**
 ```bash
-scripts/axiom-query <env> "['<dataset>'] | where _time > ago(1h) | summarize rate=count(), errors=countif(status>=500), p95_lat=percentile(duration_ms, 95) by bin_auto(_time)"
+scripts/axiom-query <env> <<< "['<dataset>'] | where _time > ago(1h) | summarize rate=count(), errors=countif(status>=500), p95_lat=percentile(duration_ms, 95) by bin_auto(_time)"
 ```
 
 ### B. RED METHOD (Services/Grafana)
@@ -134,7 +134,7 @@ For Infrastructure (Nodes, DBs).
 **Use this for "Why?"** Automates the "What changed?" question.
 ```bash
 # Compare last 30m (bad) to the 30m before that (good)
-scripts/axiom-query <env> "['<dataset>'] | where _time > ago(1h) | summarize spotlight(_time > ago(30m), service, user_agent, region, status)"
+scripts/axiom-query <env> <<< "['<dataset>'] | where _time > ago(1h) | summarize spotlight(_time > ago(30m), service, user_agent, region, status)"
 ```
 
 ### E. CODE FORENSICS (Linking Data to Code)
@@ -214,7 +214,10 @@ scripts/slack work chat.postMessage channel=C12345 text="Investigating 500s on A
 ### Axiom (Logs & Events)
 ```bash
 # Basic query
-scripts/axiom-query <env> "['<dataset_name>'] | where _time > ago(1h) | take 5"
+scripts/axiom-query <env> <<< "['<dataset_name>'] | where _time > ago(1h) | take 5"
+
+# NDJSON output (for scripts/automation)
+scripts/axiom-query <env> --ndjson <<< "['<dataset_name>'] | take 1"
 ```
 
 ### Grafana (Metrics)

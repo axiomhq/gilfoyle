@@ -1,46 +1,61 @@
 #!/usr/bin/env bash
 # Axiom APL query helper - reads query from stdin
 #
-# Usage: axiom-query <deployment> [--raw] <<< "query"
+# Usage: axiom-query <deployment> [options] <<< "query"
+#
+# Options:
+#   --raw     Output raw API response (columnar JSON)
+#   --ndjson  Output Newline Delimited JSON (row-oriented)
+#   --full    Do not truncate values in text output
 #
 # Examples:
 #   # Simple query
 #   axiom-query prod <<< "['logs'] | take 5"
 #
-#   # Complex query (heredoc - no escaping needed)
-#   axiom-query prod <<'APL'
-#   ['logs']
-#   | where ['kubernetes.labels.app'] == "my-service"
-#   | where _time between (ago(1h) .. now())
-#   | summarize count() by bin(_time, 1m)
-#   APL
+#   # JSON processing
+#   axiom-query prod --ndjson <<< "['logs'] | take 5" | jq -c '.status'
 #
-#   # From file
-#   axiom-query prod < query.apl
-#
-#   # Raw JSON output
-#   axiom-query prod --raw <<< "['logs'] | take 5"
+#   # Raw API output
+#   axiom-query prod --raw <<< "['logs']"
 
 set -euo pipefail
 
-DEPLOYMENT="${1:-}"
-RAW=""
-
-if [[ -z "$DEPLOYMENT" ]]; then
-  echo "Usage: axiom-query <deployment> [--raw] <<< 'query'" >&2
+if [[ $# -lt 1 ]]; then
+  echo "Usage: axiom-query <deployment> [options] <<< 'query'" >&2
   exit 1
 fi
 
-if [[ "${2:-}" == "--raw" ]]; then
-  RAW="--raw"
-fi
+DEPLOYMENT="$1"
+shift
+
+FMT_ARGS=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --raw)
+      FMT_ARGS="$FMT_ARGS --raw"
+      shift
+      ;;
+    --ndjson)
+      FMT_ARGS="$FMT_ARGS --ndjson"
+      shift
+      ;;
+    --full)
+      FMT_ARGS="$FMT_ARGS --full"
+      shift
+      ;;
+    *)
+      echo "Error: Unknown argument '$1'. Queries must be passed via stdin." >&2
+      exit 1
+      ;;
+  esac
+done
 
 if [[ -t 0 ]]; then
   echo "Error: No query provided. Pipe a query to stdin." >&2
   echo "" >&2
   echo "Examples:" >&2
   echo "  axiom-query $DEPLOYMENT <<< \"['logs'] | take 5\"" >&2
-  echo "  axiom-query $DEPLOYMENT < query.apl" >&2
   exit 1
 fi
 
@@ -48,5 +63,6 @@ APL=$(cat)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APL_JSON=$(printf '%s' "$APL" | jq -Rs .)
 
+# Execute query and pipe to formatter
 "$SCRIPT_DIR/axiom-api" "$DEPLOYMENT" POST "/v1/datasets/_apl?format=tabular" "{\"apl\": $APL_JSON}" \
-  | "$SCRIPT_DIR/axiom-query-fmt" $RAW
+  | "$SCRIPT_DIR/axiom-query-fmt" $FMT_ARGS
