@@ -138,20 +138,14 @@ Connection pool exhausted. Found leak in payment handler.
 
 **End of session:** Create summary in `kb/incidents.md` with key learnings.
 
-## Consolidation (Digest)
+## Consolidation (Sleep)
 
 Run after incidents or periodically:
 ```bash
-scripts/mem-digest              # Review journal, find stale entries
-scripts/mem-digest --prune      # Also archive stale entries
-scripts/mem-digest --days 60    # Custom stale threshold
+scripts/sleep    # Review recent additions for consolidation
 ```
 
-This will:
-1. Review journal entries for promotion to KB
-2. Find stale entries (unused 90+ days, not pinned)
-3. Archive stale entries (with `--prune`)
-4. Report memory stats
+This will dump recent memory additions for you to review and synthesize into patterns.
 
 ## Health Check
 

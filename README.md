@@ -78,7 +78,7 @@ scripts/slack default chat.postMessage channel=incidents text="Fixed. You're wel
 | **Grafana** | `grafana-query`, `grafana-alerts`, `grafana-datasources`, `grafana-api` |
 | **Pyroscope** | `pyroscope-flamegraph`, `pyroscope-diff`, `pyroscope-services`, `pyroscope-api` |
 | **Slack** | `slack` |
-| **Memory** | `mem-write`, `mem-doctor`, `mem-digest`, `mem-sync`, `mem-share` |
+| **Memory** | `mem-write`, `mem-doctor`, `mem-sync`, `mem-share` |
 | **Setup** | `setup`, `config` |
 
 ## Principles
