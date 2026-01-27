@@ -45,8 +45,7 @@ if [[ "$MODE" == "json" ]]; then
   exit 0
 fi
 
-echo "$INPUT" | jq -r --argjson full "$FULL" \
-'\
+echo "$INPUT" | jq -r --argjson full "$FULL" '
 def fmt:
   if . == null then empty
   elif type == "boolean" then (if . then "true" else "false" end)
