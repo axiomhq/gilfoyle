@@ -139,7 +139,7 @@ scripts/axiom-query <env> "['<dataset>'] | where _time > ago(1h) | summarize spo
 
 ### READ
 ```bash
-cat ~/.config/gilfoyle/memory/kb/*.md
+find ~/.config/gilfoyle/memory -path "*/kb/*.md" -type f -exec cat {} +
 ```
 
 ### WRITE
