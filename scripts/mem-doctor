@@ -9,10 +9,6 @@ MEMORY_DIR="$CONFIG_DIR/memory"
 KB_DIR="$MEMORY_DIR/kb"
 ORGS_DIR="$MEMORY_DIR/orgs"
 
-# Legacy paths
-LEGACY_DIR="$HOME/.config/amp/memory/personal/axiom-sre"
-LEGACY_AXIOM_TOML="$HOME/.axiom.toml"
-
 echo "=== Memory Doctor ==="
 echo ""
 
@@ -36,16 +32,14 @@ check_fail() {
 count_entries() {
   local dir="$1"
   local count=0
-  if [[ -d "$dir/kb" ]]; then
-    for f in "$dir/kb"/*.md; do
-      [[ -f "$f" ]] || continue
-      local c
-      c=$(grep -c "^## M-" "$f" 2>/dev/null | tr -d '[:space:]' || echo "0")
-      if [[ "$c" =~ ^[0-9]+$ ]]; then
-        count=$((count + c))
-      fi
-    done
-  fi
+  # Find all kb/*.md files in the directory, following symlinks if necessary
+  while IFS= read -r f; do
+    local c
+    c=$(grep -c "^## M-" "$f" 2>/dev/null | tr -d '[:space:]' || echo "0")
+    if [[ "$c" =~ ^[0-9]+$ ]]; then
+      count=$((count + c))
+    fi
+  done < <(find "$dir" -path "*/kb/*.md" -type f)
   echo "$count"
 }
 
@@ -57,16 +51,6 @@ if [[ -d "$KB_DIR" ]]; then
 else
   check_fail "Not found at $KB_DIR"
   echo "   Run: scripts/setup"
-fi
-
-# --- Check for legacy paths ---
-if [[ -d "$LEGACY_DIR/kb" ]]; then
-  check_warn "Legacy memory at $LEGACY_DIR (should migrate)"
-  echo "   Run: scripts/setup --migrate"
-fi
-if [[ -f "$LEGACY_AXIOM_TOML" ]]; then
-  check_warn "Legacy config at $LEGACY_AXIOM_TOML (should migrate)"
-  echo "   Run: scripts/setup --migrate"
 fi
 
 echo ""
