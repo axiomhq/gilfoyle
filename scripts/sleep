@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Gilfoyle Sleep Cycle (Context Review)
+# Usage: ./scripts/sleep
+#
+# Dumps recent additions to memory for the Agent to review and consolidate.
+
+set -euo pipefail
+
+MEMORY_DIR="$HOME/.config/gilfoyle/memory"
+
+# Colors
+BOLD='\033[1m'
+NC='\033[0m'
+
+echo -e "${BOLD}=== Memory Consolidation Review ===${NC}"
+echo "Agent: Review the following recent entries. Synthesize Patterns if possible."
+echo ""
+
+# Show recent entries (last 7 days)
+LAST_WEEK=$(date -v-7d +%Y-%m-%d 2>/dev/null || date -d "7 days ago" +%Y-%m-%d)
+
+find "$MEMORY_DIR" -path "*/kb/*.md" -type f | while read -r file; do
+    echo -e "${BOLD}File: $(basename "$file")${NC}"
+    # Extract headers with dates > LAST_WEEK
+    # Rough parsing of headers: ## M-YYYY-MM-DD
+    grep -n "^## M-" "$file" | awk -v d="$LAST_WEEK" '$3 > d {print}' | head -n 5
+    echo "..."
+done
+
+echo ""
+echo "Instructions:"
+echo "1. Read the full content of recent entries."
+echo "2. Synthesize generic patterns."
+echo "3. Run 'scripts/mem-write patterns ...'"
+echo "4. (Optional) Archive raw facts."
