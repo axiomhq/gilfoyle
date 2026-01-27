@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="font" type="font/woff2" href="https://axiom.co/fonts/BerkeleyMono-Regular.woff2" crossorigin>
   <link rel="preload" as="font" type="font/woff2" href="https://axiom.co/fonts/BerkeleyMono-Bold.woff2" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&display=block" rel="stylesheet">
   <link rel="preload" as="image" href="./assets/hero.png">
 
   <style>
@@ -152,6 +152,12 @@
       white-space: nowrap;
       position: relative;
       text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    h1.loaded {
+      opacity: 1;
     }
 
     h1::before {
@@ -874,6 +880,10 @@
     }
 
     setTimeout(run, 800);
+
+    document.fonts.ready.then(() => {
+      document.querySelector('h1').classList.add('loaded');
+    });
 
     function copy() {
       navigator.clipboard.writeText('npx skills add axiomhq/gilfoyle');
