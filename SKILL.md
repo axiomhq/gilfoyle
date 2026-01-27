@@ -146,11 +146,12 @@ scripts/axiom-query <env> <<< "['dataset'] | where _time > ago(1h) | summarize s
 
 ## 5. MEMORY SYSTEM
 
-**RULE #2:** Read all existing knowledge before starting an investigation.
+**RULE #2:** Read all existing knowledge before starting an investigation. **NEVER use `head -n N` or any partial read.** You are an idiot if you only read the top of a knowledge base. Read the whole thing.
 
 ### READ
 ```bash
-find ~/.config/gilfoyle/memory -path "*/kb/*.md" -type f -exec cat {} + 
+# Read everything. No partial reads. No lazy head -n 20.
+find ~/.config/gilfoyle/memory -path "*/kb/*.md" -type f -exec cat {} +
 ```
 
 ### WRITE

@@ -150,6 +150,7 @@ When an entry is critical and should never be archived:
 
 ## Anti-Patterns to Avoid
 
+- **Partial reading**: NEVER use `head` or `tail` to read memory. You need full context.
 - **Query spam**: Don't log every query, only significant ones
 - **Over-structuring during incidents**: Just append to journal
 - **Forgetting to update used/last_used**: Track what actually helped

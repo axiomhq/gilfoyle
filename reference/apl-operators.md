@@ -56,15 +56,15 @@ axiom-query staging -f /tmp/q.apl
 ## Time Range (CRITICAL)
 **ALWAYS use `between` first** — enables time-based indexing:
 ```apl
-['logs'] | where _time between (ago(1h) .. now())
-['logs'] | where _time between (datetime(2024-01-15T14:00:00Z) .. datetime(2024-01-15T15:00:00Z))
+['dataset'] | where _time between (ago(1h) .. now())
+['dataset'] | where _time between (datetime(2024-01-15T14:00:00Z) .. datetime(2024-01-15T15:00:00Z))
 ```
 
 ## Tabular Operators
 
 | Operator | Purpose | Example |
 |----------|---------|---------|
-| `where` | Filter rows | `where status >= 500` |
+| `where` | Filter rows | `where _time > ago(1h) and status >= 500` |
 | `summarize` | Aggregate | `summarize count() by service` |
 | `extend` | Add columns | `extend is_slow = duration > 1000` |
 | `project` | Select columns | `project _time, status, uri` |
@@ -78,7 +78,7 @@ axiom-query staging -f /tmp/q.apl
 | `parse` | Extract from strings | `parse msg with * "user=" user " "` |
 | `parse-kv` | Extract key-value | `parse-kv msg as (user:string)` |
 | `join` | Join tables | `join kind=inner (other) on id` |
-| `union` | Combine tables | `union ['logs-east'], ['logs-west']` |
+| `union` | Combine tables | `union ['dataset-east'], ['dataset-west']` |
 | `lookup` | Enrich with table | `lookup LookupTable on id` |
 | `mv-expand` | Expand arrays | `mv-expand tags` |
 | `make-series` | Time series arrays | `make-series count() on _time step 5m` |
@@ -109,12 +109,12 @@ Negations: `!has`, `!contains`, `!startswith`, `!in`
 
 ```apl
 // GOOD: Fast
-['logs'] | where _time between (ago(1h) .. now()) | where message has_cs "error"
-['logs'] | where _time between (ago(1h) .. now()) | where uri startswith_cs "/api/v2"
-['logs'] | where _time between (ago(1h) .. now()) | where status in (500, 502, 503)
+['dataset'] | where _time between (ago(1h) .. now()) | where message has_cs "error"
+['dataset'] | where _time between (ago(1h) .. now()) | where uri startswith_cs "/api/v2"
+['dataset'] | where _time between (ago(1h) .. now()) | where status in (500, 502, 503)
 
 // SLOW: Avoid
-['logs'] | where message matches regex ".*error.*"
+['dataset'] | where message matches regex ".*error.*"
 ```
 
 ## Logical Operators
