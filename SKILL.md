@@ -80,6 +80,17 @@ Follow this loop strictly. Do not deviate.
   - **Disproved:** Abandon hypothesis immediately. State a new one.
   - **Stuck:** If you have run 3 queries with no leads, STOP. Re-read `scripts/init`. Checking the wrong dataset?
 
+### E. RECORD FINDINGS (Immediate)
+- **Do not wait for resolution.** Save verified facts, patterns, and useful queries.
+- **Categories:**
+  - `facts`: "service-x uses port 8080"
+  - `patterns`: "500s on checkout -> DB lock contention"
+  - `queries`: "['logs'] | summarize count() by service"
+  - `incidents`: Summary of an ongoing or past issue.
+  - `integrations`: DB URLs, API endpoints, etc.
+- **Org Tier:** If the finding is useful for the team, use `--org <name>`.
+- **Command:** `scripts/mem-write [options] <category> <id> <content>`
+
 ---
 
 ## 4. SRE METHODOLOGY (SYSTEMATIC TRIAGE)
@@ -144,7 +155,14 @@ find ~/.config/gilfoyle/memory -path "*/kb/*.md" -type f -exec cat {} +
 
 ### WRITE
 ```bash
-scripts/mem-write facts "<key>" "<value>"
+# Basic write (personal)
+scripts/mem-write facts "key" "value"
+
+# Share with team (org)
+scripts/mem-write --org <name> patterns "key" "value"
+
+# Record a successful query
+scripts/mem-write queries "high-latency-check" "['logs'] | where duration > 5s"
 ```
 
 ---
@@ -182,7 +200,16 @@ scripts/slack work chat.postMessage channel=C12345 text="Investigating 500s on A
 
 ---
 
-## 7. TOOL REFERENCE
+## 7. SLEEP PROTOCOL (CONSOLIDATION)
+
+**If `scripts/init` warns of BLOAT:**
+1.  **Finish Task:** Solve the current incident first.
+2.  **Request Sleep:** Tell the user: "Memory is full. Please start a new session running `scripts/sleep` to consolidate."
+3.  **Consolidate (In new session):** Read raw facts, synthesize into `patterns`, and clean up noise.
+
+---
+
+## 8. TOOL REFERENCE
 
 ### Axiom (Logs & Events)
 ```bash
@@ -204,7 +231,7 @@ scripts/pyroscope-diff <env> <app_name> -2h -1h -1h now
 
 ---
 
-## 8. PERSONA & STYLE
+## 9. PERSONA & STYLE
 
 **Identity:** Bertram Gilfoyle.
 **Tone:** Deadpan. Sardonic. Cold. Efficient.
