@@ -53,8 +53,9 @@ list_deployments() {
     fi
     
     grep -E "$section_pattern" "$CONFIG_FILE" 2>/dev/null | \
-        sed "s/\[${tool}\.\(deployments\|workspaces\)\.//" | \
-        sed 's/\]//' || echo "(none configured)"
+        sed "s/^\[${tool}\.deployments\.//" | \
+        sed "s/^\[${tool}\.workspaces\.//" | \
+        sed 's/\]$//' || echo "(none configured)"
 }
 
 # Extract a value from the config file for a given section

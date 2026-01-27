@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Gilfoyle Axiom Discovery
+# Usage: ./scripts/discover-axiom
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_SCRIPT="$SCRIPT_DIR/config"
+
+# Colors for output
+BOLD='\033[1m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+if [[ ! -f "$CONFIG_SCRIPT" ]]; then
+    exit 1
+fi
+
+deployments=$("$CONFIG_SCRIPT" --list axiom)
+
+if [[ "$deployments" == "(none configured)" ]]; then
+    exit 0
+fi
+
+echo -e "${BLUE}=== Axiom Deployments ===${NC}"
+
+# Temp dir for parallel results
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+# Helper for millisecond timestamp using Bash built-in
+current_time_ms() {
+    # EPOCHREALTIME is available in Bash 5.0+
+    local t=${EPOCHREALTIME:-$(date +%s).000}
+    # Convert seconds.microseconds to milliseconds
+    local s=${t%.*}
+    local us=${t#*.}
+    # Ensure us is 6 digits for padding, then take first 3 for ms
+    us=$(printf "% -06s" "$us" | cut -c1-6)
+    echo $(( s * 1000 + 10#${us%???} ))
+}
+
+discover_dep() {
+    local dep="$1"
+    local out="$TMP_DIR/$dep"
+    
+    {
+        START_TIME=$(current_time_ms)
+        echo -e "deployment: ${BOLD}$dep${NC}"
+        
+        # Strategy 1: Popularity (Top queried datasets in last 2 years)
+        POPULARITY_QUERY="['axiom-history'] | where _time > ago(730d) | summarize count() by dataset | top 20 by count_"
+        
+        POPULAR_DATASETS=$(echo "$POPULARITY_QUERY" | "$SCRIPT_DIR/axiom-query" "$dep" --raw 2>/dev/null | jq -r '.tables[0].columns[0][] // empty' 2>/dev/null || echo "")
+        
+        END_QUERY=$(current_time_ms)
+        DURATION_QUERY=$(( END_QUERY - START_TIME ))
+        
+        if [[ -n "$POPULAR_DATASETS" ]]; then
+            count=$(echo "$POPULAR_DATASETS" | grep -c .)
+            echo -e "  ${GREEN}Top datasets found ($count)${NC} (${DURATION_QUERY}ms)"
+            echo "$POPULAR_DATASETS" | sed 's/^/  - /'
+        else
+            # Strategy 2: Fallback
+            response=$("$SCRIPT_DIR/axiom-api" "$dep" GET "/v1/datasets" 2>/dev/null || echo "")
+            END_FALLBACK=$(current_time_ms)
+            DURATION_FALLBACK=$(( END_FALLBACK - END_QUERY ))
+            
+            count=$(echo "$response" | jq -r 'length' 2>/dev/null || echo "0")
+            
+            if [[ "$count" -gt 0 ]]; then
+                echo -e "  ${GREEN}$count datasets found${NC} (query: ${DURATION_QUERY}ms, fallback: ${DURATION_FALLBACK}ms)"
+                echo "$response" | jq -r '.[] | "  - " + .name' | sort | head -n 10
+                if [[ "$count" -gt 10 ]]; then
+                    echo "  - ... (and $((count - 10)) more)"
+                    echo -e "  ${BOLD}To search:${NC} scripts/axiom-api $dep GET \"/v1/datasets\" | jq -r '.[].name' | grep \"pattern\""
+                fi
+            else
+                echo -e "  ${RED}No datasets found or auth failed${NC} (total: $((DURATION_QUERY + DURATION_FALLBACK))ms)"
+            fi
+        fi
+    } > "$out" 2>&1
+}
+
+# Launch all in parallel
+for dep in $deployments; do
+    discover_dep "$dep" &
+done
+
+wait
+
+# Output in order
+for dep in $deployments; do
+    if [[ -f "$TMP_DIR/$dep" ]]; then
+        cat "$TMP_DIR/$dep"
+    fi
+done
