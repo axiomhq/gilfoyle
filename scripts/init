@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Gilfoyle Initialization & Discovery Script
+# Usage: ./scripts/init
+#
+# Rule #1: RUN THIS FIRST.
+# Performs discovery on all configured environments to prevent hallucinations.
+# Lists available Axiom datasets, Grafana datasources, Pyroscope apps, and K8s contexts.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Colors for output
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+echo -e "${BOLD}Gilfoyle Environment Discovery${NC}"
+echo "=============================="
+
+# Sync shared memory first (fast, usually)
+"$SCRIPT_DIR/mem-sync"
+echo ""
+
+# Create temp files for output
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+echo -e "Scanning environments in parallel..."
+
+# Run discovery in parallel
+"$SCRIPT_DIR/discover-axiom" > "$TMP_DIR/axiom" 2>&1 &
+PID_AXIOM=$!
+
+"$SCRIPT_DIR/discover-grafana" > "$TMP_DIR/grafana" 2>&1 &
+PID_GRAFANA=$!
+
+"$SCRIPT_DIR/discover-pyroscope" > "$TMP_DIR/pyroscope" 2>&1 &
+PID_PYROSCOPE=$!
+
+"$SCRIPT_DIR/discover-k8s" > "$TMP_DIR/k8s" 2>&1 &
+PID_K8S=$!
+
+"$SCRIPT_DIR/discover-alerts" > "$TMP_DIR/alerts" 2>&1 &
+PID_ALERTS=$!
+
+"$SCRIPT_DIR/discover-slack" > "$TMP_DIR/slack" 2>&1 &
+PID_SLACK=$!
+
+# Wait for all background jobs
+wait $PID_AXIOM $PID_GRAFANA $PID_PYROSCOPE $PID_K8S $PID_ALERTS $PID_SLACK
+
+# Display results
+cat "$TMP_DIR/alerts"
+echo ""
+cat "$TMP_DIR/slack"
+echo ""
+cat "$TMP_DIR/axiom"
+echo ""
+cat "$TMP_DIR/grafana"
+echo ""
+cat "$TMP_DIR/pyroscope"
+echo ""
+cat "$TMP_DIR/k8s"
+
+echo ""
+echo -e "${BOLD}Discovery Complete.${NC}"
+echo "Context loaded. You may now formulate hypotheses based on these actual assets."
