@@ -94,27 +94,21 @@ Create summary in `kb/incidents.md` with key learnings.
 
 ---
 
-## Consolidation (Digest)
+## Consolidation (Sleep)
 
 Run periodically or after incidents:
 
 ```bash
-scripts/mem-digest
+scripts/sleep
 ```
 
 This will:
-1. **Review** journal entries for promotion to KB
-2. **Report** memory stats and stale entries
-3. **Suggest** cleanup actions
+1. **Review** recent entries for promotion to KB
+2. **Dump** content for synthesis
 
 ### Manual Actions
 
 **Promote:** Move valuable journal entries to appropriate `kb/*.md` file.
-
-**Prune:** Archive stale entries (unused 90+ days, not pinned):
-```bash
-scripts/mem-prune --tier personal
-```
 
 **Share:** Commit org memory changes:
 ```bash
@@ -142,8 +136,7 @@ When an entry is critical and should never be archived:
 | `scripts/org-add` | Add an org for shared memory |
 | `scripts/mem-sync` | Pull org memory updates |
 | `scripts/mem-share` | Commit and push org changes |
-| `scripts/mem-digest` | Consolidation pass |
-| `scripts/mem-prune` | Archive stale entries |
+| `scripts/sleep` | Consolidation pass |
 | `scripts/mem-doctor` | Health check |
 
 ---
