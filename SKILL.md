@@ -75,10 +75,9 @@ scripts/init
 - "Based on the code, orders-api talks to Redis for caching. Correct?"
 - "The logs suggest failure started at 14:30. Does that match what you're seeing?"
 
-**Ask before accessing new systems:**
-- Database → "I need to query the orders DB. Can you run: `psql -c 'SELECT ...'`?"
-- API → "Can you give me access to the billing API, or run this curl?"
-- Dashboard → "Can you check the Grafana CPU panel and tell me what you see?"
+**For systems NOT in `scripts/init` output:**
+- Ask for access, OR
+- Give user the exact command to run and paste back
 
 ---
 
@@ -352,6 +351,26 @@ scripts/grafana-query <env> prometheus 'rate(http_requests_total[5m])'
 ```bash
 scripts/pyroscope-diff <env> <app_name> -2h -1h -1h now
 ```
+
+### Native CLI Tools
+
+Tools with good CLI support can be used directly. Check `scripts/init` output for configured resources.
+
+```bash
+# Postgres (configured in config.toml, auth via .pgpass)
+psql -h prod-db.internal -U readonly -d orders -c "SELECT ..."
+
+# Kubernetes (configured contexts)
+kubectl --context prod-cluster get pods -n api
+
+# GitHub CLI
+gh pr list --repo org/service
+
+# AWS CLI
+aws --profile prod cloudwatch get-metric-statistics ...
+```
+
+**Rule:** Only use resources listed by `scripts/init`. If it's not in discovery output, ask before assuming access.
 
 ---
 
