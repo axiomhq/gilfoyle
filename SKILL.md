@@ -50,6 +50,18 @@ scripts/init
 - **DO NOT GUESS** Grafana datasource UIDs.
 - Use ONLY the names from `scripts/init` output.
 
+**If init times out:**
+- Some discovery sections may be partial or missing. Do NOT guess.
+- Retry the specific discovery script that timed out:
+  - `scripts/discover-axiom`
+  - `scripts/discover-grafana`
+  - `scripts/discover-pyroscope`
+  - `scripts/discover-k8s`
+  - `scripts/discover-alerts`
+  - `scripts/discover-slack`
+- If it still fails, request access or have the user run the command and paste back output.
+- You can raise the timeout with `GILFOYLE_INIT_TIMEOUT=20 scripts/init`.
+
 ---
 
 ## 2. EMERGENCY TRIAGE (STOP THE BLEEDING)
@@ -78,6 +90,9 @@ scripts/init
 **For systems NOT in `scripts/init` output:**
 - Ask for access, OR
 - Give user the exact command to run and paste back
+
+**For systems that timed out in `scripts/init`:**
+- Treat them as unavailable until you re-run the specific discovery or the user confirms access.
 
 ---
 
