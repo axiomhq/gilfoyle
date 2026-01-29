@@ -13,6 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Colors for output
 BOLD='\033[1m'
 NC='\033[0m' # No Color
+YELLOW='\033[0;33m'
 
 echo -e "${BOLD}Gilfoyle Environment Discovery${NC}"
 echo "=============================="
@@ -27,40 +28,74 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 echo -e "Scanning environments in parallel..."
 
+TIMEOUT_SECONDS="${GILFOYLE_INIT_TIMEOUT:-12}"
+
+JOBS=()
+
+start_job() {
+    local name="$1"
+    local out="$2"
+    shift 2
+
+    "$@" > "$out" 2>&1 &
+    local pid=$!
+
+    (
+        sleep "$TIMEOUT_SECONDS"
+        if kill -0 "$pid" 2>/dev/null; then
+            kill "$pid" 2>/dev/null || true
+            echo "timeout" > "$TMP_DIR/${name}.timeout"
+        fi
+    ) &
+    local timer=$!
+
+    JOBS+=("${name}:${pid}:${timer}")
+}
+
+wait_jobs() {
+    local job name pid timer
+    for job in "${JOBS[@]}"; do
+        IFS=: read -r name pid timer <<< "$job"
+        wait "$pid" || true
+        if kill -0 "$timer" 2>/dev/null; then
+            kill "$timer" 2>/dev/null || true
+        fi
+    done
+}
+
+render_output() {
+    local name="$1"
+    local file="$2"
+    local timeout_file="$TMP_DIR/${name}.timeout"
+    if [[ -f "$timeout_file" ]]; then
+        echo -e "${YELLOW}⚠️  ${name} timed out after ${TIMEOUT_SECONDS}s${NC}" >> "$file"
+    fi
+    cat "$file"
+}
+
 # Run discovery in parallel
-"$SCRIPT_DIR/discover-axiom" > "$TMP_DIR/axiom" 2>&1 &
-PID_AXIOM=$!
-
-"$SCRIPT_DIR/discover-grafana" > "$TMP_DIR/grafana" 2>&1 &
-PID_GRAFANA=$!
-
-"$SCRIPT_DIR/discover-pyroscope" > "$TMP_DIR/pyroscope" 2>&1 &
-PID_PYROSCOPE=$!
-
-"$SCRIPT_DIR/discover-k8s" > "$TMP_DIR/k8s" 2>&1 &
-PID_K8S=$!
-
-"$SCRIPT_DIR/discover-alerts" > "$TMP_DIR/alerts" 2>&1 &
-PID_ALERTS=$!
-
-"$SCRIPT_DIR/discover-slack" > "$TMP_DIR/slack" 2>&1 &
-PID_SLACK=$!
+start_job "axiom" "$TMP_DIR/axiom" "$SCRIPT_DIR/discover-axiom"
+start_job "grafana" "$TMP_DIR/grafana" "$SCRIPT_DIR/discover-grafana"
+start_job "pyroscope" "$TMP_DIR/pyroscope" "$SCRIPT_DIR/discover-pyroscope"
+start_job "k8s" "$TMP_DIR/k8s" "$SCRIPT_DIR/discover-k8s"
+start_job "alerts" "$TMP_DIR/alerts" "$SCRIPT_DIR/discover-alerts"
+start_job "slack" "$TMP_DIR/slack" "$SCRIPT_DIR/discover-slack"
 
 # Wait for all background jobs
-wait $PID_AXIOM $PID_GRAFANA $PID_PYROSCOPE $PID_K8S $PID_ALERTS $PID_SLACK
+wait_jobs
 
 # Display results
-cat "$TMP_DIR/alerts"
+render_output "alerts" "$TMP_DIR/alerts"
 echo ""
-cat "$TMP_DIR/slack"
+render_output "slack" "$TMP_DIR/slack"
 echo ""
-cat "$TMP_DIR/axiom"
+render_output "axiom" "$TMP_DIR/axiom"
 echo ""
-cat "$TMP_DIR/grafana"
+render_output "grafana" "$TMP_DIR/grafana"
 echo ""
-cat "$TMP_DIR/pyroscope"
+render_output "pyroscope" "$TMP_DIR/pyroscope"
 echo ""
-cat "$TMP_DIR/k8s"
+render_output "k8s" "$TMP_DIR/k8s"
 
 # Check for Memory Bloat (The "Yawn")
 MEMORY_KB="$HOME/.config/gilfoyle/memory/kb"
