@@ -19,6 +19,14 @@ You're welcome.
 npx skills add axiomhq/gilfoyle
 ```
 
+### Requirements
+
+Gilfoyle uses `timeout` (GNU coreutils). On macOS install it with:
+
+```bash
+brew install coreutils
+```
+
 ## Setup
 
 ```bash
