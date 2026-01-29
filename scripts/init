@@ -30,6 +30,15 @@ echo -e "Scanning environments in parallel..."
 
 TIMEOUT_SECONDS="${GILFOYLE_INIT_TIMEOUT:-12}"
 
+if command -v timeout >/dev/null 2>&1; then
+    TIMEOUT_CMD="timeout"
+elif command -v gtimeout >/dev/null 2>&1; then
+    TIMEOUT_CMD="gtimeout"
+else
+    echo "timeout command not found. Install coreutils (gtimeout) or provide timeout in PATH." >&2
+    exit 1
+fi
+
 JOBS=()
 
 start_job() {
@@ -37,29 +46,24 @@ start_job() {
     local out="$2"
     shift 2
 
-    "$@" > "$out" 2>&1 &
-    local pid=$!
-
     (
-        sleep "$TIMEOUT_SECONDS"
-        if kill -0 "$pid" 2>/dev/null; then
-            kill "$pid" 2>/dev/null || true
+        "$TIMEOUT_CMD" -k 2s "${TIMEOUT_SECONDS}s" "$@" > "$out" 2>&1
+        status=$?
+        if [[ $status -eq 124 || $status -eq 137 ]]; then
             echo "timeout" > "$TMP_DIR/${name}.timeout"
         fi
+        exit $status
     ) &
-    local timer=$!
+    local pid=$!
 
-    JOBS+=("${name}:${pid}:${timer}")
+    JOBS+=("${name}:${pid}")
 }
 
 wait_jobs() {
-    local job name pid timer
+    local job name pid
     for job in "${JOBS[@]}"; do
-        IFS=: read -r name pid timer <<< "$job"
+        IFS=: read -r name pid <<< "$job"
         wait "$pid" || true
-        if kill -0 "$timer" 2>/dev/null; then
-            kill "$timer" 2>/dev/null || true
-        fi
     done
 }
 

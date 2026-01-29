@@ -50,6 +50,8 @@ scripts/init
 - **DO NOT GUESS** Grafana datasource UIDs.
 - Use ONLY the names from `scripts/init` output.
 
+**Requirement:** `timeout` (GNU coreutils). On macOS, install with `brew install coreutils` (provides `gtimeout`).
+
 **If init times out:**
 - Some discovery sections may be partial or missing. Do NOT guess.
 - Retry the specific discovery script that timed out:
