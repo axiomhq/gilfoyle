@@ -11,7 +11,7 @@
 # Config: ~/.config/gilfoyle/config.toml
 #   [slack.workspaces.work]
 #   token = "xoxb-..."
-#   
+#
 #   [slack.workspaces.personal]
 #   token = "xoxp-..."
 
@@ -55,7 +55,7 @@ for arg in "$@"; do
     --raw) RAW="--raw" ;;
     --full) FULL="--full" ;;
     {*) JSON_BODY="$arg" ;;
-    *=-) 
+    *=-)
       # key=- means read value from stdin
       STDIN_KEY="${arg%=-}"
       ;;
@@ -110,7 +110,7 @@ if [[ "$IS_POST" == true ]]; then
       fi
     done
   fi
-  
+
   RESPONSE=$(curl -s -X POST "$URL" \
     -H "Authorization: Bearer $SLACK_TOKEN" \
     -H "Content-Type: application/json; charset=utf-8" \
@@ -121,10 +121,69 @@ else
     QUERY=$(printf "&%s" "${PARAMS[@]}")
     URL="$URL?${QUERY:1}"
   fi
-  
+
   RESPONSE=$(curl -s "$URL" \
     -H "Authorization: Bearer $SLACK_TOKEN")
 fi
 
-# Format output
-echo "$RESPONSE" | "$SCRIPT_DIR/slack-fmt" $RAW $FULL
+# Auto-paginate for list methods (unless --raw or cursor already specified)
+# Map method -> array key for merging
+declare -A PAGINATE_KEYS=(
+  ["conversations.list"]="channels"
+  ["conversations.history"]="messages"
+  ["conversations.replies"]="messages"
+  ["conversations.members"]="members"
+  ["users.list"]="members"
+  ["files.list"]="files"
+  ["reactions.list"]="items"
+  ["stars.list"]="items"
+  ["search.messages"]="messages.matches"
+  ["search.files"]="files.matches"
+  ["usergroups.list"]="usergroups"
+  ["usergroups.users.list"]="users"
+)
+
+ARRAY_KEY="${PAGINATE_KEYS[$METHOD]:-}"
+HAS_CURSOR=false
+
+for param in "${PARAMS[@]}"; do
+  if [[ "$param" == cursor=* ]]; then
+    HAS_CURSOR=true
+    break
+  fi
+done
+
+if [[ -n "$ARRAY_KEY" && -z "$RAW" && "$HAS_CURSOR" == false ]]; then
+  # Collect all pages
+  ALL_RESPONSES="$RESPONSE"
+  NEXT_CURSOR=$(echo "$RESPONSE" | jq -r '.response_metadata.next_cursor // empty')
+
+  while [[ -n "$NEXT_CURSOR" ]]; do
+    # Add cursor to params
+    CURSOR_URL="$URL"
+    if [[ "$CURSOR_URL" == *"?"* ]]; then
+      CURSOR_URL="$CURSOR_URL&cursor=$NEXT_CURSOR"
+    else
+      CURSOR_URL="$CURSOR_URL?cursor=$NEXT_CURSOR"
+    fi
+
+    RESPONSE=$(curl -s "$CURSOR_URL" -H "Authorization: Bearer $SLACK_TOKEN")
+    ALL_RESPONSES=$(echo "$ALL_RESPONSES"$'\n'"$RESPONSE")
+    NEXT_CURSOR=$(echo "$RESPONSE" | jq -r '.response_metadata.next_cursor // empty')
+  done
+
+  # Merge all responses based on array key
+  if [[ "$ARRAY_KEY" == *"."* ]]; then
+    # Nested key like "messages.matches" - handle search results
+    OUTER="${ARRAY_KEY%%.*}"
+    INNER="${ARRAY_KEY#*.}"
+    MERGED=$(echo "$ALL_RESPONSES" | jq -s --arg o "$OUTER" --arg i "$INNER" '{ok: true, ($o): {($i): [.[][$o][$i][]]}}')
+  else
+    MERGED=$(echo "$ALL_RESPONSES" | jq -s --arg k "$ARRAY_KEY" '{ok: true, ($k): [.[][$k][]] | unique_by(.id // .)}')
+  fi
+
+  echo "$MERGED" | "$SCRIPT_DIR/slack-fmt" $RAW $FULL
+else
+  # Format output
+  echo "$RESPONSE" | "$SCRIPT_DIR/slack-fmt" $RAW $FULL
+fi
