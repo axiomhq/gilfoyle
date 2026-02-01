@@ -7,6 +7,7 @@
 #   --raw     Output raw API response (columnar JSON)
 #   --ndjson  Output Newline Delimited JSON (row-oriented)
 #   --full    Do not truncate values in text output
+#   --trace   Print x-axiom-trace-id on success
 #
 # Examples:
 #   # Simple query
@@ -29,6 +30,7 @@ DEPLOYMENT="$1"
 shift
 
 FMT_ARGS=""
+PRINT_TRACE=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -42,6 +44,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --full)
       FMT_ARGS="$FMT_ARGS --full"
+      shift
+      ;;
+    --trace)
+      PRINT_TRACE=true
       shift
       ;;
     *)
@@ -90,6 +96,13 @@ if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
     echo "trace_id: $trace" >&2
   fi
   exit 1
+fi
+
+if [[ "$PRINT_TRACE" == true ]]; then
+  trace=$(grep -i '^x-axiom-trace-id:' "$RESP_HEADERS" | tail -1 | awk '{print $2}' | tr -d '\r')
+  if [[ -n "$trace" ]]; then
+    echo "trace_id: $trace" >&2
+  fi
 fi
 
 cat "$RESP_BODY" | "$SCRIPT_DIR/axiom-query-fmt" $FMT_ARGS

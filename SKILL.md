@@ -178,6 +178,11 @@ Follow this loop strictly.
 scripts/axiom-query <env> <<< "['dataset'] | where _time > ago(1h) | summarize rate=count(), errors=countif(status>=500), p95_lat=percentile(duration_ms, 95) by bin_auto(_time)"
 ```
 
+Trace IDs for successful queries:
+```bash
+scripts/axiom-query <env> --trace <<< "['dataset'] | take 1"
+```
+
 ### B. RED METHOD (Services/Grafana)
 
 | Signal | PromQL Pattern |
