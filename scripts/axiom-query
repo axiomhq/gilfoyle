@@ -63,6 +63,33 @@ APL=$(cat)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APL_JSON=$(printf '%s' "$APL" | jq -Rs .)
 
+# Load config from unified config file
+# shellcheck disable=SC1090
+eval "$("$SCRIPT_DIR/config" axiom "$DEPLOYMENT")"
+
+RESP_HEADERS=$(mktemp)
+RESP_BODY=$(mktemp)
+cleanup() {
+  rm -f "$RESP_HEADERS" "$RESP_BODY"
+}
+trap cleanup EXIT
+
 # Execute query and pipe to formatter
-"$SCRIPT_DIR/axiom-api" "$DEPLOYMENT" POST "/v1/datasets/_apl?format=tabular" "{\"apl\": $APL_JSON}" \
-  | "$SCRIPT_DIR/axiom-query-fmt" $FMT_ARGS
+HTTP_CODE=$(curl -sS -o "$RESP_BODY" -D "$RESP_HEADERS" -w "%{http_code}" \
+  -X POST "$AXIOM_URL/v1/datasets/_apl?format=tabular" \
+  -H "Authorization: Bearer $AXIOM_TOKEN" \
+  -H "X-Axiom-Org-Id: $AXIOM_ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d "{\"apl\": $APL_JSON}")
+
+if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
+  msg=$(jq -r '.message // empty' "$RESP_BODY" 2>/dev/null)
+  trace=$(grep -i '^x-axiom-trace-id:' "$RESP_HEADERS" | tail -1 | awk '{print $2}' | tr -d '\r')
+  echo "error: ${msg:-http $HTTP_CODE}" >&2
+  if [[ -n "$trace" ]]; then
+    echo "trace_id: $trace" >&2
+  fi
+  exit 1
+fi
+
+cat "$RESP_BODY" | "$SCRIPT_DIR/axiom-query-fmt" $FMT_ARGS
