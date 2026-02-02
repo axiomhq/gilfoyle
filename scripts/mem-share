@@ -48,29 +48,13 @@ echo "Changes:"
 git status --short
 echo ""
 
-# Secrets warning
-echo "⚠️  WARNING: Verify no secrets, credentials, or sensitive data."
-echo ""
-read -r -p "Continue? [y/N] " confirm
-
-if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-  echo "Cancelled."
-  exit 0
-fi
-
 git add -A
 git commit -m "$MESSAGE"
 
-echo ""
-read -r -p "Push to remote? [Y/n] " push_confirm
-
-if [[ "$push_confirm" != "n" && "$push_confirm" != "N" ]]; then
-  if git push; then
-    echo "✓ Pushed to $ORG_NAME org memory"
-  else
-    echo "⚠️  Push failed. Check permissions or network."
-    echo "   Commit saved locally. Retry with: cd $ORG_DIR && git push"
-  fi
+if git push; then
+  echo "✓ Pushed to $ORG_NAME org memory"
 else
-  echo "Committed locally. Push later with: cd $ORG_DIR && git push"
+  echo "⚠️  Push failed. Check permissions or network."
+  echo "   Commit saved locally. Retry with: cd $ORG_DIR && git push"
+  exit 1
 fi
