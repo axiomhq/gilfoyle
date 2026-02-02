@@ -110,7 +110,7 @@ Follow this loop strictly.
 ### B. CODE CONTEXT
 - **Locate Code:** Find the relevant service in the repository
   - Check memory (`kb/facts.md`) for known repos
-  - Search GitHub if needed
+  - Prefer GitHub CLI (`gh`) or local clones for repo access; do not use web scraping for private repos
 - **Search Errors:** Grep for exact log messages or error constants
 - **Trace Logic:** Read the code path, check try/catch, configs
 - **Check History:** Version control for recent changes
