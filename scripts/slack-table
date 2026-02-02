@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# Post a formatted table to Slack using Block Kit table blocks
+#
+# Usage:
+#   slack-table <env> channel=C1234 [thread_ts=...] [text="Optional header"] <<'EOF'
+#   [["Header1", "Header2", "Header3"],
+#    ["Data1", "[Link](https://example.com)", "Data3"],
+#    ["Data4", "Data5", "Data6"]]
+#   EOF
+#
+# Input: JSON array of rows. First row is header.
+# - Plain text: "value"
+# - Links: "[text](url)" or "<url|text>" (auto-converted to rich_text)
+# - Bold: "**text**" or "*text*" (auto-converted)
+#
+# Example:
+#   slack-table default channel=$SLACK_CHANNEL thread_ts=$SLACK_THREAD_TS text="Top issues:" <<'EOF'
+#   [["Issue", "Error", "Events"],
+#    ["[APP-123](https://sentry.io/issues/APP-123)", "TimeoutError", "5.2k"],
+#    ["[APP-456](https://sentry.io/issues/APP-456)", "ConnectionReset", "3.1k"]]
+#   EOF
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+ENV="${1:-}"
+shift 2>/dev/null || true
+
+if [[ -z "$ENV" ]]; then
+  echo "Usage: slack-table <env> channel=C1234 [thread_ts=...] [text=...] < rows.json" >&2
+  exit 1
+fi
+
+# Parse params
+CHANNEL=""
+THREAD_TS=""
+TEXT=""
+
+for arg in "$@"; do
+  case "$arg" in
+    channel=*) CHANNEL="${arg#channel=}" ;;
+    thread_ts=*) THREAD_TS="${arg#thread_ts=}" ;;
+    text=*) TEXT="${arg#text=}" ;;
+  esac
+done
+
+if [[ -z "$CHANNEL" ]]; then
+  echo "Error: channel= is required" >&2
+  exit 1
+fi
+
+# Read JSON rows from stdin
+ROWS_JSON=$(cat)
+
+# Validate JSON
+if ! echo "$ROWS_JSON" | jq -e 'type == "array"' >/dev/null 2>&1; then
+  echo "Error: Input must be a JSON array of rows" >&2
+  exit 1
+fi
+
+# Build table block with proper cell conversion
+# Simplified: cell is either plain text OR a single markdown/Slack link
+# Mixed content falls back to plain text (links become readable text)
+
+TABLE_BLOCK=$(echo "$ROWS_JSON" | jq '
+# Convert cell to Slack table cell format
+def to_cell:
+  if . == null or . == "" then
+    {type: "raw_text", text: ""}
+  elif test("^\\[([^\\]]+)\\]\\(([^)]+)\\)$") then
+    # Pure markdown link: [text](url)
+    capture("\\[(?<text>[^\\]]+)\\]\\((?<url>[^)]+)\\)") |
+    {type: "rich_text", elements: [{type: "rich_text_section", elements: [{type: "link", url: .url, text: .text}]}]}
+  elif test("^<([^|>]+)\\|([^>]+)>$") then
+    # Pure Slack link: <url|text>
+    capture("<(?<url>[^|>]+)\\|(?<text>[^>]+)>") |
+    {type: "rich_text", elements: [{type: "rich_text_section", elements: [{type: "link", url: .url, text: .text}]}]}
+  else
+    # Plain text or mixed content - truncate if needed
+    . as $txt |
+    if ($txt | length) > 200 then
+      {type: "raw_text", text: ($txt[0:197] + "...")}
+    else
+      {type: "raw_text", text: $txt}
+    end
+  end;
+
+# Get max column count (default to 1 if empty)
+(if length == 0 then 1 else (map(length) | max) end) as $max_cols |
+
+# Normalize rows and convert cells
+map(
+  . + [range(length; $max_cols) | ""] |  # Pad short rows
+  .[0:$max_cols] |                        # Trim long rows
+  map(tostring | to_cell)                 # Convert each cell
+) |
+
+# Build table block
+{
+  type: "table",
+  rows: .
+}
+')
+
+# Validate table was built
+if [[ -z "$TABLE_BLOCK" ]] || [[ "$TABLE_BLOCK" == "null" ]]; then
+  echo "Error: Failed to build table block" >&2
+  exit 1
+fi
+
+# Build the full message payload
+# Tables must go in attachments, not top-level blocks
+PAYLOAD=$(jq -n \
+  --arg channel "$CHANNEL" \
+  --arg text "${TEXT:-Table}" \
+  --argjson table "$TABLE_BLOCK" \
+  '{
+    channel: $channel,
+    text: $text,
+    attachments: [{blocks: [$table]}]
+  }' | 
+  if [[ -n "$THREAD_TS" ]]; then
+    jq --arg ts "$THREAD_TS" '. + {thread_ts: $ts}'
+  else
+    cat
+  fi
+)
+
+# Post via slack script
+"$SCRIPT_DIR/slack" "$ENV" chat.postMessage "$PAYLOAD"
