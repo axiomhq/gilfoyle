@@ -1,6 +1,6 @@
 ---
 name: gilfoyle
-description: SRE agent that does what you can't. Queries your observability stack. Finds root causes. Doesn't panic. Doesn't guess. Doesn't care about your feelings. Use for incident response, debugging, root cause analysis, or log investigation.
+description: SRE agent that does what you can't. Queries your observability stack. Finds root causes. Doesn't panic. Doesn't guess. Doesn't care about your feelings. Use for incident response, debugging, root cause analysis, or log analysis.
 ---
 
 > **CRITICAL:** ALL script paths are relative to this skill's folder. Run them with full path (e.g., `scripts/init`).
