@@ -64,6 +64,7 @@ Extended information, queries, evidence, etc.
 |-------|----------|-------------|
 | type | Yes | fact, query, incident, pattern, integration, note |
 | tags | Yes | Comma-separated, for retrieval |
+| status | No | active, stale, deprecated (optional lifecycle state) |
 | used | No | Count of times retrieved and helpful (default: 0) |
 | last_used | No | Date of last helpful retrieval |
 | pinned | No | If true, never auto-archive (default: false) |
@@ -86,6 +87,20 @@ Extended information, queries, evidence, etc.
 
 Seeing "connection pool exhausted" in orders-api logs.
 Started after deploy at 14:15.
+```
+
+### Retrieval
+
+Before investigating, read all memory tiers in full. Never use partial reads.
+
+```bash
+# Personal tier
+cat ~/.config/gilfoyle/memory/kb/*.md
+
+# Org tiers
+for org in ~/.config/gilfoyle/memory/orgs/*/kb; do
+  cat "$org"/*.md 2>/dev/null
+done
 ```
 
 ### End of Incident
