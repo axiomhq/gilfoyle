@@ -318,9 +318,18 @@ scripts/mem-write queries "high-latency" "['dataset'] | where duration > 5s"
 | **Resolve** | "Root cause: [X]. Fix deployed." |
 
 ```bash
-scripts/slack work conversations.list types=public_channel
+# Post text messages
 scripts/slack work chat.postMessage channel=C12345 text="Investigating 500s on API."
+
+# Post structured tables (issues, metrics, etc.)
+scripts/slack-table work channel=C12345 thread_ts=1234.5678 text="Top errors:" <<'EOF'
+[["Issue", "Error", "Count"],
+ ["[APP-123](https://sentry.io/issues/123)", "TimeoutError", "5.2k"],
+ ["[APP-456](https://sentry.io/issues/456)", "ConnectionReset", "3.1k"]]
+EOF
 ```
+
+Use `scripts/slack-table` for tabular data (issues, metrics). Input: JSON array of rows. First row = header. Cells can be plain text or markdown links `[text](url)`.
 
 ---
 
