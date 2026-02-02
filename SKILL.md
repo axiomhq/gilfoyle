@@ -310,6 +310,8 @@ scripts/mem-write queries "high-latency" "['dataset'] | where duration > 5s"
 
 **Silence is deadly.** Communicate state changes. **Confirm target channel** before first post.
 
+**Always link to sources.** Issue IDs link to Sentry. Queries link to Axiom. PRs link to GitHub. No naked IDs.
+
 | When | Post |
 |:-----|:-----|
 | **Start** | "Investigating [symptom]. [Link to Dashboard]" |
@@ -318,18 +320,13 @@ scripts/mem-write queries "high-latency" "['dataset'] | where duration > 5s"
 | **Resolve** | "Root cause: [X]. Fix deployed." |
 
 ```bash
-# Post text messages
 scripts/slack work chat.postMessage channel=C12345 text="Investigating 500s on API."
-
-# Post structured tables (issues, metrics, etc.)
-scripts/slack-table work channel=C12345 thread_ts=1234.5678 text="Top errors:" <<'EOF'
-[["Issue", "Error", "Count"],
- ["[APP-123](https://sentry.io/issues/123)", "TimeoutError", "5.2k"],
- ["[APP-456](https://sentry.io/issues/456)", "ConnectionReset", "3.1k"]]
-EOF
 ```
 
-Use `scripts/slack-table` for tabular data (issues, metrics). Input: JSON array of rows. First row = header. Cells can be plain text or markdown links `[text](url)`.
+**NEVER use markdown tables** — Slack renders them as broken garbage. Use bullet lists:
+
+• <https://sentry.io/issues/APP-123|APP-123>: `TimeoutError` — 5.2k events
+• <https://sentry.io/issues/APP-456|APP-456>: `ConnectionReset` — 3.1k events
 
 ---
 
