@@ -55,7 +55,9 @@ discover_ws() {
         # But script usage defaults to fmt. Let's check if it worked.
         
         # Check if response contains channel names (lines starting with #)
-        count=$(echo "$response" | grep -c "^#" || echo "0")
+        count=$(echo "$response" | grep -c "^#" 2>/dev/null || true)
+        count="${count:-0}"
+        count="${count##*$'\n'}"  # Take last line if multi-line
         
         if [[ "$count" -gt 0 ]]; then
             echo -e "  ${GREEN}$count channels found${NC} (${DURATION}ms)"
