@@ -145,7 +145,82 @@ Follow this loop strictly.
 
 ---
 
-## 5. COGNITIVE TRAPS
+## 5. CONCLUSION VALIDATION (MANDATORY)
+
+Before declaring **any** stop condition (RESOLVED, MONITORING, ESCALATED, STALLED), run both checks.
+This applies to **pure RCA** too. No fix ≠ no validation.
+
+### Step 1: Self-Check (Same Context)
+
+If any answer is "no" or "not sure," keep investigating.
+
+```
+1. Did I prove mechanism, not just timing or correlation?
+2. What would prove me wrong, and did I actually test that?
+3. Are there untested assumptions in my reasoning chain?
+4. Is there a simpler explanation I didn't rule out?
+5. If no fix was applied (pure RCA), is the evidence still sufficient to explain the symptom?
+```
+
+### Step 2: Oracle Judge (Independent Review)
+
+Call the Oracle with your conclusion and evidence. Different model, fresh context, no sunk cost bias.
+
+```
+oracle({
+  task: "Review this incident investigation conclusion.
+
+        Check for:
+        1. Correlation vs causation (mechanism proven?)
+        2. Untested assumptions in the reasoning chain
+        3. Alternative explanations not ruled out
+        4. Evidence gaps or weak inferences
+
+        Be adversarial. Try to poke holes. If solid, say so.",
+  context: `
+## ORIGINAL INCIDENT
+
+**Report:** [User message/alert]
+**Symptom:** [What was broken]
+**Impact:** [Who/what was affected]
+**Started:** [Start time]
+
+## INVESTIGATION SUMMARY
+
+**Hypotheses tested:** [List]
+**Key evidence:** [Queries + links]
+
+## CONCLUSION
+
+**Root Cause:** [Statement]
+**Why this explains symptom:** [Mechanism + evidence]
+
+## IF FIX APPLIED
+
+**Fix:** [Action]
+**Verification:** [Query/test showing recovery]
+`
+})
+```
+
+If the Oracle finds gaps, keep investigating and report the gaps.
+
+---
+
+## 6. FINAL MEMORY DISTILLATION (MANDATORY)
+
+Before declaring RESOLVED/MONITORING/ESCALATED/STALLED, distill what matters:
+
+1. **Incident summary:** Add a short entry to `kb/incidents.md`.
+2. **Key facts:** Save 1-3 durable facts to `kb/facts.md`.
+3. **Best queries:** Save 1-3 queries that proved the conclusion to `kb/queries.md`.
+4. **New patterns:** If discovered, record to `kb/patterns.md`.
+
+Use `scripts/mem-write` for each item. If memory bloat is flagged by `scripts/init`, request `scripts/sleep`.
+
+---
+
+## 7. COGNITIVE TRAPS
 
 | Trap | Antidote |
 |:-----|:---------|
@@ -162,7 +237,7 @@ Follow this loop strictly.
 
 ---
 
-## 6. SRE METHODOLOGY
+## 8. SRE METHODOLOGY
 
 ### A. FOUR GOLDEN SIGNALS (Logs/Axiom)
 
@@ -232,7 +307,7 @@ scripts/axiom-query <env> "..." --raw | jq '.. | objects | select(.differences?)
 
 ---
 
-## 7. APL ESSENTIALS
+## 9. APL ESSENTIALS
 
 ### Time Ranges (CRITICAL)
 ```apl
@@ -263,7 +338,7 @@ scripts/axiom-query <env> "..." --raw | jq '.. | objects | select(.differences?)
 
 ---
 
-## 8. AXIOM LINKS
+## 10. AXIOM LINKS
 
 **Generate shareable links** for queries:
 ```bash
@@ -286,7 +361,7 @@ scripts/axiom-link <env> "['logs'] | summarize count() by service" "24h"
 
 ---
 
-## 9. MEMORY SYSTEM
+## 11. MEMORY SYSTEM
 
 See `reference/memory-system.md` for full documentation.
 
@@ -306,7 +381,7 @@ scripts/mem-write queries "high-latency" "['dataset'] | where duration > 5s"
 
 ---
 
-## 10. COMMUNICATION PROTOCOL
+## 12. COMMUNICATION PROTOCOL
 
 **Silence is deadly.** Communicate state changes. **Confirm target channel** before first post.
 
@@ -330,7 +405,7 @@ scripts/slack work chat.postMessage channel=C12345 text="Investigating 500s on A
 
 ---
 
-## 11. POST-INCIDENT
+## 13. POST-INCIDENT
 
 **Before sharing any findings:**
 - [ ] Every claim verified with query evidence
@@ -347,7 +422,7 @@ See `reference/postmortem-template.md` for retrospective format.
 
 ---
 
-## 12. SLEEP PROTOCOL (CONSOLIDATION)
+## 14. SLEEP PROTOCOL (CONSOLIDATION)
 
 **If `scripts/init` warns of BLOAT:**
 1. **Finish task:** Solve the current incident first
@@ -356,7 +431,7 @@ See `reference/postmortem-template.md` for retrospective format.
 
 ---
 
-## 13. TOOL REFERENCE
+## 15. TOOL REFERENCE
 
 ### Axiom (Logs & Events)
 ```bash
