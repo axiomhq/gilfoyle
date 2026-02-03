@@ -398,6 +398,23 @@ scripts/mem-write queries "high-latency" "['dataset'] | where duration > 5s"
 scripts/slack work chat.postMessage channel=C12345 text="Investigating 500s on API."
 ```
 
+### Sharing Images
+
+Generate diagrams or visualizations with the `painter` tool, then upload to Slack:
+
+```bash
+# Upload image to channel
+scripts/slack-upload <env> <channel> /path/to/image.png
+
+# With comment in thread
+scripts/slack-upload <env> <channel> ./diagram.png --comment "Architecture diagram" --thread_ts 1234567890.123456
+```
+
+**When to generate images:**
+- Architecture diagrams showing request flow or failure points
+- Timelines visualizing incident progression
+- Charts if APL visualization isn't sufficient
+
 **NEVER use markdown tables** — Slack renders them as broken garbage. Use bullet lists:
 
 • <https://sentry.io/issues/APP-123|APP-123>: `TimeoutError` — 5.2k events
@@ -453,6 +470,15 @@ scripts/grafana-query <env> prometheus 'rate(http_requests_total[5m])'
 ### Pyroscope (Profiling)
 ```bash
 scripts/pyroscope-diff <env> <app_name> -2h -1h -1h now
+```
+
+### Slack (Communication & Files)
+```bash
+# Post message
+scripts/slack <env> chat.postMessage channel=C1234 text="Message" thread_ts=1234567890.123456
+
+# Upload file/image
+scripts/slack-upload <env> <channel> ./file.png --comment "Description" --thread_ts 1234567890.123456
 ```
 
 ### Native CLI Tools
