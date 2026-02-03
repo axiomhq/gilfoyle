@@ -107,7 +107,7 @@ if [[ -z "$DEPLOYMENT" || -z "$datasource" || -z "$query" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-eval "$("$SCRIPT_DIR/grafana-config" "$DEPLOYMENT")"
+eval "$("$SCRIPT_DIR/config" grafana "$DEPLOYMENT")"
 
 # Helper function for authenticated requests
 grafana_curl() {
@@ -115,29 +115,10 @@ grafana_curl() {
     local url="$2"
     local data="${3:-}"
     
-    local curl_args=(-s -X "$method")
     if [[ -n "$data" ]]; then
-        curl_args+=(-H "Content-Type: application/json" -d "$data")
-    fi
-    
-    if [[ -n "${GRAFANA_ACCESS_CMD:-}" ]]; then
-        # cloudflared access curl requires URL as first argument after 'curl'
-        if [[ -n "$data" ]]; then
-            $GRAFANA_ACCESS_CMD "$url" -X "$method" -H "Content-Type: application/json" -d "$data" 2>/dev/null
-        else
-            $GRAFANA_ACCESS_CMD "$url" 2>/dev/null
-        fi
-    elif [[ -n "${GRAFANA_CF_ACCESS_CLIENT_ID:-}" && -n "${GRAFANA_CF_ACCESS_CLIENT_SECRET:-}" ]]; then
-        curl "${curl_args[@]}" \
-            -H "CF-Access-Client-Id: $GRAFANA_CF_ACCESS_CLIENT_ID" \
-            -H "CF-Access-Client-Secret: $GRAFANA_CF_ACCESS_CLIENT_SECRET" \
-            "$url"
-    elif [[ -n "${GRAFANA_TOKEN:-}" ]]; then
-        curl "${curl_args[@]}" -H "Authorization: Bearer $GRAFANA_TOKEN" "$url"
-    elif [[ -n "${GRAFANA_USERNAME:-}" ]]; then
-        curl "${curl_args[@]}" -u "$GRAFANA_USERNAME:$GRAFANA_PASSWORD" "$url"
+        "$SCRIPT_DIR/curl-auth" grafana "$DEPLOYMENT" -X "$method" -d "$data" "$url"
     else
-        curl "${curl_args[@]}" "$url"
+        "$SCRIPT_DIR/curl-auth" grafana "$DEPLOYMENT" "$url"
     fi
 }
 
