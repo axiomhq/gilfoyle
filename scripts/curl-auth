@@ -4,9 +4,10 @@
 #
 # Auth priority:
 #   1. access_command (e.g., cloudflared access curl)
-#   2. token (Bearer auth)
-#   3. username/password (Basic auth)
-#   4. No auth
+#   2. CF Access headers
+#   3. token (Bearer auth)
+#   4. username/password (Basic auth)
+#   5. No auth
 
 set -euo pipefail
 
@@ -30,6 +31,11 @@ case "$TOOL" in
     grafana)
         if [[ -n "${GRAFANA_ACCESS_CMD:-}" ]]; then
             $GRAFANA_ACCESS_CMD "$URL" "$@"
+        elif [[ -n "${GRAFANA_CF_ACCESS_CLIENT_ID:-}" && -n "${GRAFANA_CF_ACCESS_CLIENT_SECRET:-}" ]]; then
+            curl -s \
+                -H "CF-Access-Client-Id: $GRAFANA_CF_ACCESS_CLIENT_ID" \
+                -H "CF-Access-Client-Secret: $GRAFANA_CF_ACCESS_CLIENT_SECRET" \
+                "$URL" "$@"
         elif [[ -n "${GRAFANA_TOKEN:-}" ]]; then
             curl -s -H "Authorization: Bearer $GRAFANA_TOKEN" "$URL" "$@"
         elif [[ -n "${GRAFANA_USERNAME:-}" ]]; then
@@ -42,6 +48,11 @@ case "$TOOL" in
     pyroscope)
         if [[ -n "${PYROSCOPE_ACCESS_CMD:-}" ]]; then
             $PYROSCOPE_ACCESS_CMD "$URL" "$@"
+        elif [[ -n "${PYROSCOPE_CF_ACCESS_CLIENT_ID:-}" && -n "${PYROSCOPE_CF_ACCESS_CLIENT_SECRET:-}" ]]; then
+            curl -s \
+                -H "CF-Access-Client-Id: $PYROSCOPE_CF_ACCESS_CLIENT_ID" \
+                -H "CF-Access-Client-Secret: $PYROSCOPE_CF_ACCESS_CLIENT_SECRET" \
+                "$URL" "$@"
         elif [[ -n "${PYROSCOPE_TOKEN:-}" ]]; then
             curl -s -H "Authorization: Bearer $PYROSCOPE_TOKEN" "$URL" "$@"
         elif [[ -n "${PYROSCOPE_USERNAME:-}" ]]; then
