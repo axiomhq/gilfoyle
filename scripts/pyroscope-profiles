@@ -15,23 +15,9 @@ if [[ -z "$DEPLOYMENT" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-eval "$("$SCRIPT_DIR/pyroscope-config" "$DEPLOYMENT")"
+eval "$("$SCRIPT_DIR/config" pyroscope "$DEPLOYMENT")"
 
-# Use authenticated curl based on config
 api_url="${PYROSCOPE_URL}/querier.v1.QuerierService/ProfileTypes"
-if [[ -n "${PYROSCOPE_ACCESS_CMD:-}" ]]; then
-    result=$($PYROSCOPE_ACCESS_CMD "$api_url" -X POST -H "Content-Type: application/json" -d '{}' 2>/dev/null)
-elif [[ -n "${PYROSCOPE_CF_ACCESS_CLIENT_ID:-}" && -n "${PYROSCOPE_CF_ACCESS_CLIENT_SECRET:-}" ]]; then
-    result=$(curl -s \
-        -H "CF-Access-Client-Id: $PYROSCOPE_CF_ACCESS_CLIENT_ID" \
-        -H "CF-Access-Client-Secret: $PYROSCOPE_CF_ACCESS_CLIENT_SECRET" \
-        -X POST -H "Content-Type: application/json" -d '{}' "$api_url")
-elif [[ -n "${PYROSCOPE_TOKEN:-}" ]]; then
-    result=$(curl -s -H "Authorization: Bearer $PYROSCOPE_TOKEN" -X POST -H "Content-Type: application/json" -d '{}' "$api_url")
-elif [[ -n "${PYROSCOPE_USERNAME:-}" ]]; then
-    result=$(curl -s -u "$PYROSCOPE_USERNAME:$PYROSCOPE_PASSWORD" -X POST -H "Content-Type: application/json" -d '{}' "$api_url")
-else
-    result=$(curl -s -X POST -H "Content-Type: application/json" -d '{}' "$api_url")
-fi
+result=$("$SCRIPT_DIR/curl-auth" pyroscope "$DEPLOYMENT" -X POST -d '{}' "$api_url")
 
 echo "$result" | jq -r '.profileTypes[] | "\(.ID)\t\(.name)/\(.sampleType)"' 2>/dev/null | column -t -s $'\t'

@@ -111,10 +111,7 @@ if [[ "$IS_POST" == true ]]; then
     done
   fi
 
-  RESPONSE=$(curl -s -X POST "$URL" \
-    -H "Authorization: Bearer $SLACK_TOKEN" \
-    -H "Content-Type: application/json; charset=utf-8" \
-    -d "$BODY")
+  RESPONSE=$("$SCRIPT_DIR/curl-auth" slack "$ENV" -X POST -d "$BODY" "$URL")
 else
   # GET with query params
   if [[ ${#PARAMS[@]} -gt 0 ]]; then
@@ -122,8 +119,7 @@ else
     URL="$URL?${QUERY:1}"
   fi
 
-  RESPONSE=$(curl -s "$URL" \
-    -H "Authorization: Bearer $SLACK_TOKEN")
+  RESPONSE=$("$SCRIPT_DIR/curl-auth" slack "$ENV" "$URL")
 fi
 
 # Auto-paginate for list methods (unless --raw or cursor already specified)
@@ -167,7 +163,7 @@ if [[ -n "$ARRAY_KEY" && -z "$RAW" && "$HAS_CURSOR" == false ]]; then
       CURSOR_URL="$CURSOR_URL?cursor=$NEXT_CURSOR"
     fi
 
-    RESPONSE=$(curl -s "$CURSOR_URL" -H "Authorization: Bearer $SLACK_TOKEN")
+    RESPONSE=$("$SCRIPT_DIR/curl-auth" slack "$ENV" "$CURSOR_URL")
     ALL_RESPONSES=$(echo "$ALL_RESPONSES"$'\n'"$RESPONSE")
     NEXT_CURSOR=$(echo "$RESPONSE" | jq -r '.response_metadata.next_cursor // empty')
   done

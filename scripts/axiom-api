@@ -18,26 +18,10 @@ if [[ -z "$DEPLOYMENT" || -z "$ENDPOINT" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Load config from unified config file
 eval "$("$SCRIPT_DIR/config" axiom "$DEPLOYMENT")"
 
-URL="$AXIOM_URL"
-TOKEN="$AXIOM_TOKEN"
-ORG_ID="$AXIOM_ORG_ID"
-
-# Build curl command
-CURL_ARGS=(
-  -s
-  -X "$METHOD"
-  "${URL}${ENDPOINT}"
-  -H "Authorization: Bearer $TOKEN"
-  -H "X-Axiom-Org-Id: $ORG_ID"
-  -H "Content-Type: application/json"
-)
-
 if [[ -n "$BODY" ]]; then
-  CURL_ARGS+=(-d "$BODY")
+  "$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X "$METHOD" -d "$BODY" "${AXIOM_URL}${ENDPOINT}"
+else
+  "$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X "$METHOD" "${AXIOM_URL}${ENDPOINT}"
 fi
-
-curl "${CURL_ARGS[@]}"

@@ -24,24 +24,10 @@ if [[ -z "$DEPLOYMENT" || -z "$endpoint" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-eval "$("$SCRIPT_DIR/grafana-config" "$DEPLOYMENT")"
+eval "$("$SCRIPT_DIR/config" grafana "$DEPLOYMENT")"
 
-# Use authenticated curl based on config
 api_url="${GRAFANA_URL}/${endpoint}"
-if [[ -n "${GRAFANA_ACCESS_CMD:-}" ]]; then
-    result=$($GRAFANA_ACCESS_CMD "$api_url" 2>/dev/null)
-elif [[ -n "${GRAFANA_CF_ACCESS_CLIENT_ID:-}" && -n "${GRAFANA_CF_ACCESS_CLIENT_SECRET:-}" ]]; then
-    result=$(curl -s \
-        -H "CF-Access-Client-Id: $GRAFANA_CF_ACCESS_CLIENT_ID" \
-        -H "CF-Access-Client-Secret: $GRAFANA_CF_ACCESS_CLIENT_SECRET" \
-        "$api_url")
-elif [[ -n "${GRAFANA_TOKEN:-}" ]]; then
-    result=$(curl -s -H "Authorization: Bearer $GRAFANA_TOKEN" "$api_url")
-elif [[ -n "${GRAFANA_USERNAME:-}" ]]; then
-    result=$(curl -s -u "$GRAFANA_USERNAME:$GRAFANA_PASSWORD" "$api_url")
-else
-    result=$(curl -s "$api_url")
-fi
+result=$("$SCRIPT_DIR/curl-auth" grafana "$DEPLOYMENT" "$api_url")
 
 if command -v jq &>/dev/null; then
     echo "$result" | jq .
