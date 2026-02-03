@@ -489,6 +489,9 @@ scripts/pyroscope-diff <env> <app_name> -2h -1h -1h now
 # Post message
 scripts/slack <env> chat.postMessage channel=C1234 text="Message" thread_ts=1234567890.123456
 
+# Download file from Slack (url_private from thread context)
+scripts/slack-download <env> <url_private> [output_path]
+
 # Upload file/image
 scripts/slack-upload <env> <channel> ./file.png --comment "Description" --thread_ts 1234567890.123456
 ```
