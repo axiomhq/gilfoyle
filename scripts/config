@@ -15,8 +15,21 @@
 #   slack:    SLACK_TOKEN
 #
 # Auth priority: access_command > CF Access headers > token > username/password > none
+#
+# WARNING: This script outputs secrets. NEVER run it directly - always use eval:
+#   eval "$(scripts/config grafana prod)"
+# For authenticated requests, use scripts/curl-auth instead.
 
 set -euo pipefail
+
+# Abort if stdout is a terminal (someone ran this directly instead of via eval)
+if [[ -t 1 ]] && [[ "${1:-}" != "--list" ]] && [[ "${1:-}" != "--list-tools" ]]; then
+    echo "ERROR: This script outputs secrets and must not be run directly." >&2
+    echo "" >&2
+    echo "Use: eval \"\$(scripts/config <tool> <deployment>)\"" >&2
+    echo "Or for HTTP requests: scripts/curl-auth <tool> <deployment> <url>" >&2
+    exit 1
+fi
 
 CONFIG_DIR="${GILFOYLE_CONFIG_DIR:-$HOME/.config/gilfoyle}"
 CONFIG_FILE="${GILFOYLE_CONFIG:-$CONFIG_DIR/config.toml}"
