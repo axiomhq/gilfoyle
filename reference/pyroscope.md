@@ -14,6 +14,11 @@ token = "glsa_xxxx"  # API token for cloud
 [pyroscope.deployments.internal]
 url = "https://pyroscope.internal.example.com"
 access_command = "cloudflared access curl"  # Custom auth wrapper
+
+[pyroscope.deployments.cloudflare]
+url = "https://pyroscope.cloudflare-protected.example.com"
+cf_access_client_id = "abcd1234"
+cf_access_client_secret = "efgh5678"
 ```
 
 ## Quick Start

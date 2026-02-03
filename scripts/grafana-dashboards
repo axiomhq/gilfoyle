@@ -31,6 +31,11 @@ fi
 # Use authenticated curl based on config
 if [[ -n "${GRAFANA_ACCESS_CMD:-}" ]]; then
     result=$($GRAFANA_ACCESS_CMD "$url" 2>/dev/null)
+elif [[ -n "${GRAFANA_CF_ACCESS_CLIENT_ID:-}" && -n "${GRAFANA_CF_ACCESS_CLIENT_SECRET:-}" ]]; then
+    result=$(curl -s \
+        -H "CF-Access-Client-Id: $GRAFANA_CF_ACCESS_CLIENT_ID" \
+        -H "CF-Access-Client-Secret: $GRAFANA_CF_ACCESS_CLIENT_SECRET" \
+        "$url")
 elif [[ -n "${GRAFANA_TOKEN:-}" ]]; then
     result=$(curl -s -H "Authorization: Bearer $GRAFANA_TOKEN" "$url")
 elif [[ -n "${GRAFANA_USERNAME:-}" ]]; then

@@ -15,6 +15,11 @@ token = "glsa_xxxx"  # API token for cloud
 url = "https://watchtower.internal.example.com"
 access_command = "cloudflared access curl"  # Custom auth wrapper
 
+[grafana.deployments.cloudflare]
+url = "https://grafana.cloudflare-protected.example.com"
+cf_access_client_id = "abcd1234"
+cf_access_client_secret = "efgh5678"
+
 [grafana.deployments.onprem]
 url = "https://grafana.corp.example.com"
 username = "admin"

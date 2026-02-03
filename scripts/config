@@ -8,11 +8,13 @@
 #
 # Returns environment variables based on tool:
 #   axiom:    AXIOM_URL, AXIOM_TOKEN, AXIOM_ORG_ID
-#   grafana:  GRAFANA_URL, GRAFANA_TOKEN, GRAFANA_ACCESS_CMD, GRAFANA_USERNAME, GRAFANA_PASSWORD
-#   pyroscope: PYROSCOPE_URL, PYROSCOPE_TOKEN, PYROSCOPE_ACCESS_CMD, PYROSCOPE_USERNAME, PYROSCOPE_PASSWORD
+#   grafana:  GRAFANA_URL, GRAFANA_TOKEN, GRAFANA_ACCESS_CMD, GRAFANA_USERNAME, GRAFANA_PASSWORD,
+#             GRAFANA_CF_ACCESS_CLIENT_ID, GRAFANA_CF_ACCESS_CLIENT_SECRET
+#   pyroscope: PYROSCOPE_URL, PYROSCOPE_TOKEN, PYROSCOPE_ACCESS_CMD, PYROSCOPE_USERNAME, PYROSCOPE_PASSWORD,
+#             PYROSCOPE_CF_ACCESS_CLIENT_ID, PYROSCOPE_CF_ACCESS_CLIENT_SECRET
 #   slack:    SLACK_TOKEN
 #
-# Auth priority: access_command > token > username/password > none
+# Auth priority: access_command > CF Access headers > token > username/password > none
 
 set -euo pipefail
 
@@ -121,6 +123,8 @@ fi
 URL=$(extract_value "$SECTION" "url")
 TOKEN=$(extract_value "$SECTION" "token")
 ACCESS_CMD=$(extract_value "$SECTION" "access_command")
+CF_ACCESS_CLIENT_ID=$(extract_value "$SECTION" "cf_access_client_id")
+CF_ACCESS_CLIENT_SECRET=$(extract_value "$SECTION" "cf_access_client_secret")
 USERNAME=$(extract_value "$SECTION" "username")
 PASSWORD=$(extract_value "$SECTION" "password")
 
@@ -151,6 +155,8 @@ case "$TOOL" in
         echo "GRAFANA_URL=\"$URL\""
         [[ -n "$TOKEN" ]] && echo "GRAFANA_TOKEN=\"$TOKEN\""
         [[ -n "$ACCESS_CMD" ]] && echo "GRAFANA_ACCESS_CMD=\"$ACCESS_CMD\""
+        [[ -n "$CF_ACCESS_CLIENT_ID" ]] && echo "GRAFANA_CF_ACCESS_CLIENT_ID=\"$CF_ACCESS_CLIENT_ID\""
+        [[ -n "$CF_ACCESS_CLIENT_SECRET" ]] && echo "GRAFANA_CF_ACCESS_CLIENT_SECRET=\"$CF_ACCESS_CLIENT_SECRET\""
         [[ -n "$USERNAME" ]] && echo "GRAFANA_USERNAME=\"$USERNAME\""
         [[ -n "$PASSWORD" ]] && echo "GRAFANA_PASSWORD=\"$PASSWORD\""
         ;;
@@ -166,6 +172,8 @@ case "$TOOL" in
         echo "PYROSCOPE_URL=\"$URL\""
         [[ -n "$TOKEN" ]] && echo "PYROSCOPE_TOKEN=\"$TOKEN\""
         [[ -n "$ACCESS_CMD" ]] && echo "PYROSCOPE_ACCESS_CMD=\"$ACCESS_CMD\""
+        [[ -n "$CF_ACCESS_CLIENT_ID" ]] && echo "PYROSCOPE_CF_ACCESS_CLIENT_ID=\"$CF_ACCESS_CLIENT_ID\""
+        [[ -n "$CF_ACCESS_CLIENT_SECRET" ]] && echo "PYROSCOPE_CF_ACCESS_CLIENT_SECRET=\"$CF_ACCESS_CLIENT_SECRET\""
         [[ -n "$USERNAME" ]] && echo "PYROSCOPE_USERNAME=\"$USERNAME\""
         [[ -n "$PASSWORD" ]] && echo "PYROSCOPE_PASSWORD=\"$PASSWORD\""
         ;;
