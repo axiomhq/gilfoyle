@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 # Slack API wrapper - multi-env, token-efficient output
-# Usage: slack <env> <method> [params...] [--raw|--full]
+# Usage: slack <workspace> <method> [params...] [--raw|--full]
+#
+# Use workspace names from `scripts/init` output (under "Slack Workspaces").
 #
 # Examples:
-#   slack work conversations.list types=public_channel
-#   slack personal chat.postMessage channel=C1234 text="Hello"
-#   echo "multiline msg" | slack work chat.postMessage channel=C1234 text=-
-#   slack work users.list
+#   slack default conversations.list types=public_channel
+#   slack default chat.postMessage channel=C1234 text="Hello"
+#   echo "multiline msg" | slack default chat.postMessage channel=C1234 text=-
+#   slack default users.list
 #
 # Config: ~/.config/gilfoyle/config.toml
-#   [slack.workspaces.work]
+#   [slack.workspaces.default]
 #   token = "xoxb-..."
 #
-#   [slack.workspaces.personal]
+#   [slack.workspaces.corp]
 #   token = "xoxp-..."
 
 set -euo pipefail
