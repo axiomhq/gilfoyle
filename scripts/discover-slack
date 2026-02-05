@@ -54,14 +54,16 @@ discover_ws() {
         # slack-fmt usually returns a clean list. If raw, we'd need jq.
         # But script usage defaults to fmt. Let's check if it worked.
         
-        # Check if response contains channel names (lines starting with #)
-        count=$(echo "$response" | grep -c "^#" 2>/dev/null || true)
+        # slack-fmt outputs "# N channels" summary then "ID name" per channel
+        # Extract count from summary line
+        summary=$(echo "$response" | grep "^# " | head -n1)
+        count=$(echo "$summary" | sed -n 's/^# \([0-9]*\) channels.*/\1/p')
         count="${count:-0}"
-        count="${count##*$'\n'}"  # Take last line if multi-line
         
         if [[ "$count" -gt 0 ]]; then
             echo -e "  ${GREEN}$count channels found${NC} (${DURATION}ms)"
-            echo "$response" | grep "^#" | head -n 10 | sed 's/^/  - /'
+            # Show channel lines (not the summary)
+            echo "$response" | grep -v "^#" | head -n 10 | sed 's/^/  - /'
             if [[ "$count" -gt 10 ]]; then
                 echo "  - ... (and $((count - 10)) more)"
             fi

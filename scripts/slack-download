@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Download file from Slack using url_private
-# Usage: slack-download <env> <url> [output_path]
+# Usage: slack-download <workspace> <url> [output_path]
+#
+# Use workspace names from `scripts/init` output (under "Slack Workspaces").
+# Common workspaces: default, work, corp - check init output for what's configured.
 #
 # Examples:
-#   slack-download work https://files.slack.com/files-pri/.../screenshot.png
-#   slack-download work https://files.slack.com/files-pri/.../config.yaml ./local.yaml
-#   slack-download work https://files.slack.com/files-pri/.../report.pdf /tmp/report.pdf
+#   slack-download default https://files.slack.com/files-pri/.../screenshot.png
+#   slack-download default https://files.slack.com/files-pri/.../config.yaml ./local.yaml
+#   slack-download myworkspace https://files.slack.com/files-pri/.../report.pdf /tmp/report.pdf
 
 set -euo pipefail
 

@@ -49,7 +49,7 @@ discover_dep() {
         END_TIME=$(current_time_ms)
         DURATION=$(( END_TIME - START_TIME ))
         
-        count=$(echo "$response" | grep -c . || echo "0")
+        count=$(echo "$response" | grep -c . || true)
         
         if [[ "$count" -gt 0 ]]; then
             echo -e "  ${GREEN}$count services found (last 1h)${NC} (${DURATION}ms)"

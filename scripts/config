@@ -150,6 +150,8 @@ case "$TOOL" in
             echo "" >&2
             echo "Available deployments:" >&2
             list_deployments axiom >&2
+            echo "" >&2
+            echo "Hint: Run scripts/init to discover available resources." >&2
             exit 1
         fi
         echo "AXIOM_URL=\"$URL\""
@@ -163,6 +165,8 @@ case "$TOOL" in
             echo "" >&2
             echo "Available deployments:" >&2
             list_deployments grafana >&2
+            echo "" >&2
+            echo "Hint: Run scripts/init to discover available resources." >&2
             exit 1
         fi
         echo "GRAFANA_URL=\"$URL\""
@@ -180,6 +184,8 @@ case "$TOOL" in
             echo "" >&2
             echo "Available deployments:" >&2
             list_deployments pyroscope >&2
+            echo "" >&2
+            echo "Hint: Run scripts/init to discover available resources." >&2
             exit 1
         fi
         echo "PYROSCOPE_URL=\"$URL\""
@@ -197,6 +203,8 @@ case "$TOOL" in
             echo "" >&2
             echo "Available workspaces:" >&2
             list_deployments slack >&2
+            echo "" >&2
+            echo "Hint: Run scripts/init to discover available resources." >&2
             exit 1
         fi
         echo "SLACK_TOKEN=\"$TOKEN\""

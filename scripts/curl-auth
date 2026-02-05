@@ -61,7 +61,8 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Load config
-eval "$("$SCRIPT_DIR/config" "$TOOL" "$DEPLOYMENT")"
+CONFIG_OUTPUT="$("$SCRIPT_DIR/config" "$TOOL" "$DEPLOYMENT")" || exit 1
+eval "$CONFIG_OUTPUT"
 
 # Build base curl args
 CURL_ARGS=(-s -X "$METHOD")

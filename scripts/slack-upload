@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Upload file to Slack using external upload flow
-# Usage: slack-upload <env> <channel> <file> [--comment "text"] [--thread_ts ts]
+# Usage: slack-upload <workspace> <channel> <file> [--comment "text"] [--thread_ts ts]
+#
+# Use workspace names from `scripts/init` output (under "Slack Workspaces").
 #
 # Examples:
-#   slack-upload work C1234567890 ./chart.png
-#   slack-upload work C1234567890 ./diagram.png --comment "Here's what I found"
-#   slack-upload work C1234567890 ./screenshot.png --thread_ts 1234567890.123456
+#   slack-upload default C1234567890 ./chart.png
+#   slack-upload default C1234567890 ./diagram.png --comment "Here's what I found"
+#   slack-upload default C1234567890 ./screenshot.png --thread_ts 1234567890.123456
 #
 # Supports images, text files, and any other file type Slack accepts.
 
