@@ -1,0 +1,26 @@
+{
+  "name": "gilfoyle-evals",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval": "axiom eval",
+    "eval:amp": "axiom eval --flag.harness=amp",
+    "eval:opencode": "axiom eval --flag.harness=opencode --flag.model=grok-4.1-fast",
+    "optimize": "bun optimizer/run.ts",
+    "optimize:apply": "bun optimizer/run.ts --apply",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "axiom": "^0.38.0",
+    "@ai-sdk/anthropic": "^1.0.0",
+    "@ai-sdk/xai": "^1.0.0",
+    "@anthropic-ai/sdk": "^0.30.0",
+    "ai": "^4.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
