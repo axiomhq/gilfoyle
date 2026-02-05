@@ -21,6 +21,10 @@ Ready-to-use APL queries for common investigation scenarios.
 ## Latency Analysis
 
 ```apl
+// Latency by individual host (find saturated nodes)
+['traces'] | where ['service.name'] == '<service>'
+| summarize p99=percentile(duration, 99) by ['resource.host.name'], bin(_time, 1m)
+
 // Percentiles over time (logs with duration_ms field)
 ['dataset'] | where _time between (ago(1h) .. now()) 
 | summarize percentiles_array(duration_ms, 50, 95, 99) by bin_auto(_time)

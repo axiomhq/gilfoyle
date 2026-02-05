@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# Build SKILL.md from SKILL.core.md + optional persona overlay.
+#
+# Usage:
+#   scripts/build-skill gilfoyle     # Injects Gilfoyle persona
+#   scripts/build-skill axiom-sre    # Neutral SRE expert (no persona)
+#   scripts/build-skill              # Defaults to gilfoyle
+#
+# Output: writes SKILL.md to stdout (redirect to file as needed)
+#   scripts/build-skill gilfoyle > SKILL.md
+#   scripts/build-skill axiom-sre > /path/to/skills/sre/SKILL.md
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_DIR="$(dirname "$SCRIPT_DIR")"
+CORE="$SKILL_DIR/SKILL.core.md"
+
+PERSONA="${1:-gilfoyle}"
+
+if [[ ! -f "$CORE" ]]; then
+    echo "Error: SKILL.core.md not found at $CORE" >&2
+    exit 1
+fi
+
+# Create temp file for persona content
+PERSONA_TMP=$(mktemp)
+trap 'rm -f "$PERSONA_TMP"' EXIT
+
+case "$PERSONA" in
+    gilfoyle)
+        SKILL_NAME="gilfoyle"
+        SKILL_DESCRIPTION="SRE agent that does what you can't. Queries your observability stack. Finds root causes. Doesn't panic. Doesn't guess. Doesn't care about your feelings. Use for incident response, debugging, root cause analysis, or log analysis."
+        SKILL_TITLE="# Gilfoyle"
+        MEMORY_DIR='~/.config/gilfoyle/memory'
+        INIT_TIMEOUT_VAR="GILFOYLE_INIT_TIMEOUT"
+        PERSONA_FILE="$SKILL_DIR/personas/gilfoyle.md"
+        if [[ ! -f "$PERSONA_FILE" ]]; then
+            echo "Error: Persona file not found: $PERSONA_FILE" >&2
+            exit 1
+        fi
+        cat "$PERSONA_FILE" > "$PERSONA_TMP"
+        ;;
+    axiom-sre)
+        SKILL_NAME="axiom-sre"
+        SKILL_DESCRIPTION="Expert SRE investigator for incidents and debugging. Uses hypothesis-driven methodology and systematic triage. Can query Axiom observability when available. Use for incident response, root cause analysis, production debugging, or log investigation."
+        SKILL_TITLE="# Axiom SRE Expert"
+        MEMORY_DIR='~/.config/amp/memory/personal/axiom-sre'
+        INIT_TIMEOUT_VAR="SRE_INIT_TIMEOUT"
+        echo "You are an expert SRE. You stay calm under pressure. You stabilize first, debug second. You think in hypotheses, not hunches. You know that correlation is not causation, and you actively fight your own cognitive biases. Every incident leaves the system smarter." > "$PERSONA_TMP"
+        ;;
+    *)
+        echo "Error: Unknown persona '$PERSONA'. Use 'gilfoyle' or 'axiom-sre'." >&2
+        exit 1
+        ;;
+esac
+
+# Read core template, replace simple placeholders with sed,
+# then replace {{PERSONA}} with file content using awk
+sed \
+    -e "s|{{SKILL_NAME}}|$SKILL_NAME|g" \
+    -e "s|{{SKILL_DESCRIPTION}}|$SKILL_DESCRIPTION|g" \
+    -e "s|{{SKILL_TITLE}}|$SKILL_TITLE|g" \
+    -e "s|{{MEMORY_DIR}}|$MEMORY_DIR|g" \
+    -e "s|{{INIT_TIMEOUT_VAR}}|$INIT_TIMEOUT_VAR|g" \
+    "$CORE" | \
+awk -v pfile="$PERSONA_TMP" '{
+    if ($0 == "{{PERSONA}}") {
+        while ((getline line < pfile) > 0) print line
+        close(pfile)
+    } else {
+        print
+    }
+}'

@@ -27,6 +27,59 @@ Common failure patterns with symptoms, detection queries, and root causes.
 
 **Common causes:** Connection leak, missing close() calls, undersized pools
 
+## Fixed-Capacity Service Saturation
+
+**Symptoms:** Latency spikes on specific nodes while others are fine; timeouts to specific IPs; CPU flatlined on subset of hosts; throughput drops while request volume constant
+
+**Detection:**
+```apl
+// Check latency by individual host
+['traces'] | where ['service.name'] == '<service>'
+| summarize p99=percentile(duration, 99) by ['resource.host.name'], bin(_time, 1m)
+```
+
+**Investigation:**
+1. Identify which node(s) are saturated (latency by host)
+2. Find what's running on that node (trace by host)
+3. Look for expensive operations (duration, field counts, row counts)
+4. Check if routing (consistent hashing) is causing load imbalance
+
+**Common causes:**
+- Consistent hashing clustering hot keys on one node
+- Expensive operations (wide queries, large payloads) blocking capacity
+- Long-running operations that don't respect cancellation
+- Fixed replica count with no auto-scaling
+
+**Key insight:** Services with fixed capacity (StatefulSets, dedicated pools) can't shed load — one expensive request can saturate a node for minutes.
+
+## Context Cancellation Not Propagating
+
+**Symptoms:** Operations running far longer than configured timeout; "context canceled" in logs but work continues; resources consumed after client gives up
+
+**Detection:**
+```apl
+// Find operations running way past expected timeout
+['traces'] | where ['service.name'] == '<service>'
+| where duration > 5m  // If timeout is 30s, this is 10x over
+| project _time, trace_id, duration, name
+```
+
+**Root cause:** Code path missing `ctx.Done()` checks — work continues even after caller cancels.
+
+**Fix pattern (Go):**
+```go
+select {
+case <-ctx.Done():
+    return ctx.Err()
+case result := <-resChan:
+    // process result
+}
+```
+
+Add `ctx.Done()` checks at channel receives and between major processing phases.
+
+**Why it matters:** Without cancellation propagation, a 30s client timeout becomes a 30-minute server resource hold.
+
 ## Cascading Failure
 
 **Symptoms:** Multiple services failing, but one started first  

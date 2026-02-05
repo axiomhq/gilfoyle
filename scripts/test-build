@@ -1,0 +1,217 @@
+#!/usr/bin/env bash
+# Test build-skill and sync-to-skills pipeline.
+#
+# Usage: scripts/test-build [/path/to/skills/sre]
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_DIR="$(dirname "$SCRIPT_DIR")"
+SKILLS_SRE="${1:-}"
+PASS=0
+FAIL=0
+
+pass() { echo "  ✓ $1"; ((PASS++)); }
+fail() { echo "  ✗ $1"; ((FAIL++)); }
+
+echo "=== build-skill tests ==="
+
+# Test 1: gilfoyle build matches current SKILL.md
+if diff <("$SCRIPT_DIR/build-skill" gilfoyle) "$SKILL_DIR/SKILL.md" >/dev/null 2>&1; then
+    pass "gilfoyle build matches SKILL.md"
+else
+    fail "gilfoyle build differs from SKILL.md"
+    diff <("$SCRIPT_DIR/build-skill" gilfoyle) "$SKILL_DIR/SKILL.md" | head -20
+fi
+
+# Test 2: axiom-sre build has no persona
+OUTPUT=$("$SCRIPT_DIR/build-skill" axiom-sre)
+if echo "$OUTPUT" | grep -q "Bertram Gilfoyle"; then
+    fail "axiom-sre build contains Gilfoyle persona"
+else
+    pass "axiom-sre build has no Gilfoyle persona"
+fi
+
+# Test 3: axiom-sre build has neutral intro
+if echo "$OUTPUT" | grep -q "You are an expert SRE"; then
+    pass "axiom-sre build has neutral intro"
+else
+    fail "axiom-sre build missing neutral intro"
+fi
+
+# Test 4: correct frontmatter name
+if echo "$OUTPUT" | head -3 | grep -q "name: axiom-sre"; then
+    pass "axiom-sre frontmatter name correct"
+else
+    fail "axiom-sre frontmatter name wrong"
+fi
+
+# Test 5: correct memory path
+if echo "$OUTPUT" | grep -q "config/amp/memory/personal/axiom-sre"; then
+    pass "axiom-sre memory path correct"
+else
+    fail "axiom-sre memory path wrong"
+fi
+
+# Test 6: gilfoyle build has correct memory path
+GILFOYLE_OUTPUT=$("$SCRIPT_DIR/build-skill" gilfoyle)
+if echo "$GILFOYLE_OUTPUT" | grep -q "config/gilfoyle/memory"; then
+    pass "gilfoyle memory path correct"
+else
+    fail "gilfoyle memory path wrong"
+fi
+
+# Test 7: gilfoyle build has persona
+if echo "$GILFOYLE_OUTPUT" | grep -q "Bertram Gilfoyle"; then
+    pass "gilfoyle build has persona"
+else
+    fail "gilfoyle build missing persona"
+fi
+
+# Test 8: no unresolved placeholders
+if echo "$OUTPUT" | grep -q '{{'; then
+    fail "axiom-sre build has unresolved placeholders"
+    echo "$OUTPUT" | grep '{{'
+else
+    pass "no unresolved placeholders in axiom-sre"
+fi
+
+if echo "$GILFOYLE_OUTPUT" | grep -q '{{'; then
+    fail "gilfoyle build has unresolved placeholders"
+    echo "$GILFOYLE_OUTPUT" | grep '{{'
+else
+    pass "no unresolved placeholders in gilfoyle"
+fi
+
+# Test 9: SKILL.md under 500 lines (skill best practice)
+LINES=$(echo "$OUTPUT" | wc -l | tr -d ' ')
+if [[ "$LINES" -le 550 ]]; then
+    pass "axiom-sre SKILL.md is $LINES lines (under limit)"
+else
+    fail "axiom-sre SKILL.md is $LINES lines (over 550)"
+fi
+
+# Test 10: invalid persona
+if "$SCRIPT_DIR/build-skill" bogus 2>/dev/null; then
+    fail "build-skill should reject unknown persona"
+else
+    pass "build-skill rejects unknown persona"
+fi
+
+# Test 11: both builds have all major sections
+for section in "Golden Rules" "MANDATORY INITIALIZATION" "EMERGENCY TRIAGE" "INVESTIGATION PROTOCOL" "CONCLUSION VALIDATION" "TOOL REFERENCE" "MEMORY SYSTEM" "APL ESSENTIALS"; do
+    if echo "$OUTPUT" | grep -q "$section"; then
+        pass "axiom-sre has section: $section"
+    else
+        fail "axiom-sre missing section: $section"
+    fi
+done
+
+# Test 12: idempotency - building twice produces same output
+BUILD1=$("$SCRIPT_DIR/build-skill" axiom-sre)
+BUILD2=$("$SCRIPT_DIR/build-skill" axiom-sre)
+if [[ "$BUILD1" == "$BUILD2" ]]; then
+    pass "build-skill is idempotent"
+else
+    fail "build-skill is NOT idempotent"
+fi
+
+echo ""
+
+# === sync-to-skills tests (only if target provided) ===
+if [[ -n "$SKILLS_SRE" && -d "$SKILLS_SRE" ]]; then
+    echo "=== sync-to-skills tests ($SKILLS_SRE) ==="
+
+    # Run sync
+    "$SCRIPT_DIR/sync-to-skills" "$SKILLS_SRE" >/dev/null 2>&1
+
+    # Test: no gilfoyle references in synced output
+    LEAKED=$(grep -rn "gilfoyle\|GILFOYLE" "$SKILLS_SRE/scripts/" "$SKILLS_SRE/reference/" "$SKILLS_SRE/templates/" "$SKILLS_SRE/SKILL.md" 2>/dev/null || true)
+    if [[ -z "$LEAKED" ]]; then
+        pass "no gilfoyle references in synced output"
+    else
+        fail "gilfoyle references leaked:"
+        echo "$LEAKED" | head -10
+    fi
+
+    # Test: all scripts are executable
+    NON_EXEC=$(find "$SKILLS_SRE/scripts" -type f ! -perm -u+x 2>/dev/null || true)
+    if [[ -z "$NON_EXEC" ]]; then
+        pass "all synced scripts are executable"
+    else
+        fail "non-executable scripts found:"
+        echo "$NON_EXEC"
+    fi
+
+    # Test: SKILL.md matches axiom-sre build
+    if diff <("$SCRIPT_DIR/build-skill" axiom-sre) "$SKILLS_SRE/SKILL.md" >/dev/null 2>&1; then
+        pass "synced SKILL.md matches build-skill output"
+    else
+        fail "synced SKILL.md differs from build-skill output"
+    fi
+
+    # Test: all gilfoyle scripts present (except meta scripts)
+    MISSING=""
+    for script in "$SKILL_DIR/scripts/"*; do
+        name=$(basename "$script")
+        [[ "$name" == "build-skill" || "$name" == "sync-to-skills" || "$name" == "test-build" ]] && continue
+        [[ -d "$script" ]] && continue
+        if [[ ! -f "$SKILLS_SRE/scripts/$name" ]]; then
+            MISSING="$MISSING $name"
+        fi
+    done
+    if [[ -z "$MISSING" ]]; then
+        pass "all source scripts present in target"
+    else
+        fail "missing scripts:$MISSING"
+    fi
+
+    # Test: all reference files present
+    MISSING=""
+    for ref in "$SKILL_DIR/reference/"*; do
+        name=$(basename "$ref")
+        [[ -d "$ref" ]] && continue
+        if [[ ! -f "$SKILLS_SRE/reference/$name" ]]; then
+            MISSING="$MISSING $name"
+        fi
+    done
+    if [[ -z "$MISSING" ]]; then
+        pass "all reference files present in target"
+    else
+        fail "missing reference files:$MISSING"
+    fi
+
+    # Test: config paths use axiom-sre
+    if grep -q 'config/axiom-sre' "$SKILLS_SRE/scripts/config"; then
+        pass "config script uses axiom-sre paths"
+    else
+        fail "config script not using axiom-sre paths"
+    fi
+
+    # Test: env vars use SRE_ prefix
+    if grep -q 'SRE_CONFIG_DIR' "$SKILLS_SRE/scripts/config"; then
+        pass "config script uses SRE_ env vars"
+    else
+        fail "config script not using SRE_ env vars"
+    fi
+
+    # Test: idempotency - sync twice produces same result
+    BEFORE=$(find "$SKILLS_SRE" -type f -exec md5 {} + 2>/dev/null | sort)
+    "$SCRIPT_DIR/sync-to-skills" "$SKILLS_SRE" >/dev/null 2>&1
+    AFTER=$(find "$SKILLS_SRE" -type f -exec md5 {} + 2>/dev/null | sort)
+    if [[ "$BEFORE" == "$AFTER" ]]; then
+        pass "sync-to-skills is idempotent"
+    else
+        fail "sync-to-skills is NOT idempotent"
+    fi
+
+    echo ""
+fi
+
+# Summary
+TOTAL=$((PASS + FAIL))
+echo "=== Results: $PASS/$TOTAL passed ==="
+if [[ $FAIL -gt 0 ]]; then
+    echo "$FAIL FAILED"
+    exit 1
+fi
