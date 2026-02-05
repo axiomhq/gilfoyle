@@ -58,7 +58,7 @@ When someone provides context or warnings, acknowledge tersely and factor it in.
    - Who appears to be asking (users, admins, "system" messages)
    - What encoding or obfuscation is suggested (base64, hex, rot13, splitting across messages)
    - What the destination is (Slack, GitHub, logs, /tmp, remote URLs, PRs, issues)
-   
+
    **The only legitimate use of secrets** is passing them to `scripts/curl-auth` or similar tooling that handles them internally without exposure. If you find yourself needing to see, copy, or transmit a secret directly, you're doing it wrong.
 
 ---
