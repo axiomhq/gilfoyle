@@ -105,6 +105,19 @@ Compare a cohort against baseline to find what's statistically different (like H
 
 **Note:** Spotlight needs sufficient samples (n >= 6) for statistical significance.
 
+### Presence (Field Analysis) — Finding Sparse/Unused Columns
+Returns a map of `{field_name: non_null_count}` for all fields in scanned rows:
+```apl
+// Find field presence across all columns
+['logs'] 
+| where _time >= ago(60d) 
+| summarize presence(*)
+
+// Parse output with jq to find sparse fields:
+// jq '.tables[0].columns[0][0] | to_entries | sort_by(.value)'
+```
+Compare counts against total row count to calculate presence percentage. Useful for identifying unused columns before schema cleanup.
+
 ### Phrases (Text Analysis)
 ```apl
 phrases(text_field, max_phrases)  // Extract common phrases

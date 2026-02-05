@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# Sync gilfoyle core to skills/sre repo.
+#
+# Usage:
+#   scripts/sync-to-skills /path/to/skills/skills/sre
+#   scripts/sync-to-skills                              # defaults to ~/code/skills/skills/sre
+#
+# This script:
+# 1. Builds SKILL.md with axiom-sre persona (no Gilfoyle voice)
+# 2. Copies all scripts (except build-skill, sync-to-skills)
+# 3. Copies all reference files
+# 4. Copies all templates
+# 5. Replaces gilfoyle-specific paths and env vars with axiom-sre equivalents
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_DIR="$(dirname "$SCRIPT_DIR")"
+TARGET="${1:-$HOME/code/skills/skills/sre}"
+
+if [[ ! -d "$TARGET" ]]; then
+    echo "Error: Target directory not found: $TARGET" >&2
+    echo "Usage: scripts/sync-to-skills /path/to/skills/skills/sre" >&2
+    exit 1
+fi
+
+echo "Syncing gilfoyle → $TARGET"
+echo ""
+
+# 1. Build SKILL.md with axiom-sre persona
+echo "Building SKILL.md (axiom-sre)..."
+"$SCRIPT_DIR/build-skill" axiom-sre > "$TARGET/SKILL.md"
+echo "  ✓ SKILL.md"
+
+# 2. Copy scripts (skip meta scripts, remove stale)
+SKIP_SCRIPTS="build-skill sync-to-skills test-build"
+echo "Syncing scripts..."
+
+# Remove scripts in target that don't exist in source or are meta-only
+for target_script in "$TARGET/scripts/"*; do
+    name=$(basename "$target_script")
+    [[ -d "$target_script" ]] && continue
+
+    should_remove=false
+    if [[ ! -f "$SKILL_DIR/scripts/$name" ]]; then
+        should_remove=true
+    fi
+    for s in $SKIP_SCRIPTS; do
+        if [[ "$name" == "$s" ]]; then
+            should_remove=true
+            break
+        fi
+    done
+
+    if $should_remove; then
+        rm "$target_script"
+        echo "  ✗ scripts/$name (removed)"
+    fi
+done
+
+for script in "$SKILL_DIR/scripts/"*; do
+    name=$(basename "$script")
+
+    # Skip meta scripts
+    skip=false
+    for s in $SKIP_SCRIPTS; do
+        if [[ "$name" == "$s" ]]; then
+            skip=true
+            break
+        fi
+    done
+    $skip && continue
+
+    # Skip directories
+    [[ -d "$script" ]] && continue
+
+    cp "$script" "$TARGET/scripts/$name"
+    echo "  ✓ scripts/$name"
+done
+
+# 3. Copy reference files
+echo "Syncing reference..."
+mkdir -p "$TARGET/reference"
+for ref in "$SKILL_DIR/reference/"*; do
+    name=$(basename "$ref")
+    [[ -d "$ref" ]] && continue
+    cp "$ref" "$TARGET/reference/$name"
+    echo "  ✓ reference/$name"
+done
+
+# 4. Copy templates (preserving directory structure)
+echo "Syncing templates..."
+rsync -a --delete "$SKILL_DIR/templates/" "$TARGET/templates/"
+echo "  ✓ templates/"
+
+# 5. Apply path/env var replacements across all synced files
+echo "Applying axiom-sre path replacements..."
+
+# Portable in-place sed (macOS needs -i '', Linux needs -i)
+sedi() {
+    if sed --version 2>/dev/null | grep -q GNU; then
+        sed -i "$@"
+    else
+        sed -i '' "$@"
+    fi
+}
+
+find "$TARGET/scripts" "$TARGET/reference" "$TARGET/templates" -type f | while read -r file; do
+    # Skip binary files
+    if file "$file" | grep -q "text"; then
+        sedi \
+            -e 's|GILFOYLE_INIT_TIMEOUT|SRE_INIT_TIMEOUT|g' \
+            -e 's|GILFOYLE_CONFIG_DIR|SRE_CONFIG_DIR|g' \
+            -e 's|GILFOYLE_CONFIG|SRE_CONFIG|g' \
+            -e 's|Unified config reader for Gilfoyle|Unified config reader for axiom-sre|g' \
+            -e 's|\.config/gilfoyle|.config/axiom-sre|g' \
+            -e 's|gilfoyle/memory|axiom-sre/memory|g' \
+            "$file"
+    fi
+done
+echo "  ✓ replacements applied"
+
+# Summary
+echo ""
+GILFOYLE_SCRIPTS=$(ls "$SKILL_DIR/scripts/" | grep -v -E "build-skill|sync-to-skills" | wc -l | tr -d ' ')
+TARGET_SCRIPTS=$(ls "$TARGET/scripts/" | wc -l | tr -d ' ')
+GILFOYLE_REFS=$(ls "$SKILL_DIR/reference/" | wc -l | tr -d ' ')
+TARGET_REFS=$(ls "$TARGET/reference/" | wc -l | tr -d ' ')
+
+echo "Done. $TARGET_SCRIPTS scripts, $TARGET_REFS reference files synced."
+
+# Verify no gilfoyle references leaked
+LEAKED=$(grep -rn "gilfoyle\|GILFOYLE" "$TARGET/scripts/" "$TARGET/reference/" "$TARGET/templates/" "$TARGET/SKILL.md" 2>/dev/null | grep -v "build-skill\|sync-to-skills" || true)
+if [[ -n "$LEAKED" ]]; then
+    echo ""
+    echo "⚠ WARNING: gilfoyle references still found:"
+    echo "$LEAKED"
+fi

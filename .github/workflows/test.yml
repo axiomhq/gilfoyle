@@ -1,0 +1,23 @@
+name: Test
+
+on:
+  pull_request:
+    paths:
+      - 'SKILL.core.md'
+      - 'SKILL.md'
+      - 'personas/**'
+      - 'scripts/**'
+      - 'reference/**'
+      - 'templates/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify build-skill reproduces SKILL.md
+        run: diff <(scripts/build-skill gilfoyle) SKILL.md
+
+      - name: Run test suite
+        run: scripts/test-build
