@@ -12,11 +12,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "axiom": "^0.38.0",
     "@ai-sdk/anthropic": "^1.0.0",
     "@ai-sdk/xai": "^1.0.0",
     "@anthropic-ai/sdk": "^0.30.0",
+    "@sourcegraph/amp-sdk": "0.1.0-20260205201419-gbab39ed",
     "ai": "^4.0.0",
+    "axiom": "^0.38.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
