@@ -1,7 +1,8 @@
 import { Scorer } from 'axiom/ai/evals';
-import { generateText } from 'ai';
+import { generateText, Output } from 'ai';
 import { google } from '@ai-sdk/google';
 import { wrapAISDKModel } from 'axiom/ai';
+import { z } from 'zod';
 import type { EvalInput, EvalOutput } from '../harness/types.js';
 
 if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
@@ -26,14 +27,7 @@ If the root cause were actually one of the counterfactual wrong causes listed ab
 {agent_conclusion}
 
 ## Task
-Evaluate whether the agent correctly identified the root cause.
-Respond with ONLY a JSON object:
-{
-  "score": <0-100>,
-  "correct": <true|false>,
-  "discriminative": <true|false>,
-  "explanation": "<one sentence>"
-}`;
+Evaluate whether the agent correctly identified the root cause.`;
 
 export const RCAAccuracyScorer = Scorer<{
   input: EvalInput;
@@ -49,17 +43,21 @@ export const RCAAccuracyScorer = Scorer<{
       .replace('{counterfactual_causes}', (scenario.expected.rootCauseMustNotMention?.length ? scenario.expected.rootCauseMustNotMention.join(', ') : 'None specified'))
       .replace('{agent_conclusion}', output.rootCause);
 
+    const judgmentSchema = z.object({
+      score: z.number().describe('Score from 0 to 100 indicating how well the agent identified the root cause'),
+      correct: z.boolean().describe('Whether the agent correctly identified the root cause'),
+      discriminative: z.boolean().describe('Whether the evidence specifically supports the correct cause over the counterfactuals'),
+      explanation: z.string().describe('One sentence explaining the judgment'),
+    });
+
     try {
-      const { text: rawText } = await generateText({
+      const { output: judgment } = await generateText({
         model: wrapAISDKModel(google('gemini-3-flash-preview')),
         prompt,
+        output: Output.object({ schema: judgmentSchema }),
         maxOutputTokens: 1000,
       });
-      const text = rawText.replace(/```(?:json)?\s*/g, '').trim();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error(`Gemini response contained no JSON: ${rawText.slice(0, 300)}`);
-      const judgment = JSON.parse(jsonMatch[0]);
-      const rawScore = typeof judgment.score === 'number' ? judgment.score : NaN;
+      const rawScore = judgment.score;
       const score = Number.isFinite(rawScore) ? Math.max(0, Math.min(1, rawScore / 100)) : 0;
       return {
         score,
