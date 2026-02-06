@@ -59,7 +59,7 @@ jobs:
         working-directory: .meta
       - name: Install OpenCode CLI
         if: matrix.harness == 'opencode'
-        run: bun install -g opencode-ai
+        run: bun install -g opencode-ai jose
       - name: Run eval
         working-directory: .meta
         run: bunx axiom eval 2>&1 | tee eval-output.log

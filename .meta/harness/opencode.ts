@@ -212,6 +212,11 @@ IMPORTANT: All scripts are in ${scriptsDir}. Run them with the full path. Exampl
       try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     }
 
+    if (usage.inputTokens === 0 && usage.outputTokens === 0) {
+      const captured = finalText.trim().slice(0, 500);
+      throw new Error(`[opencode] ${scenario.id}: zero tokens — the LLM never ran.\n${captured}`);
+    }
+
     return {
       finalText: finalText.trim(),
       toolCalls,
