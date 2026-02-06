@@ -101,8 +101,8 @@ export const MemoryWriteScorer = Scorer<{
 );
 
 function parseMemWriteArgs(input: string): { category: string; key: string; content: string } | null {
-  // Remove any leading script path
-  let cleaned = input.replace(/^scripts\/mem-write\s*/, '').trim();
+  // Remove any leading script path (handles ./scripts/, bash scripts/, etc.)
+  let cleaned = input.replace(/^(?:bash\s+)?(?:\.\/)?scripts\/mem-write\s*/, '').trim();
 
   // Handle --org flag
   if (cleaned.startsWith('--org')) {

@@ -96,7 +96,7 @@ function normalize(s: string): string {
 }
 
 function parseMemWriteArgs(input: string): { category: string; key: string; content: string } | null {
-  let cleaned = input.replace(/^scripts\/mem-write\s*/, '').trim();
+  let cleaned = input.replace(/^(?:bash\s+)?(?:\.\/)?scripts\/mem-write\s*/, '').trim();
 
   if (cleaned.startsWith('--org')) {
     const orgMatch = cleaned.match(/^--org\s+\S+\s+(.+)/);
