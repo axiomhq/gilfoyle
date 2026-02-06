@@ -31,12 +31,13 @@ function parseModel(config: RunConfig): { provider: string; model: string } {
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
   return Promise.race([
     promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-    ),
-  ]);
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
 }
 
 function getFreePort(): Promise<number> {
@@ -202,6 +203,10 @@ IMPORTANT: All scripts are in ${scriptsDir}. Run them with the full path. Exampl
         console.error(`[opencode] token usage: input=${usage.inputTokens} output=${usage.outputTokens} cache_read=${usage.cacheReadTokens} cache_write=${usage.cacheWriteTokens} reasoning=${usage.reasoningTokens ?? 0} cost=$${usage.costUsd?.toFixed(4) ?? '0'}`);
         console.error(`[opencode] final text (first 300): ${finalText.slice(0, 300)}`);
       }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[opencode] harness error for ${scenario.id}: ${errMsg}`);
+      finalText += `\nHARNESS ERROR: ${errMsg}\n`;
     } finally {
       try { opencode?.server.close(); } catch {}
       try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}

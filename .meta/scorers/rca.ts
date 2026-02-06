@@ -63,13 +63,14 @@ export const RCAAccuracyScorer = Scorer<{
         metadata: { ...judgment, agentConclusion: output.rootCause.slice(0, 500) },
       };
     } catch (e) {
+      console.error(`[rca-accuracy] Gemini scorer failed for ${scenario.id}, falling back to keyword matching: ${e instanceof Error ? e.message : String(e)}`);
       const text = output.rootCause.toLowerCase();
       const mustMention = scenario.expected.rootCauseMustMention;
       if (mustMention.length === 0) {
-        return { score: 1, metadata: { fallback: true, error: String(e), note: 'No rootCauseMustMention defined' } };
+        return { score: 1, metadata: { fallback: true, fallbackReason: String(e), note: 'No rootCauseMustMention defined' } };
       }
       const score = mustMention.filter(kw => text.includes(kw.toLowerCase())).length / mustMention.length;
-      return { score, metadata: { fallback: true, error: String(e) } };
+      return { score, metadata: { fallback: true, fallbackReason: String(e) } };
     }
   }
 );

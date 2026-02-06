@@ -113,6 +113,10 @@ export const ampHarness: HarnessRunner = {
           finalText += (message.is_error ? `\nError: ${message.error}\n` : `${message.result}\n`);
         }
       }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[amp] harness error for ${scenario.id}: ${errMsg}`);
+      finalText += `\nHARNESS ERROR: ${errMsg}\n`;
     } finally {
       try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     }
