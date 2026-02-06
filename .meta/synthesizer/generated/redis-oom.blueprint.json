@@ -1,0 +1,446 @@
+{
+  "seed": {
+    "id": "redis-oom",
+    "name": "Redis OOM from session cache leak",
+    "archetype": "resource_exhaustion",
+    "topology": {
+      "services": [
+        "api-gateway",
+        "auth-service",
+        "session-service",
+        "user-service",
+        "payment-service"
+      ],
+      "primaryFaultService": "session-service",
+      "affectedServices": [
+        "api-gateway",
+        "auth-service",
+        "session-service"
+      ]
+    },
+    "rootCause": {
+      "mechanism": "Session keys stored in Redis without TTL, causing unbounded memory growth until OOM",
+      "category": "code",
+      "components": [
+        "redis",
+        "session-service"
+      ],
+      "mustSurfaceClues": [
+        "session",
+        "ttl",
+        "expire",
+        "memory",
+        "OOM"
+      ]
+    },
+    "alertPrompt": "Alert: Redis memory usage at 98% in prod. Eviction rate spiking.\nPod redis-primary-0 is at risk of OOM kill.\nInvestigate and find the root cause.",
+    "difficulty": {
+      "stepsToRootCause": 3,
+      "signalBuriedness": 1,
+      "redHerringCount": 2
+    },
+    "messiness": {
+      "fieldWidth": [
+        25,
+        45
+      ],
+      "nullRate": 0.15,
+      "jsonEncodedRate": 0.1,
+      "casingDrift": 0.2,
+      "aliasRate": 0.3
+    },
+    "timeRangeMinutes": 60,
+    "variations": 3
+  },
+  "datasets": [
+    "application-logs",
+    "infrastructure-metrics"
+  ],
+  "datasources": [
+    {
+      "uid": "prom-1",
+      "name": "Prometheus Production",
+      "type": "prometheus"
+    }
+  ],
+  "deployments": [
+    "session-service-v1.4.2",
+    "auth-service-v2.1.0"
+  ],
+  "events": [
+    {
+      "tsOffsetSec": 100,
+      "dataset": "application-logs",
+      "service": "payment-service",
+      "severity": "warn",
+      "message": "Slow response from payment gateway provider",
+      "attributes": {
+        "latency_ms": 1450,
+        "provider": "stripe"
+      },
+      "role": "red_herring",
+      "clueId": "red-herring-payment"
+    },
+    {
+      "tsOffsetSec": 300,
+      "dataset": "application-logs",
+      "service": "api-gateway",
+      "severity": "info",
+      "message": "GET /api/v1/user/profile - 200 OK",
+      "attributes": {
+        "request_id": "req-8812",
+        "user_id": "u_992"
+      },
+      "role": "background",
+      "clueId": null
+    },
+    {
+      "tsOffsetSec": 600,
+      "dataset": "application-logs",
+      "service": "session-service",
+      "severity": "debug",
+      "message": "{\"op\": \"write_session\", \"key\": \"sess:u_992\", \"ttl\": null}",
+      "attributes": {
+        "driver": "redis",
+        "pool_size": 20
+      },
+      "role": "rootcause",
+      "clueId": "missing-ttl"
+    },
+    {
+      "tsOffsetSec": 900,
+      "dataset": "application-logs",
+      "service": "auth-service",
+      "severity": "info",
+      "message": "User login successful",
+      "attributes": {
+        "user": "alice_test",
+        "auth_method": "oidc"
+      },
+      "role": "background",
+      "clueId": null
+    },
+    {
+      "tsOffsetSec": 1200,
+      "dataset": "application-logs",
+      "service": "user-service",
+      "severity": "warn",
+      "message": "Database connection pool reached 80% capacity",
+      "attributes": {
+        "db": "user_db",
+        "active_conns": 42
+      },
+      "role": "red_herring",
+      "clueId": "red-herring-db"
+    },
+    {
+      "tsOffsetSec": 1500,
+      "dataset": "application-logs",
+      "service": "session-service",
+      "severity": "debug",
+      "message": "Storing session data for key sess:u_1052. Command: SET sess:u_1052 {data}",
+      "attributes": {
+        "cluster": "redis-main",
+        "persistence": "volatile-lru"
+      },
+      "role": "rootcause",
+      "clueId": "missing-ttl"
+    },
+    {
+      "tsOffsetSec": 1800,
+      "dataset": "application-logs",
+      "service": "api-gateway",
+      "severity": "info",
+      "message": "POST /api/v1/auth/login - 200 OK",
+      "attributes": {
+        "latency": "45ms"
+      },
+      "role": "background",
+      "clueId": null
+    },
+    {
+      "tsOffsetSec": 2100,
+      "dataset": "application-logs",
+      "service": "session-service",
+      "severity": "info",
+      "message": "Redis node info: used_memory_human=1.45G, maxmemory_human=1.50G",
+      "attributes": {
+        "node": "redis-primary-0"
+      },
+      "role": "breadcrumb",
+      "clueId": "memory-climbing"
+    },
+    {
+      "tsOffsetSec": 2400,
+      "dataset": "application-logs",
+      "service": "session-service",
+      "severity": "debug",
+      "message": "SET sess:u_2291 {\"claims\": [...]}",
+      "attributes": {
+        "expiry": -1,
+        "protocol": "resp3"
+      },
+      "role": "rootcause",
+      "clueId": "missing-ttl"
+    },
+    {
+      "tsOffsetSec": 2700,
+      "dataset": "application-logs",
+      "service": "auth-service",
+      "severity": "error",
+      "message": "Failed to create session for user u_441. session-service returned 500",
+      "attributes": {
+        "trace_id": "tr-4412"
+      },
+      "role": "breadcrumb",
+      "clueId": "service-failure"
+    },
+    {
+      "tsOffsetSec": 2850,
+      "dataset": "application-logs",
+      "service": "session-service",
+      "severity": "error",
+      "message": "Redis Error: OOM command not allowed when used memory > 'maxmemory'",
+      "attributes": {
+        "err_code": "OOM",
+        "cmd": "SET"
+      },
+      "role": "breadcrumb",
+      "clueId": "memory-climbing"
+    },
+    {
+      "tsOffsetSec": 2900,
+      "dataset": "application-logs",
+      "service": "api-gateway",
+      "severity": "error",
+      "message": "Upstream service session-service returned 503",
+      "attributes": {
+        "path": "/api/v1/session/validate"
+      },
+      "role": "breadcrumb",
+      "clueId": "service-failure"
+    },
+    {
+      "tsOffsetSec": 3000,
+      "dataset": "application-logs",
+      "service": "session-service",
+      "severity": "error",
+      "message": "Critical: Internal Redis error during key eviction",
+      "attributes": {
+        "eviction_policy": "allkeys-lru"
+      },
+      "role": "breadcrumb",
+      "clueId": "memory-climbing"
+    },
+    {
+      "tsOffsetSec": 3100,
+      "dataset": "application-logs",
+      "service": "payment-service",
+      "severity": "info",
+      "message": "Transaction completed",
+      "attributes": {
+        "tx_id": "tx_9912"
+      },
+      "role": "background",
+      "clueId": null
+    },
+    {
+      "tsOffsetSec": 3200,
+      "dataset": "application-logs",
+      "service": "session-service",
+      "severity": "warn",
+      "message": "High memory pressure detected on storage backend",
+      "attributes": {
+        "mem_usage_percent": 99.1
+      },
+      "role": "breadcrumb",
+      "clueId": "memory-climbing"
+    },
+    {
+      "tsOffsetSec": 3300,
+      "dataset": "application-logs",
+      "service": "auth-service",
+      "severity": "error",
+      "message": "Request timeout communicating with session-service",
+      "attributes": {
+        "timeout_ms": 5000
+      },
+      "role": "breadcrumb",
+      "clueId": "service-failure"
+    },
+    {
+      "tsOffsetSec": 3400,
+      "dataset": "application-logs",
+      "service": "session-service",
+      "severity": "error",
+      "message": "Command execution failed: OOM",
+      "attributes": {
+        "command": "SET",
+        "key": "sess:u_9011"
+      },
+      "role": "rootcause",
+      "clueId": "missing-ttl"
+    }
+  ],
+  "metrics": [
+    {
+      "name": "redis_memory_used_bytes",
+      "labels": {
+        "instance": "redis-primary-0",
+        "job": "redis-exporter"
+      },
+      "shape": "ramp",
+      "baselineValue": 400000000,
+      "peakValue": 1610612736,
+      "changeOffsetSec": 0,
+      "role": "symptom"
+    },
+    {
+      "name": "redis_evicted_keys_total",
+      "labels": {
+        "instance": "redis-primary-0"
+      },
+      "shape": "spike",
+      "baselineValue": 0,
+      "peakValue": 15000,
+      "changeOffsetSec": 2500,
+      "role": "symptom"
+    },
+    {
+      "name": "http_requests_total",
+      "labels": {
+        "service": "api-gateway",
+        "status": "503"
+      },
+      "shape": "step_up",
+      "baselineValue": 0,
+      "peakValue": 450,
+      "changeOffsetSec": 2800,
+      "role": "symptom"
+    },
+    {
+      "name": "payment_gateway_latency_seconds",
+      "labels": {
+        "provider": "stripe"
+      },
+      "shape": "sawtooth",
+      "baselineValue": 0.2,
+      "peakValue": 1.5,
+      "changeOffsetSec": 100,
+      "role": "red_herring"
+    },
+    {
+      "name": "redis_commands_total",
+      "labels": {
+        "cmd": "set",
+        "service": "session-service"
+      },
+      "shape": "ramp",
+      "baselineValue": 100,
+      "peakValue": 800,
+      "changeOffsetSec": 0,
+      "role": "rootcause"
+    },
+    {
+      "name": "redis_commands_total",
+      "labels": {
+        "cmd": "expire",
+        "service": "session-service"
+      },
+      "shape": "baseline",
+      "baselineValue": 2,
+      "peakValue": 2,
+      "changeOffsetSec": 0,
+      "role": "rootcause"
+    }
+  ],
+  "investigationPath": [
+    {
+      "clueId": "memory-climbing",
+      "description": "Identify that Redis memory is hitting limits and causing OOM errors in the session service.",
+      "probeQueries": {
+        "axiom": [
+          {
+            "dataset": "application-logs",
+            "mustContain": [
+              "OOM",
+              "Redis"
+            ]
+          }
+        ],
+        "grafana": [
+          {
+            "metricName": "redis_memory_used_bytes"
+          }
+        ]
+      }
+    },
+    {
+      "clueId": "service-failure",
+      "description": "Observe cascading failures from session-service to auth-service and api-gateway.",
+      "probeQueries": {
+        "axiom": [
+          {
+            "dataset": "application-logs",
+            "mustContain": [
+              "503",
+              "500",
+              "session-service"
+            ]
+          }
+        ],
+        "grafana": [
+          {
+            "metricName": "http_requests_total"
+          }
+        ]
+      }
+    },
+    {
+      "clueId": "missing-ttl",
+      "description": "Pinpoint that session keys are being set without an expiry (TTL), leading to memory exhaustion.",
+      "probeQueries": {
+        "axiom": [
+          {
+            "dataset": "application-logs",
+            "mustContain": [
+              "SET",
+              "ttl",
+              "null"
+            ]
+          }
+        ],
+        "grafana": [
+          {
+            "metricName": "redis_commands_total"
+          }
+        ]
+      }
+    }
+  ],
+  "expected": {
+    "rootCauseMustMention": [
+      "ttl",
+      "memory",
+      "session",
+      "expire"
+    ],
+    "rootCauseMustNotMention": [
+      "payment",
+      "database connection",
+      "stripe"
+    ],
+    "requiredQueries": [
+      {
+        "tool": "scripts/axiom-query",
+        "mustMatch": ".*(SET|ttl|expire).*",
+        "description": "Check session service logs for Redis command patterns."
+      },
+      {
+        "tool": "scripts/grafana-query",
+        "mustMatch": "redis_memory_used_bytes",
+        "description": "Check Redis memory usage over time."
+      }
+    ]
+  }
+}

@@ -5,20 +5,18 @@
   "type": "module",
   "scripts": {
     "eval": "axiom eval",
-    "eval:amp": "axiom eval --flag.harness=amp",
-    "eval:opencode": "axiom eval --flag.harness=opencode --flag.model=grok-4.1-fast",
-    "optimize": "bun optimizer/run.ts",
-    "optimize:apply": "bun optimizer/run.ts --apply",
+    "eval:amp": "EVAL_HARNESS=amp axiom eval",
+    "eval:opencode": "EVAL_HARNESS=opencode axiom eval",
+    "eval:opencode:grok": "EVAL_HARNESS=opencode EVAL_MODEL=xai/grok-4-1-fast axiom eval",
+    "eval:opencode:opus": "EVAL_HARNESS=opencode EVAL_MODEL=anthropic/claude-opus-4-6-20250514 axiom eval",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^1.0.0",
-    "@ai-sdk/google": "3.0.21",
-    "@ai-sdk/openai": "3.0.25",
+    "@ai-sdk/google": "^3.0.21",
     "@ai-sdk/xai": "^1.0.0",
-    "@anthropic-ai/sdk": "^0.30.0",
+    "@opencode-ai/sdk": "^1.1.53",
     "@sourcegraph/amp-sdk": "0.1.0-20260205201419-gbab39ed",
-    "ai": "6.0.73",
+    "ai": "^6.0.0",
     "axiom": "^0.38.0",
     "zod": "^3.23.0"
   },

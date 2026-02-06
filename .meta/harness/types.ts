@@ -1,101 +1,97 @@
-/**
- * Gilfoyle Eval Harness Types
- *
- * Abstracts different agent frameworks (Amp, OpenCode, direct API)
- * so the same scenarios can run across all of them.
- */
-
-export type HarnessName = 'amp' | 'opencode' | 'direct';
-
-export type ModelName =
-  | 'claude-opus-4'
-  | 'claude-sonnet-4'
-  | 'gpt-5'
-  | 'grok-4.1-fast'
-  | 'gemini-2.0-flash';
-
-export type ToolName =
-  | 'scripts/init'
-  | 'scripts/axiom-query'
-  | 'scripts/grafana-query'
-  | 'scripts/slack'
-  | 'scripts/mem-write';
+export type HarnessName = 'amp' | 'opencode';
+export type ModelName = string;
+export type ToolName = 'scripts/init' | 'scripts/axiom-query' | 'scripts/grafana-query' | 'scripts/slack' | 'scripts/mem-write';
 
 export interface ToolCall {
   tool: ToolName;
   input: unknown;
   output?: unknown;
-  error?: string;
-  durationMs?: number;
+  queryValid?: boolean;
+  queryErrors?: string[];
 }
 
 export interface TokenUsage {
-  inputTokens?: number;
-  outputTokens?: number;
-  totalTokens?: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  reasoningTokens?: number;
+  costUsd?: number;
 }
 
 export interface RunTrace {
   finalText: string;
   toolCalls: ToolCall[];
-  usage?: TokenUsage;
   elapsedMs: number;
+  usage?: TokenUsage;
 }
 
-export interface RunConfig {
-  model: ModelName;
-  harness: HarnessName;
-  skillPath?: string;
-}
-
-export interface HarnessRunner {
-  name: HarnessName;
-  run(scenario: IncidentScenario, config: RunConfig): Promise<RunTrace>;
-}
-
-// Scenario types
-
+// Legacy mock types (kept for backward compat)
 export interface ToolMock {
   when: { contains?: string[]; regex?: string };
   return: unknown;
 }
 
+// New fixture-based types
+export interface LogRow {
+  _time: string;
+  [field: string]: unknown;
+}
+
+export interface MetricSeries {
+  metric: string;
+  labels: Record<string, string>;
+  values: [number, number][]; // [timestamp_epoch, value]
+}
+
+export interface DataSourceInfo {
+  uid: string;
+  name: string;
+  type: string; // 'prometheus' | 'loki' | etc
+}
+
+export interface ScenarioFixtures {
+  datasets: Record<string, LogRow[]>; // dataset name → log rows
+  metrics: Record<string, MetricSeries[]>; // metric name → series
+  datasources: DataSourceInfo[];
+  validDeployments: string[]; // e.g. ['prod', 'staging']
+}
+
 export interface IncidentScenario {
   id: string;
   name: string;
-  description?: string;
-
-  // Initial alert or question
+  description: string;
   prompt: string;
-
-  // What scripts/init returns (mocked discovery output)
   initOutput: string;
-
-  // Mocked tool responses keyed by tool type
+  // Legacy keyword mocks (deprecated)
   toolMocks: {
     axiom?: ToolMock[];
     grafana?: ToolMock[];
     slack?: ToolMock[];
   };
-
-  // Expected outcomes
+  // New fixture-based data
+  fixtures?: ScenarioFixtures;
   expected: {
     rootCauseMustMention: string[];
     rootCauseMustNotMention?: string[];
-    requiredEvidence?: Array<{
+    requiredEvidence: { tool: ToolName; mustMention: string[] }[];
+    requiredQueries?: {
       tool: ToolName;
-      mustMention: string[];
-    }>;
+      mustMatch: string; // regex that at least one query to this tool must match
+      description: string; // what this query should accomplish
+    }[];
   };
-
-  // Efficiency budgets
   budgets?: {
     maxToolCalls?: number;
     maxTotalTokens?: number;
   };
 }
 
-// Eval input/output types for Axiom Eval API
+export interface RunConfig {
+  harness: HarnessName;
+  model?: ModelName;
+}
+
 export interface EvalInput {
   scenario: IncidentScenario;
   config: RunConfig;
@@ -106,3 +102,8 @@ export interface EvalOutput {
   rootCause: string;
   evidence: string[];
 }
+
+export type HarnessRunner = {
+  name: HarnessName;
+  run: (scenario: IncidentScenario, config: RunConfig) => Promise<RunTrace>;
+};

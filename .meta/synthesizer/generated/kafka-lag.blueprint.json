@@ -1,0 +1,414 @@
+{
+  "seed": {
+    "id": "kafka-lag",
+    "name": "Kafka consumer lag from slow downstream",
+    "archetype": "dependency_failure",
+    "topology": {
+      "services": [
+        "event-processor",
+        "notification-service",
+        "email-gateway",
+        "api-gateway",
+        "analytics-worker"
+      ],
+      "primaryFaultService": "email-gateway",
+      "affectedServices": [
+        "event-processor",
+        "notification-service"
+      ]
+    },
+    "rootCause": {
+      "mechanism": "Email gateway SMTP connection pool exhausted due to rate limiting by upstream provider, causing consumer lag to spike as notification-service backs up",
+      "category": "dependency",
+      "components": [
+        "kafka",
+        "email-gateway",
+        "smtp"
+      ],
+      "mustSurfaceClues": [
+        "consumer_lag",
+        "smtp",
+        "rate_limit",
+        "email",
+        "backpressure"
+      ]
+    },
+    "alertPrompt": "Alert: Kafka consumer group \"notifications\" lag at 450,000 messages and growing.\nnotification-service pods healthy but processing rate near zero.\nUsers reporting delayed email notifications (30+ minutes).\nInvestigate and find the root cause.",
+    "difficulty": {
+      "stepsToRootCause": 4,
+      "signalBuriedness": 2,
+      "redHerringCount": 2
+    },
+    "messiness": {
+      "fieldWidth": [
+        30,
+        50
+      ],
+      "nullRate": 0.2,
+      "jsonEncodedRate": 0.15,
+      "casingDrift": 0.25,
+      "aliasRate": 0.35
+    },
+    "timeRangeMinutes": 120,
+    "variations": 3
+  },
+  "datasets": [
+    "application_logs",
+    "infrastructure_logs",
+    "kafka_metrics"
+  ],
+  "datasources": [
+    {
+      "uid": "prom-1",
+      "name": "Prometheus",
+      "type": "prometheus"
+    }
+  ],
+  "deployments": [
+    "prod",
+    "event-processor-v2.1.0",
+    "notification-service-v1.4.2",
+    "email-gateway-v1.0.5",
+    "analytics-worker-v3.0.1"
+  ],
+  "events": [
+    {
+      "tsOffsetSec": 60,
+      "dataset": "application_logs",
+      "service": "analytics-worker",
+      "severity": "warn",
+      "message": "GC pause exceeded threshold: 240ms",
+      "attributes": {
+        "heap_used_mb": 1024,
+        "thread_count": 42
+      },
+      "role": "red_herring",
+      "clueId": "red-herring-worker"
+    },
+    {
+      "tsOffsetSec": 300,
+      "dataset": "application_logs",
+      "service": "api-gateway",
+      "severity": "info",
+      "message": "Request completed 200 OK /api/v1/health",
+      "attributes": {
+        "latency_ms": 1.2
+      },
+      "role": "background",
+      "clueId": null
+    },
+    {
+      "tsOffsetSec": 600,
+      "dataset": "application_logs",
+      "service": "email-gateway",
+      "severity": "info",
+      "message": "SMTP connection established to smtp.sendgrid.net:587",
+      "attributes": {
+        "peer": "167.89.115.12",
+        "pool_size": 5
+      },
+      "role": "background",
+      "clueId": null
+    },
+    {
+      "tsOffsetSec": 1200,
+      "dataset": "application_logs",
+      "service": "notification-service",
+      "severity": "info",
+      "message": "Processed batch of 50 messages from kafka.notifications.0",
+      "attributes": {
+        "batch_time_ms": 140
+      },
+      "role": "background",
+      "clueId": "check-lag"
+    },
+    {
+      "tsOffsetSec": 1850,
+      "dataset": "application_logs",
+      "service": "email-gateway",
+      "severity": "warn",
+      "message": "Upstream SMTP response: 429 Too Many Requests - Rate limit exceeded for account_id: AC-9942",
+      "attributes": {
+        "provider": "SendGrid",
+        "retry_after": 60
+      },
+      "role": "rootcause",
+      "clueId": "smtp-bottleneck"
+    },
+    {
+      "tsOffsetSec": 1900,
+      "dataset": "application_logs",
+      "service": "email-gateway",
+      "severity": "error",
+      "message": "Failed to acquire connection from pool 'smtp-outbound' after 5000ms",
+      "attributes": {
+        "pool_usage": "100%",
+        "waiters": 42
+      },
+      "role": "rootcause",
+      "clueId": "smtp-bottleneck"
+    },
+    {
+      "tsOffsetSec": 2000,
+      "dataset": "application_logs",
+      "service": "notification-service",
+      "severity": "warn",
+      "message": "Slow response from email-gateway POST /v1/send",
+      "attributes": {
+        "duration_ms": 5002,
+        "status": 504
+      },
+      "role": "breadcrumb",
+      "clueId": "notification-latency"
+    },
+    {
+      "tsOffsetSec": 2100,
+      "dataset": "application_logs",
+      "service": "notification-service",
+      "severity": "info",
+      "message": "Kafka consumer heartbeat successful",
+      "attributes": {
+        "group_id": "notifications",
+        "member_id": "notif-svc-78f9-x2"
+      },
+      "role": "breadcrumb",
+      "clueId": "check-lag"
+    },
+    {
+      "tsOffsetSec": 2400,
+      "dataset": "application_logs",
+      "service": "notification-service",
+      "severity": "error",
+      "message": "Error processing kafka message: remote service timeout",
+      "attributes": {
+        "topic": "notifications",
+        "partition": 2,
+        "offset": 992013,
+        "error_code": "ETIMEDOUT"
+      },
+      "role": "breadcrumb",
+      "clueId": "notification-latency"
+    },
+    {
+      "tsOffsetSec": 2500,
+      "dataset": "application_logs",
+      "service": "analytics-worker",
+      "severity": "error",
+      "message": "failed to flush buffer to s3: context deadline exceeded",
+      "attributes": {
+        "bucket": "raw-events-prod"
+      },
+      "role": "red_herring",
+      "clueId": "red-herring-worker"
+    },
+    {
+      "tsOffsetSec": 3600,
+      "dataset": "application_logs",
+      "service": "email-gateway",
+      "severity": "error",
+      "message": "ConnectionPoolExhaustedException: smtp-outbound pool size 50 reached",
+      "attributes": {
+        "active_conns": 50,
+        "pending_requests": 154
+      },
+      "role": "rootcause",
+      "clueId": "smtp-bottleneck"
+    },
+    {
+      "tsOffsetSec": 4500,
+      "dataset": "application_logs",
+      "service": "notification-service",
+      "severity": "warn",
+      "message": "Consumer group 'notifications' rebalance triggered by member leave",
+      "attributes": {
+        "reason": "session_timeout"
+      },
+      "role": "breadcrumb",
+      "clueId": "check-lag"
+    }
+  ],
+  "metrics": [
+    {
+      "name": "kafka_consumergroup_lag",
+      "labels": {
+        "group": "notifications",
+        "topic": "notifications"
+      },
+      "shape": "ramp",
+      "baselineValue": 150,
+      "peakValue": 450000,
+      "changeOffsetSec": 1800,
+      "role": "symptom"
+    },
+    {
+      "name": "http_request_duration_seconds_bucket",
+      "labels": {
+        "service": "notification-service",
+        "path": "/v1/send",
+        "target": "email-gateway"
+      },
+      "shape": "step_up",
+      "baselineValue": 0.05,
+      "peakValue": 10,
+      "changeOffsetSec": 1850,
+      "role": "symptom"
+    },
+    {
+      "name": "service_processing_rate_events_per_sec",
+      "labels": {
+        "service": "notification-service"
+      },
+      "shape": "step_down",
+      "baselineValue": 1200,
+      "peakValue": 5,
+      "changeOffsetSec": 1900,
+      "role": "symptom"
+    },
+    {
+      "name": "smtp_connection_pool_active",
+      "labels": {
+        "service": "email-gateway",
+        "pool": "smtp-outbound"
+      },
+      "shape": "step_up",
+      "baselineValue": 5,
+      "peakValue": 50,
+      "changeOffsetSec": 1820,
+      "role": "rootcause"
+    },
+    {
+      "name": "smtp_upstream_rate_limit_errors_total",
+      "labels": {
+        "service": "email-gateway",
+        "provider": "sendgrid"
+      },
+      "shape": "ramp",
+      "baselineValue": 0,
+      "peakValue": 85,
+      "changeOffsetSec": 1800,
+      "role": "rootcause"
+    },
+    {
+      "name": "jvm_memory_used_bytes",
+      "labels": {
+        "service": "analytics-worker",
+        "area": "heap"
+      },
+      "shape": "sawtooth",
+      "baselineValue": 500000000,
+      "peakValue": 950000000,
+      "changeOffsetSec": 0,
+      "role": "red_herring"
+    }
+  ],
+  "investigationPath": [
+    {
+      "clueId": "check-lag",
+      "description": "Observe high lag on the notifications consumer group and check if the service is still consuming.",
+      "probeQueries": {
+        "axiom": [
+          {
+            "dataset": "application_logs",
+            "mustContain": [
+              "notification-service",
+              "kafka"
+            ]
+          }
+        ],
+        "grafana": [
+          {
+            "metricName": "kafka_consumergroup_lag"
+          }
+        ]
+      }
+    },
+    {
+      "clueId": "notification-latency",
+      "description": "Examine notification-service logs for why processing has slowed down despite being healthy.",
+      "probeQueries": {
+        "axiom": [
+          {
+            "dataset": "application_logs",
+            "mustContain": [
+              "notification-service",
+              "error",
+              "timeout"
+            ]
+          }
+        ],
+        "grafana": [
+          {
+            "metricName": "http_request_duration_seconds_bucket"
+          }
+        ]
+      }
+    },
+    {
+      "clueId": "smtp-bottleneck",
+      "description": "Investigate the downstream dependency (email-gateway) to see why it is timing out.",
+      "probeQueries": {
+        "axiom": [
+          {
+            "dataset": "application_logs",
+            "mustContain": [
+              "email-gateway",
+              "pool",
+              "exhausted"
+            ]
+          }
+        ],
+        "grafana": [
+          {
+            "metricName": "smtp_connection_pool_active"
+          }
+        ]
+      }
+    },
+    {
+      "clueId": "upstream-rate-limit",
+      "description": "Determine the trigger for the connection pool exhaustion in the email-gateway.",
+      "probeQueries": {
+        "axiom": [
+          {
+            "dataset": "application_logs",
+            "mustContain": [
+              "429",
+              "Rate limit",
+              "SendGrid"
+            ]
+          }
+        ],
+        "grafana": [
+          {
+            "metricName": "smtp_upstream_rate_limit_errors_total"
+          }
+        ]
+      }
+    }
+  ],
+  "expected": {
+    "rootCauseMustMention": [
+      "rate limit",
+      "smtp",
+      "connection pool",
+      "email-gateway"
+    ],
+    "rootCauseMustNotMention": [
+      "analytics-worker",
+      "memory leak",
+      "kafka broker failure"
+    ],
+    "requiredQueries": [
+      {
+        "tool": "scripts/axiom-query",
+        "mustMatch": ".*email-gateway.*(429|rate limit|pool).*",
+        "description": "Search email-gateway logs for errors related to connections or rate limits."
+      },
+      {
+        "tool": "scripts/grafana-query",
+        "mustMatch": "kafka_consumergroup_lag",
+        "description": "Monitor the lag of the consumer group."
+      }
+    ]
+  }
+}

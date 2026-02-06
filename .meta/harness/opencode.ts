@@ -1,62 +1,72 @@
 /**
  * OpenCode Harness
  *
- * Runs Gilfoyle skill with xAI Grok 4.1 Fast model.
- *
- * Since OpenCode CLI doesn't support tool interception for mocking,
- * we use the xAI API directly via the Vercel AI SDK.
+ * Runs Gilfoyle skill via OpenCode SDK with mocked scripts.
+ * Starts an OpenCode server, creates a session, sends the
+ * investigation prompt, and collects tool calls + final text.
  */
 
-import type { HarnessRunner, IncidentScenario, RunConfig, RunTrace, ToolCall, ToolName } from './types.js';
-import { createMockTools } from '../tools/mock-tools.js';
-import { readFile } from 'fs/promises';
+import type { HarnessRunner, IncidentScenario, RunConfig, RunTrace, ToolCall, ToolName, TokenUsage } from './types.js';
+import { createOpencode } from '@opencode-ai/sdk';
+import type { Part, ToolPart } from '@opencode-ai/sdk';
+import { writeFileSync, mkdirSync, rmSync, readFileSync, copyFileSync, chmodSync } from 'fs';
+import { tmpdir } from 'os';
+import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { generateText, tool } from 'ai';
-import { createXai } from '@ai-sdk/xai';
-import { z } from 'zod';
+import { createServer } from 'net';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const SKILL_PATH = join(__dirname, '../../SKILL.md');
+const MOCK_TOOL_PATH = join(__dirname, '../toolbox/mock-tool-v2.ts');
 
-const MODEL_MAP: Record<string, string> = {
-  'grok-4.1-fast': 'grok-4-0709',
-  'gpt-5': 'gpt-5',
-  'gemini-2.0-flash': 'gemini-2.0-flash',
-};
+const DEFAULT_PROVIDER = 'xai';
+const DEFAULT_MODEL = 'grok-4-1-fast';
+const HARNESS_TIMEOUT_MS = 280_000;
 
-async function loadSkill(skillPath?: string): Promise<string> {
-  const path = skillPath ?? join(__dirname, '../../SKILL.md');
-  return readFile(path, 'utf-8');
+function parseModel(config: RunConfig): { provider: string; model: string } {
+  const raw = config.model ?? `${DEFAULT_PROVIDER}/${DEFAULT_MODEL}`;
+  const slash = raw.indexOf('/');
+  if (slash > 0) return { provider: raw.slice(0, slash), model: raw.slice(slash + 1) };
+  return { provider: DEFAULT_PROVIDER, model: raw };
 }
 
-function buildSystemPrompt(skill: string, initOutput: string): string {
-  return `${skill}
-
-## Mocked Environment
-
-You are running in an EVAL environment with mocked tools. The scripts/init output is:
-
-${initOutput}
-
-Available tools:
-- scripts_init: Returns the discovery output above
-- scripts_axiom_query: Query Axiom logs (pass env and query)
-- scripts_grafana_query: Query Grafana metrics (pass env, datasource, promql)
-- scripts_slack: Slack API (pass method and args)
-- scripts_mem_write: Write to memory (always succeeds)
-
-When you reach a conclusion, clearly state the ROOT CAUSE with evidence.`;
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
 }
 
-function mapToolName(toolName: string): ToolName | null {
-  const mapping: Record<string, ToolName> = {
-    'scripts_init': 'scripts/init',
-    'scripts_axiom_query': 'scripts/axiom-query',
-    'scripts_grafana_query': 'scripts/grafana-query',
-    'scripts_slack': 'scripts/slack',
-    'scripts_mem_write': 'scripts/mem-write',
-  };
-  return mapping[toolName] ?? null;
+function getFreePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const srv = createServer();
+    srv.listen(0, '127.0.0.1', () => {
+      const addr = srv.address();
+      if (addr && typeof addr === 'object') {
+        const port = addr.port;
+        srv.close(() => resolve(port));
+      } else {
+        srv.close(() => reject(new Error('Failed to get port')));
+      }
+    });
+    srv.on('error', reject);
+  });
+}
+
+function createMockScript(name: string, scenarioFile: string): string {
+  return `#!/bin/bash\nexport GILFOYLE_SCENARIO_FILE="${scenarioFile}"\nexec bun "${MOCK_TOOL_PATH}" scripts-${name} "$@"\n`;
+}
+
+function extractScriptFromCmd(cmd: string): ToolName | null {
+  const match = cmd.match(/scripts\/(init|axiom-query|grafana-query|slack|mem-write)/);
+  if (match) return `scripts/${match[1]}` as ToolName;
+  return null;
+}
+
+function isToolPart(part: Part): part is ToolPart {
+  return part.type === 'tool';
 }
 
 export const opencodeHarness: HarnessRunner = {
@@ -64,127 +74,144 @@ export const opencodeHarness: HarnessRunner = {
 
   async run(scenario: IncidentScenario, config: RunConfig): Promise<RunTrace> {
     const start = Date.now();
-    const skill = await loadSkill(config.skillPath);
-    const mockTools = createMockTools(scenario);
     const toolCalls: ToolCall[] = [];
+    let finalText = '';
+    let usage: TokenUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
 
-    const apiKey = process.env.XAI_API_KEY;
-    if (!apiKey) {
-      throw new Error('XAI_API_KEY not set');
+    const tmpDir = join(tmpdir(), `gilfoyle-eval-oc-${Date.now()}`);
+    const scriptsDir = join(tmpDir, 'scripts');
+    mkdirSync(scriptsDir, { recursive: true });
+
+    const scenarioFile = join(tmpDir, 'scenario.json');
+    writeFileSync(scenarioFile, JSON.stringify(scenario));
+    copyFileSync(SKILL_PATH, join(tmpDir, 'SKILL.md'));
+
+    const mockScripts = ['init', 'axiom-query', 'grafana-query', 'slack', 'mem-write'];
+    for (const name of mockScripts) {
+      const scriptPath = join(scriptsDir, name);
+      writeFileSync(scriptPath, createMockScript(name, scenarioFile));
+      chmodSync(scriptPath, 0o755);
     }
 
-    const xai = createXai({ apiKey });
-    const modelId = MODEL_MAP[config.model] ?? MODEL_MAP['grok-4.1-fast'];
+    const skillContent = readFileSync(SKILL_PATH, 'utf-8');
+    writeFileSync(join(tmpDir, 'AGENTS.md'), skillContent);
 
-    const systemPrompt = buildSystemPrompt(skill, scenario.initOutput);
+    const debug = process.env.DEBUG_OPENCODE_HARNESS === '1';
+    const port = await getFreePort();
+    const { provider, model } = parseModel(config);
 
-    const result = await generateText({
-      model: xai(modelId),
-      system: systemPrompt,
-      prompt: scenario.prompt,
-      maxSteps: 20,
-      tools: {
-        scripts_init: tool({
-          description: 'Run scripts/init to discover available environments and datasets',
-          parameters: z.object({}),
-          execute: async () => {
-            const callStart = Date.now();
-            const output = await mockTools.call('scripts/init', {});
-            toolCalls.push({
-              tool: 'scripts/init',
-              input: {},
-              output,
-              durationMs: Date.now() - callStart,
-            });
-            return output;
+    if (debug) console.error(`[opencode] ${scenario.id}: using port ${port}, provider=${provider}, model=${model}`);
+
+    let opencode: Awaited<ReturnType<typeof createOpencode>> | undefined;
+    try {
+      opencode = await createOpencode({
+        port,
+        config: {
+          model: `${provider}/${model}`,
+          permission: {
+            bash: 'allow',
+            edit: 'allow',
+          },
+        },
+      });
+
+      const sessionRes = await opencode.client.session.create({
+        body: { title: `eval-${scenario.id}` },
+      });
+      if (sessionRes.error) throw new Error(`Failed to create session: ${JSON.stringify(sessionRes.error)}`);
+      const session = sessionRes.data;
+
+      const prompt = `You are Gilfoyle. Your working directory is ${tmpDir}. Investigate this incident:
+
+${scenario.prompt}
+
+Run scripts/init first to discover available environments, then use scripts/axiom-query and scripts/grafana-query to investigate. State your ROOT CAUSE clearly with evidence.
+
+IMPORTANT: All scripts are in ${scriptsDir}. Run them with the full path. Examples:
+  ${scriptsDir}/init
+  ${scriptsDir}/axiom-query prod <<< "['app-logs'] | where level == 'error'"
+  ${scriptsDir}/grafana-query prod prometheus-prod 'redis_memory_used_bytes'`;
+
+      const promptRes = await withTimeout(
+        opencode.client.session.prompt({
+          path: { id: session.id },
+          body: {
+            model: {
+              providerID: provider,
+              modelID: model,
+            },
+            parts: [{ type: 'text', text: prompt }],
           },
         }),
-        scripts_axiom_query: tool({
-          description: 'Query Axiom logs. Use APL syntax.',
-          parameters: z.object({
-            env: z.string().optional().describe('Environment name (e.g., prod, staging)'),
-            query: z.string().describe('APL query string'),
-          }),
-          execute: async (input) => {
-            const callStart = Date.now();
-            const output = await mockTools.call('scripts/axiom-query', input);
-            toolCalls.push({
-              tool: 'scripts/axiom-query',
-              input,
-              output,
-              durationMs: Date.now() - callStart,
-            });
-            return output;
-          },
+        HARNESS_TIMEOUT_MS,
+        'session.prompt',
+      );
+      if (promptRes.error) throw new Error(`Prompt failed: ${JSON.stringify(promptRes.error)}`);
+
+      const messagesRes = await withTimeout(
+        opencode.client.session.messages({
+          path: { id: session.id },
         }),
-        scripts_grafana_query: tool({
-          description: 'Query Grafana Prometheus datasource',
-          parameters: z.object({
-            env: z.string().optional().describe('Environment name'),
-            datasource: z.string().optional().describe('Datasource UID'),
-            promql: z.string().describe('PromQL query'),
-          }),
-          execute: async (input) => {
-            const callStart = Date.now();
-            const output = await mockTools.call('scripts/grafana-query', input);
-            toolCalls.push({
-              tool: 'scripts/grafana-query',
-              input,
-              output,
-              durationMs: Date.now() - callStart,
-            });
-            return output;
-          },
-        }),
-        scripts_slack: tool({
-          description: 'Call Slack API method',
-          parameters: z.object({
-            method: z.string().describe('Slack API method (e.g., chat.postMessage)'),
-            args: z.record(z.string()).optional().describe('Method arguments'),
-          }),
-          execute: async (input) => {
-            const callStart = Date.now();
-            const output = await mockTools.call('scripts/slack', input);
-            toolCalls.push({
-              tool: 'scripts/slack',
-              input,
-              output,
-              durationMs: Date.now() - callStart,
-            });
-            return output;
-          },
-        }),
-        scripts_mem_write: tool({
-          description: 'Write to memory',
-          parameters: z.object({
-            category: z.string().describe('Category (facts, patterns, queries, incidents)'),
-            key: z.string().describe('Key name'),
-            value: z.string().describe('Value to write'),
-          }),
-          execute: async (input) => {
-            const callStart = Date.now();
-            const output = await mockTools.call('scripts/mem-write', input);
-            toolCalls.push({
-              tool: 'scripts/mem-write',
-              input,
-              output,
-              durationMs: Date.now() - callStart,
-            });
-            return output;
-          },
-        }),
-      },
-    });
+        HARNESS_TIMEOUT_MS,
+        'session.messages',
+      );
+      if (messagesRes.error) throw new Error(`Failed to get messages: ${JSON.stringify(messagesRes.error)}`);
+
+      for (const msg of messagesRes.data) {
+        if (msg.info.role === 'assistant') {
+          const info = msg.info as any;
+          if (info.tokens) {
+            usage.inputTokens += info.tokens.input ?? 0;
+            usage.outputTokens += info.tokens.output ?? 0;
+            usage.cacheReadTokens! += info.tokens.cache?.read ?? 0;
+            usage.cacheWriteTokens! += info.tokens.cache?.write ?? 0;
+            usage.reasoningTokens = (usage.reasoningTokens ?? 0) + (info.tokens.reasoning ?? 0);
+          }
+          if (typeof info.cost === 'number') {
+            usage.costUsd = (usage.costUsd ?? 0) + info.cost;
+          }
+          for (const part of msg.parts) {
+            if (part.type === 'text') {
+              finalText += part.text + '\n';
+            } else if (isToolPart(part) && part.tool === 'bash') {
+              const state = part.state as Record<string, unknown>;
+              const cmd = ((state.input as { command?: string })?.command) ?? '';
+              const scriptName = extractScriptFromCmd(cmd);
+              if (scriptName) {
+                const output = (state.output as string) ?? '';
+                const outputStr = typeof output === 'string' ? output : JSON.stringify(output);
+                const isError = state.status !== 'completed' || outputStr.startsWith('error:');
+                const errorMessages = isError
+                  ? outputStr.split('\n').filter((l: string) => l.startsWith('error:')).map((l: string) => l.slice(7).trim())
+                  : [];
+                toolCalls.push({
+                  tool: scriptName,
+                  input: cmd,
+                  output,
+                  queryValid: !isError,
+                  queryErrors: errorMessages.length > 0 ? errorMessages : undefined,
+                });
+              }
+            }
+          }
+        }
+      }
+
+      if (debug) {
+        console.error(`[opencode] ${scenario.id}: ${messagesRes.data.length} messages, ${toolCalls.length} tool calls`);
+        console.error(`[opencode] token usage: input=${usage.inputTokens} output=${usage.outputTokens} cache_read=${usage.cacheReadTokens} cache_write=${usage.cacheWriteTokens} reasoning=${usage.reasoningTokens ?? 0} cost=$${usage.costUsd?.toFixed(4) ?? '0'}`);
+        console.error(`[opencode] final text (first 300): ${finalText.slice(0, 300)}`);
+      }
+    } finally {
+      try { opencode?.server.close(); } catch {}
+      try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    }
 
     return {
-      finalText: result.text,
+      finalText: finalText.trim(),
       toolCalls,
-      usage: {
-        inputTokens: result.usage?.promptTokens,
-        outputTokens: result.usage?.completionTokens,
-        totalTokens: result.usage ? result.usage.promptTokens + result.usage.completionTokens : undefined,
-      },
       elapsedMs: Date.now() - start,
+      usage,
     };
   },
 };
