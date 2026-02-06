@@ -1,2 +1,0 @@
-#!/bin/bash
-exec bun "$(dirname "$0")/mock-tool.ts" scripts-axiom-query "$@"

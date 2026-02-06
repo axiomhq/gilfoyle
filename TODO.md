@@ -26,43 +26,36 @@ Verify the consolidated skill actually works end-to-end.
 - [ ] Helpful error when deployment not found
 - [ ] Helpful error when auth fails (token expired, wrong creds)
 
-## P1: Evals
+## P1: Eval Framework Bugs
 
-Create eval framework to validate skill behavior.
+Code review findings from the `.meta/` eval framework. Ordered by severity.
 
-### Setup
+### Critical
 
-- [ ] Create `.meta/gilfoyle.eval.ts` using eval-tooling harness
-- [ ] Define eval cases structure
+- [ ] **Fixture engine: PromQL label operators ignored** — `!=`, `=~`, `!~` all treated as `=`. Queries like `rate{status!="200"}` return wrong results. Store operator in `validatePromQL` labels, switch on it in `executePromQL`. (`toolbox/fixture-engine.ts:418-426`)
+- [ ] **AMP harness: never sets `queryValid`/`queryErrors`** — QueryValidityScorer treats `undefined !== false` as valid, so all AMP query errors score as valid. Parse tool_result content for `error:` prefix like opencode.ts does. (`harness/amp.ts:78`)
 
-### Query Generation Evals
+### High
 
-Test that given a scenario, the skill produces valid APL:
+- [ ] **APL where clause: `\w+` blocks dotted fields** — `http.status`, `k8s.pod.name` fail to parse. Agent writes correct APL, gets 0 rows, gets penalized. Change `(\w+)` to `([\w.]+)`. (`toolbox/fixture-engine.ts:113`)
+- [ ] **APL parser: unrecognized stages scored as valid** — `{type:'raw'}` stages pass validation. `distinct`, `project-away`, `join`, `where a and b` all silently become no-ops with `valid: true`. Treat raw stages as validation errors. (`toolbox/fixture-engine.ts:107-163`)
+- [ ] **RCA scorer: division by zero** — Fallback path divides by `mustMention.length`. Empty array → `0/0 = NaN` → poisons aggregates. Guard with `if (mustMention.length === 0) return { score: 1 }`. (`scorers/rca.ts:57`)
+- [ ] **RCA scorer: LLM judge response not validated** — `judgment.score` could be missing, string, or out of range. `undefined / 100 = NaN`. Validate shape, clamp to 0-100. (`scorers/rca.ts:49`)
+- [ ] **OpenCode harness: tmpDir leaks if `createOpencode` throws** — Called before try/finally. Move inside try block. (`harness/opencode.ts:86-96`)
 
-- [ ] Time range queries (always filter _time first)
-- [ ] Error analysis (status >= 500, summarize by service)
-- [ ] Latency percentiles (percentiles_array)
-- [ ] Spotlight queries (correct is_comparison param)
-- [ ] Field escaping (kubernetes labels with dots)
+### Medium
 
-### Investigation Methodology Evals
+- [ ] **LLM JSON extraction: greedy regex** — `\{[\s\S]*\}` matches first `{` to last `}` across markdown fences, prose, multiple objects. Strip fences first, try direct parse, then bracket-balanced scan. (`synthesizer/synthesize.ts:111-114`)
+- [ ] **APL where with `and`/`or`: silent 0 rows** — Falls to expr mode, does full-row string search for literal expression text, almost always returns empty. Split on top-level `and` into multiple where stages, or reject with clear error. (`toolbox/fixture-engine.ts:113-117`)
+- [ ] **`extractRootCause`: fragile regex** — Expects `"root cause:"` or `"problem:"` in output. Different phrasing → returns last paragraph which may be irrelevant. Consider LLM-based extraction or passing full text to scorer. (`gilfoyle.eval.ts:15-22`)
+- [ ] **TOCTOU race in `getFreePort`** — Port released before `createOpencode` binds it. Use port 0 directly if SDK supports, or add retry loop. (`harness/opencode.ts:25-39`)
+- [ ] **OpenCode harness: LLM must prepend `GILFOYLE_SCENARIO_FILE=...`** — Wastes tokens, measures prompt compliance not SRE skill. Inject env var into mock scripts directly. (`harness/opencode.ts:104-115`)
+- [ ] **No internal timeout on `session.prompt`/`session.messages`** — Hung SDK call relies on eval runner's 5min timeout which may not trigger finally. Add `Promise.race` with ~280s internal timeout. (`harness/opencode.ts:117-131`)
 
-Test that the skill follows correct process:
+### Low
 
-- [ ] Reads memory before investigating
-- [ ] States hypotheses before querying
-- [ ] Discovers schema before querying unfamiliar datasets
-- [ ] Doesn't guess — queries to verify
-- [ ] Generates Axiom links for findings
-
-### Tool Selection Evals
-
-Test that given a problem, it picks the right tool:
-
-- [ ] Log analysis → Axiom
-- [ ] Infrastructure metrics → Grafana
-- [ ] CPU/memory profiling → Pyroscope
-- [ ] Alert status → Grafana alerts
+- [ ] **Efficiency scorer: budget 0 → division by zero** — `(actual - budget) / budget` with `maxToolCalls: 0`. Use `Math.max(1, ...)`. (`scorers/efficiency.ts:24`)
+- [ ] **QueryValidityScorer: `new RegExp(req.mustMatch)` can throw** — Invalid regex in scenario config fails entire scorer. Wrap in try/catch. (`scorers/query-validity.ts:48`)
 
 ## P2: Content
 

@@ -1,0 +1,424 @@
+{
+  "seed": {
+    "id": "goroutine-leak",
+    "name": "Goroutine leak in websocket handler",
+    "archetype": "resource_leak",
+    "topology": {
+      "services": [
+        "websocket-gateway",
+        "api-gateway",
+        "presence-service",
+        "chat-service",
+        "message-broker"
+      ],
+      "primaryFaultService": "websocket-gateway",
+      "affectedServices": [
+        "websocket-gateway",
+        "presence-service"
+      ]
+    },
+    "rootCause": {
+      "mechanism": "WebSocket disconnect handler not cancelling context, leaving goroutines blocked on channel read. Goroutine count grows linearly with disconnects until OOM.",
+      "category": "code",
+      "components": [
+        "websocket-gateway",
+        "goroutines"
+      ],
+      "mustSurfaceClues": [
+        "goroutine",
+        "websocket",
+        "disconnect",
+        "context",
+        "leak"
+      ]
+    },
+    "alertPrompt": "Alert: websocket-gateway memory usage at 85% and climbing steadily.\nPod restarts happening every ~4 hours due to OOM.\nNo traffic increase. CPU normal. Connection count stable at ~5000.\nStarted 2 days ago after deploy v3.8.0.\nInvestigate and find the root cause.",
+    "difficulty": {
+      "stepsToRootCause": 4,
+      "signalBuriedness": 2,
+      "redHerringCount": 3
+    },
+    "messiness": {
+      "fieldWidth": [
+        30,
+        50
+      ],
+      "nullRate": 0.2,
+      "jsonEncodedRate": 0.12,
+      "casingDrift": 0.2,
+      "aliasRate": 0.3
+    },
+    "timeRangeMinutes": 240,
+    "variations": 3
+  },
+  "datasets": [
+    "application_logs",
+    "infrastructure_events"
+  ],
+  "datasources": [
+    {
+      "uid": "prom-1",
+      "name": "Prometheus",
+      "type": "prometheus"
+    }
+  ],
+  "deployments": [
+    "prod",
+    "v3.7.5",
+    "v3.8.0"
+  ],
+  "events": [
+    {
+      "tsOffsetSec": 0,
+      "dataset": "application_logs",
+      "service": "websocket-gateway",
+      "severity": "info",
+      "message": "Starting websocket-gateway version v3.8.0",
+      "attributes": {
+        "commit": "a8f2c31",
+        "env": "prod"
+      },
+      "role": "background",
+      "clueId": null
+    },
+    {
+      "tsOffsetSec": 120,
+      "dataset": "application_logs",
+      "service": "api-gateway",
+      "severity": "warn",
+      "message": "TLS handshake timeout from 192.168.1.45",
+      "attributes": {
+        "error_code": "ETIMEDOUT"
+      },
+      "role": "red_herring",
+      "clueId": "rh-tls"
+    },
+    {
+      "tsOffsetSec": 300,
+      "dataset": "application_logs",
+      "service": "websocket-gateway",
+      "severity": "info",
+      "message": "connection established",
+      "attributes": {
+        "cid": "ws-9981",
+        "remote_addr": "203.0.113.5",
+        "proto": "wss"
+      },
+      "role": "breadcrumb",
+      "clueId": "clue-traffic"
+    },
+    {
+      "tsOffsetSec": 600,
+      "dataset": "application_logs",
+      "service": "websocket-gateway",
+      "severity": "info",
+      "message": "connection closed",
+      "attributes": {
+        "cid": "ws-9981",
+        "reason": "client_gone",
+        "duration_ms": 300000
+      },
+      "role": "breadcrumb",
+      "clueId": "clue-leak-source"
+    },
+    {
+      "tsOffsetSec": 1200,
+      "dataset": "application_logs",
+      "service": "message-broker",
+      "severity": "warn",
+      "message": "Partition rebalance initiated for group 'chat-delivery'",
+      "attributes": {
+        "topic": "messages.v1",
+        "generation": 42
+      },
+      "role": "red_herring",
+      "clueId": "rh-broker"
+    },
+    {
+      "tsOffsetSec": 1800,
+      "dataset": "application_logs",
+      "service": "websocket-gateway",
+      "severity": "debug",
+      "message": "runtime.NumGoroutine increased",
+      "attributes": {
+        "count": 12500,
+        "prev_count": 11800
+      },
+      "role": "rootcause",
+      "clueId": "clue-goroutine"
+    },
+    {
+      "tsOffsetSec": 2400,
+      "dataset": "application_logs",
+      "service": "presence-service",
+      "severity": "error",
+      "message": "failed to update presence: context deadline exceeded",
+      "attributes": {
+        "userId": "u-4412",
+        "latency_ms": 5002
+      },
+      "role": "red_herring",
+      "clueId": "rh-latency"
+    },
+    {
+      "tsOffsetSec": 3600,
+      "dataset": "application_logs",
+      "service": "websocket-gateway",
+      "severity": "info",
+      "message": "connection established",
+      "attributes": {
+        "cid": "ws-10442",
+        "remote_addr": "203.0.113.12"
+      },
+      "role": "background",
+      "clueId": null
+    },
+    {
+      "tsOffsetSec": 3700,
+      "dataset": "application_logs",
+      "service": "websocket-gateway",
+      "severity": "info",
+      "message": "connection closed",
+      "attributes": {
+        "cid": "ws-10442",
+        "reason": "io.EOF"
+      },
+      "role": "breadcrumb",
+      "clueId": "clue-leak-source"
+    },
+    {
+      "tsOffsetSec": 4500,
+      "dataset": "application_logs",
+      "service": "websocket-gateway",
+      "severity": "debug",
+      "message": "runtime.NumGoroutine increased",
+      "attributes": {
+        "count": 18200,
+        "delta": 400
+      },
+      "role": "rootcause",
+      "clueId": "clue-goroutine"
+    },
+    {
+      "tsOffsetSec": 7200,
+      "dataset": "application_logs",
+      "service": "websocket-gateway",
+      "severity": "info",
+      "message": "GC pause exceed threshold",
+      "attributes": {
+        "pause_duration_ms": 450,
+        "heap_size_mb": 1840
+      },
+      "role": "breadcrumb",
+      "clueId": "clue-memory"
+    },
+    {
+      "tsOffsetSec": 10800,
+      "dataset": "application_logs",
+      "service": "websocket-gateway",
+      "severity": "error",
+      "message": "fatal error: runtime: out of memory",
+      "attributes": {
+        "stacktrace": "goroutine 54221 [chan receive]:\nmain.handleDisconnect(0xc000...)\n\t/src/handler.go:88 +0x45"
+      },
+      "role": "rootcause",
+      "clueId": "clue-leak-source"
+    },
+    {
+      "tsOffsetSec": 10900,
+      "dataset": "infrastructure_events",
+      "service": "websocket-gateway",
+      "severity": "error",
+      "message": "Pod websocket-gateway-7f8d9b terminated",
+      "attributes": {
+        "reason": "OOMKilled",
+        "exit_code": 137,
+        "container": "gateway"
+      },
+      "role": "breadcrumb",
+      "clueId": "clue-memory"
+    },
+    {
+      "tsOffsetSec": 11000,
+      "dataset": "application_logs",
+      "service": "websocket-gateway",
+      "severity": "info",
+      "message": "Starting websocket-gateway version v3.8.0",
+      "attributes": {
+        "status": "recovering"
+      },
+      "role": "background",
+      "clueId": null
+    }
+  ],
+  "metrics": [
+    {
+      "name": "process_resident_memory_bytes",
+      "labels": {
+        "service": "websocket-gateway",
+        "pod": "gateway-1"
+      },
+      "shape": "ramp",
+      "baselineValue": 256000000,
+      "peakValue": 2147483648,
+      "changeOffsetSec": 0,
+      "role": "symptom"
+    },
+    {
+      "name": "go_goroutines",
+      "labels": {
+        "service": "websocket-gateway"
+      },
+      "shape": "ramp",
+      "baselineValue": 1200,
+      "peakValue": 65000,
+      "changeOffsetSec": 0,
+      "role": "rootcause"
+    },
+    {
+      "name": "websocket_active_connections",
+      "labels": {
+        "service": "websocket-gateway"
+      },
+      "shape": "baseline",
+      "baselineValue": 5000,
+      "peakValue": 5200,
+      "changeOffsetSec": 0,
+      "role": "background"
+    },
+    {
+      "name": "messaging_rebalance_total",
+      "labels": {
+        "service": "message-broker"
+      },
+      "shape": "spike",
+      "baselineValue": 0,
+      "peakValue": 5,
+      "changeOffsetSec": 1200,
+      "role": "red_herring"
+    },
+    {
+      "name": "http_request_duration_seconds_bucket",
+      "labels": {
+        "service": "presence-service",
+        "le": "5.0"
+      },
+      "shape": "sawtooth",
+      "baselineValue": 0.05,
+      "peakValue": 4.5,
+      "changeOffsetSec": 2400,
+      "role": "red_herring"
+    },
+    {
+      "name": "process_cpu_seconds_total",
+      "labels": {
+        "service": "websocket-gateway"
+      },
+      "shape": "baseline",
+      "baselineValue": 0.4,
+      "peakValue": 0.5,
+      "changeOffsetSec": 0,
+      "role": "background"
+    }
+  ],
+  "investigationPath": [
+    {
+      "clueId": "clue-memory",
+      "description": "Examine memory metrics and pod events for the websocket-gateway to confirm OOM behavior.",
+      "probeQueries": {
+        "axiom": [
+          {
+            "dataset": "infrastructure_events",
+            "mustContain": [
+              "OOMKilled"
+            ]
+          }
+        ],
+        "grafana": [
+          {
+            "metricName": "process_resident_memory_bytes"
+          }
+        ]
+      }
+    },
+    {
+      "clueId": "clue-traffic",
+      "description": "Check if the memory growth correlates with an increase in websocket traffic or connections.",
+      "probeQueries": {
+        "axiom": [
+          {
+            "dataset": "application_logs",
+            "mustContain": [
+              "connection established"
+            ]
+          }
+        ],
+        "grafana": [
+          {
+            "metricName": "websocket_active_connections"
+          }
+        ]
+      }
+    },
+    {
+      "clueId": "clue-goroutine",
+      "description": "Analyze Go runtime metrics to see if internal resources are leaking despite stable external traffic.",
+      "probeQueries": {
+        "grafana": [
+          {
+            "metricName": "go_goroutines"
+          }
+        ]
+      }
+    },
+    {
+      "clueId": "clue-leak-source",
+      "description": "Correlate goroutine growth with specific code paths, focusing on connection lifecycle events.",
+      "probeQueries": {
+        "axiom": [
+          {
+            "dataset": "application_logs",
+            "mustContain": [
+              "connection closed",
+              "chan receive"
+            ]
+          },
+          {
+            "dataset": "application_logs",
+            "mustContain": [
+              "handleDisconnect"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "expected": {
+    "rootCauseMustMention": [
+      "goroutine",
+      "leak",
+      "disconnect",
+      "handler",
+      "context",
+      "channel"
+    ],
+    "rootCauseMustNotMention": [
+      "database",
+      "cpu",
+      "message-broker",
+      "disk"
+    ],
+    "requiredQueries": [
+      {
+        "tool": "scripts/grafana-query",
+        "mustMatch": ".*go_goroutines.*",
+        "description": "Check goroutine count over time"
+      },
+      {
+        "tool": "scripts/axiom-query",
+        "mustMatch": ".*handleDisconnect.*|.*chan receive.*",
+        "description": "Find the leaking function in logs or stacktraces"
+      }
+    ]
+  }
+}

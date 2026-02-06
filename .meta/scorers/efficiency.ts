@@ -1,17 +1,14 @@
-/**
- * Efficiency Scorer
- *
- * Measures tool call count and token usage against scenario budgets.
- * Rewards efficient investigations that don't waste resources.
- */
-
 import { Scorer } from 'axiom/ai/evals';
-import type { EvalInput, EvalOutput } from '../harness/types.js';
+import type { EvalInput, EvalOutput, ToolCall } from '../harness/types.js';
 
-function clamp01(value: number): number {
-  return Math.max(0, Math.min(1, value));
-}
-
+/**
+ * Efficiency Scorer — v2
+ *
+ * Beyond simple call counting, penalizes:
+ * - Failed queries (syntax/contract errors)
+ * - Redundant near-duplicate queries
+ * - Exceeding budget
+ */
 export const EfficiencyScorer = Scorer<{
   input: EvalInput;
   output: EvalOutput;
@@ -19,38 +16,52 @@ export const EfficiencyScorer = Scorer<{
 }>(
   'efficiency',
   ({ input, output }) => {
-    const budgets = input.scenario.budgets ?? {};
-    const trace = output.trace;
+    const budget = Math.max(1, input.scenario.budgets?.maxToolCalls ?? 15);
+    const toolCalls = output.trace.toolCalls;
+    const actual = toolCalls.length;
 
-    const toolCalls = trace.toolCalls.length;
-    const maxToolCalls = budgets.maxToolCalls ?? 15;
+    // Budget compliance (0-1)
+    const budgetScore = actual <= budget ? 1 : Math.max(0, 1 - (actual - budget) / budget);
 
-    const totalTokens = trace.usage?.totalTokens ?? 0;
-    const maxTokens = budgets.maxTotalTokens ?? 10000;
+    // Failed query penalty
+    const failedQueries = toolCalls.filter((tc: ToolCall) => tc.queryValid === false).length;
+    const failureRate = actual > 0 ? failedQueries / actual : 0;
+    const failurePenalty = 1 - failureRate;
 
-    const toolOverage = toolCalls - maxToolCalls;
-    const toolScore = toolOverage <= 0 ? 1 : clamp01(1 - toolOverage / maxToolCalls);
+    // Redundancy penalty — detect near-duplicate queries
+    const queryCalls = toolCalls.filter((tc: ToolCall) =>
+      tc.tool === 'scripts/axiom-query' || tc.tool === 'scripts/grafana-query'
+    );
+    const queryInputs = queryCalls.map((tc: ToolCall) =>
+      typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input)
+    );
+    const uniqueQueries = new Set(queryInputs.map(normalizeQuery));
+    const redundantQueries = queryCalls.length - uniqueQueries.size;
+    const redundancyPenalty = queryCalls.length > 0
+      ? 1 - (redundantQueries / queryCalls.length)
+      : 1;
 
-    let tokenScore = 1;
-    if (totalTokens > 0) {
-      const tokenOverage = totalTokens - maxTokens;
-      tokenScore = tokenOverage <= 0 ? 1 : clamp01(1 - tokenOverage / maxTokens);
-    }
-
-    const hasTokenData = totalTokens > 0;
-    const score = hasTokenData ? 0.7 * toolScore + 0.3 * tokenScore : toolScore;
+    // Combined: 40% budget, 30% no failures, 30% no redundancy
+    const score = budgetScore * 0.4 + failurePenalty * 0.3 + redundancyPenalty * 0.3;
 
     return {
       score,
       metadata: {
-        toolCalls,
-        maxToolCalls,
-        toolScore,
-        totalTokens: totalTokens || 'N/A',
-        maxTokens,
-        tokenScore: hasTokenData ? tokenScore : 'N/A',
-        elapsedMs: trace.elapsedMs,
+        toolCalls: actual,
+        budget,
+        withinBudget: actual <= budget,
+        failedQueries,
+        failureRate: Math.round(failureRate * 100),
+        redundantQueries,
+        uniqueQueries: uniqueQueries.size,
+        budgetScore: Math.round(budgetScore * 100),
+        failurePenalty: Math.round(failurePenalty * 100),
+        redundancyPenalty: Math.round(redundancyPenalty * 100),
       },
     };
   }
 );
+
+function normalizeQuery(q: string): string {
+  return q.toLowerCase().replace(/\s+/g, ' ').replace(/['"]/g, '').trim();
+}
