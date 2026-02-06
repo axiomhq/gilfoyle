@@ -1,5 +1,9 @@
 name: Eval
 
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   push:
