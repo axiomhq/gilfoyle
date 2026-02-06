@@ -45,7 +45,7 @@ jobs:
           - harness: opencode
             model: xai/grok-4-1-fast
           - harness: opencode
-            model: anthropic/claude-opus-4-6-20250514
+            model: anthropic/claude-opus-4-6
           - harness: claude
             model: claude-opus-4-6
     env:
