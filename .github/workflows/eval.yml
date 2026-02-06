@@ -1,6 +1,7 @@
 name: Eval
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -10,6 +11,7 @@ on:
       - 'scripts/**'
       - 'reference/**'
       - '.meta/**'
+      - '.github/workflows/**'
 
 jobs:
   lint:
