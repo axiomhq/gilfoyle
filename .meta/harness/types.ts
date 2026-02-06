@@ -1,4 +1,4 @@
-export type HarnessName = 'amp' | 'opencode' | 'direct';
+export type HarnessName = 'amp' | 'opencode' | 'direct' | 'claude';
 export type ModelName = string;
 export type ToolName = 'scripts/init' | 'scripts/axiom-query' | 'scripts/grafana-query' | 'scripts/slack' | 'scripts/mem-write' | 'scripts/rollback' | 'scripts/flag-revert' | 'scripts/axiom-link';
 

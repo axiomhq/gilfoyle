@@ -9,6 +9,8 @@
     "eval:opencode": "EVAL_HARNESS=opencode axiom eval",
     "eval:opencode:grok": "EVAL_HARNESS=opencode EVAL_MODEL=xai/grok-4-1-fast axiom eval",
     "eval:opencode:opus": "EVAL_HARNESS=opencode EVAL_MODEL=anthropic/claude-opus-4-6-20250514 axiom eval",
+    "eval:claude": "EVAL_HARNESS=claude axiom eval",
+    "eval:claude:opus": "EVAL_HARNESS=claude EVAL_MODEL=claude-opus-4-20250514 axiom eval",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
     "check": "tsc --noEmit && biome lint ."
@@ -17,6 +19,7 @@
     "@ai-sdk/anthropic": "3.0.37",
     "@ai-sdk/google": "^3.0.21",
     "@ai-sdk/xai": "^1.0.0",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.31",
     "@anthropic-ai/sdk": "0.73.0",
     "@opencode-ai/sdk": "^1.1.53",
     "@sourcegraph/amp-sdk": "0.1.0-20260205201419-gbab39ed",
