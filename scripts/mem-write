@@ -154,8 +154,16 @@ echo "✓ Written to [$TIER] kb/${FILE}.md"
 echo "  Entry: ${ID}"
 echo "  Path: ${TARGET_FILE}"
 
-if [[ -n "$ORG" ]]; then
+if [[ -n "$ORG" ]] && [[ -d "$TARGET_DIR/.git" ]]; then
   echo ""
-  echo "To share with team:"
-  echo "  scripts/mem-share $ORG \"Added: $ID\""
+  cd "$TARGET_DIR"
+  if [[ -n $(git status --porcelain) ]]; then
+    git add -A
+    git commit -m "Added: $ID" >/dev/null 2>&1
+    if git push >/dev/null 2>&1; then
+      echo "✓ Shared with team (committed + pushed)"
+    else
+      echo "⚠️  Committed locally but push failed. Retry: cd $TARGET_DIR && git push"
+    fi
+  fi
 fi

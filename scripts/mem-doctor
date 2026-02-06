@@ -70,7 +70,7 @@ if [[ -d "$ORGS_DIR" ]]; then
       entries=$(count_entries "$org_dir")
       if [[ "$uncommitted" -gt 0 ]]; then
         check_warn "$org_name: $entries entries, $uncommitted uncommitted changes"
-        echo "   Run: scripts/mem-share $org_name \"message\""
+        echo "   Run: scripts/mem-write --org $org_name to auto-share, or scripts/mem-share $org_name \"message\""
       else
         check_ok "$org_name: $entries entries (synced)"
       fi
