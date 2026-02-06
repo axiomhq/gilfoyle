@@ -8,9 +8,9 @@
     "eval:amp": "EVAL_HARNESS=amp axiom eval",
     "eval:opencode": "EVAL_HARNESS=opencode axiom eval",
     "eval:opencode:grok": "EVAL_HARNESS=opencode EVAL_MODEL=xai/grok-4-1-fast axiom eval",
-    "eval:opencode:opus": "EVAL_HARNESS=opencode EVAL_MODEL=anthropic/claude-opus-4-6-20250514 axiom eval",
+    "eval:opencode:opus": "EVAL_HARNESS=opencode EVAL_MODEL=anthropic/claude-opus-4-6 axiom eval",
     "eval:claude": "EVAL_HARNESS=claude axiom eval",
-    "eval:claude:opus": "EVAL_HARNESS=claude EVAL_MODEL=claude-opus-4-20250514 axiom eval",
+    "eval:claude:opus": "EVAL_HARNESS=claude EVAL_MODEL=claude-opus-4-6 axiom eval",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
     "check": "tsc --noEmit && biome lint ."

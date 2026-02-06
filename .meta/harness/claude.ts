@@ -2,8 +2,8 @@
  * Claude Agent SDK Harness
  *
  * Runs Gilfoyle skill via the Claude Agent SDK (claude-agent-sdk).
- * Spawns a Claude Code subprocess, streams messages, collects
- * tool calls + token usage, and returns a RunTrace.
+ * Spawns a Claude Code subprocess, streams messages, logs tool
+ * calls + errors in real time, and returns a RunTrace.
  */
 
 import type { HarnessRunner, IncidentScenario, RunConfig, RunTrace, ToolCall, ToolName, TokenUsage } from './types.js';
@@ -61,10 +61,13 @@ export const claudeHarness: HarnessRunner = {
       chmodSync(scriptPath, 0o755);
     }
 
-    const debug = process.env.DEBUG_CLAUDE_HARNESS === '1';
+    const elapsed = () => `${((Date.now() - start) / 1000).toFixed(0)}s`;
+    const log = (msg: string) => console.error(`[claude] ${scenario.id} (${elapsed()}): ${msg}`);
     const pendingTools = new Map<string, { tool: ToolName; input: unknown }>();
     const model = config.model ?? DEFAULT_MODEL;
     const skillContent = readFileSync(SKILL_PATH, 'utf-8');
+
+    log(`model=${model}`);
 
     try {
       const prompt = `Investigate this incident:\n\n${scenario.prompt}\n\nRun scripts/init first to discover available environments, then use scripts/axiom-query and scripts/grafana-query to investigate. State your ROOT CAUSE clearly with evidence.`;
@@ -89,11 +92,12 @@ export const claudeHarness: HarnessRunner = {
         },
       })) {
         if (message.type === 'assistant') {
-          if (debug) {
-            const msgUsage = message.message.usage;
-            if (msgUsage) {
-              console.error(`[claude] assistant usage: in=${msgUsage.input_tokens} out=${msgUsage.output_tokens} cache_read=${msgUsage.cache_read_input_tokens} cache_write=${msgUsage.cache_creation_input_tokens}`);
-            }
+          const msgUsage = message.message.usage;
+          if (msgUsage) {
+            usage.inputTokens += msgUsage.input_tokens ?? 0;
+            usage.outputTokens += msgUsage.output_tokens ?? 0;
+            usage.cacheReadTokens! += msgUsage.cache_read_input_tokens ?? 0;
+            usage.cacheWriteTokens! += msgUsage.cache_creation_input_tokens ?? 0;
           }
           for (const block of message.message.content) {
             if (block.type === 'text') {
@@ -102,7 +106,10 @@ export const claudeHarness: HarnessRunner = {
               if (block.name === 'Bash' && typeof block.input === 'object' && block.input !== null) {
                 const cmd = (block.input as { command?: string }).command ?? '';
                 const scriptName = extractScriptFromBashCmd(cmd);
-                if (scriptName) pendingTools.set(block.id, { tool: scriptName, input: cmd });
+                if (scriptName) {
+                  log(`TOOL ${scriptName}: ${cmd.slice(0, 120)}`);
+                  pendingTools.set(block.id, { tool: scriptName, input: cmd });
+                }
               }
             }
           }
@@ -115,6 +122,7 @@ export const claudeHarness: HarnessRunner = {
                 if (pending) {
                   const outputStr = toolResultToString(block.content);
                   const isError = block.is_error === true || outputStr.startsWith('error:');
+                  if (isError) log(`TOOL ${pending.tool} ERROR: ${outputStr.slice(0, 120)}`);
                   const errorMessages = isError
                     ? outputStr.split('\n').filter(l => l.startsWith('error:')).map(l => l.slice(7).trim())
                     : [];
@@ -142,27 +150,26 @@ export const claudeHarness: HarnessRunner = {
           if (typeof result.total_cost_usd === 'number') {
             usage.costUsd = result.total_cost_usd;
           }
-          if (debug) {
-            console.error(`[claude] result: turns=${result.num_turns} cost=$${(result.total_cost_usd as number)?.toFixed(4)} is_error=${result.is_error}`);
-            console.error(`[claude] total usage: in=${usage.inputTokens} out=${usage.outputTokens} cache_read=${usage.cacheReadTokens} cache_write=${usage.cacheWriteTokens}`);
-          }
+          log(`RESULT: turns=${result.num_turns} cost=$${(result.total_cost_usd as number)?.toFixed(4)} is_error=${result.is_error}`);
           if (result.subtype === 'success') {
             resultText = String(result.result ?? '');
           } else {
             const errors = Array.isArray(result.errors) ? (result.errors as string[]).join('; ') : String(result.subtype);
+            log(`RESULT ERROR: ${errors}`);
             streamedText += `\nError (${result.subtype}): ${errors}\n`;
           }
         }
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.error(`[claude] harness error for ${scenario.id}: ${errMsg}`);
+      log(`HARNESS ERROR: ${errMsg}`);
       streamedText += `\nHARNESS ERROR: ${errMsg}\n`;
     } finally {
       try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     }
 
     const finalText = (resultText ?? streamedText).trim();
+    log(`done: ${toolCalls.length} tool calls, in=${usage.inputTokens} out=${usage.outputTokens}`);
     return { finalText, toolCalls, elapsedMs: Date.now() - start, usage };
   },
 };
