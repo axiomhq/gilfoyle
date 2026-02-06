@@ -135,6 +135,34 @@ export function createMockRouter(scenario: IncidentScenario): MockToolRouter {
           output = { ok: true };
           break;
 
+        case 'scripts/rollback': {
+          const { service, version } = input as { service?: string; version?: string };
+          output = {
+            ok: true,
+            rolled_back_to: version ?? 'previous',
+            service: service ?? 'unknown',
+            message: `Rolled back ${service ?? 'service'} to ${version ?? 'previous version'}`,
+          };
+          break;
+        }
+
+        case 'scripts/flag-revert': {
+          const { flag } = input as { flag?: string };
+          output = {
+            ok: true,
+            reverted: flag ?? 'unknown',
+            message: `Reverted feature flag: ${flag ?? 'unknown'}`,
+          };
+          break;
+        }
+
+        case 'scripts/axiom-link': {
+          const { env, query, range } = input as { env?: string; query?: string; range?: string };
+          const encodedQuery = encodeURIComponent(query ?? '');
+          output = `https://app.axiom.co/acme/explorer?q=${encodedQuery}&t=${range ?? '1h'}`;
+          break;
+        }
+
         default:
           error = `Unknown tool: ${tool}`;
           output = { error };
