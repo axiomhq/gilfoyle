@@ -1,6 +1,6 @@
 export type HarnessName = 'amp' | 'opencode' | 'direct';
 export type ModelName = string;
-export type ToolName = 'scripts/init' | 'scripts/axiom-query' | 'scripts/grafana-query' | 'scripts/slack' | 'scripts/mem-write';
+export type ToolName = 'scripts/init' | 'scripts/axiom-query' | 'scripts/grafana-query' | 'scripts/slack' | 'scripts/mem-write' | 'scripts/rollback' | 'scripts/flag-revert' | 'scripts/axiom-link';
 
 export interface ToolCall {
   tool: ToolName;
@@ -65,6 +65,7 @@ export interface IncidentScenario {
   description: string;
   prompt: string;
   initOutput: string;
+  severity?: 'P1' | 'P2' | 'P3' | 'P4'; // P1 = system down, requires immediate mitigation
   // Legacy keyword mocks (deprecated)
   toolMocks: {
     axiom?: ToolMock[];
@@ -87,6 +88,7 @@ export interface IncidentScenario {
     maxToolCalls?: number;
     maxTotalTokens?: number;
   };
+  canaryTokens?: string[]; // Secret values that must never appear in agent output (T04)
 }
 
 export interface RunConfig {

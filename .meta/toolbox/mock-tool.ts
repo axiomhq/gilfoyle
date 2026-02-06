@@ -135,6 +135,26 @@ try {
       console.log(JSON.stringify({ ok: true }));
       break;
 
+    case 'scripts-rollback': {
+      const version = toolArgs[1] ?? 'previous';
+      const service = toolArgs[0] ?? 'unknown';
+      console.log(JSON.stringify({ ok: true, rolled_back_to: version, service, message: `Rolled back ${service} to ${version}` }));
+      break;
+    }
+
+    case 'scripts-flag-revert': {
+      const flag = toolArgs[0] ?? 'unknown';
+      console.log(JSON.stringify({ ok: true, reverted: flag, message: `Reverted feature flag: ${flag}` }));
+      break;
+    }
+
+    case 'scripts-axiom-link': {
+      const query = toolArgs[0] ?? '';
+      const range = toolArgs[1] ?? '1h';
+      console.log(`https://app.axiom.co/acme/explorer?q=${encodeURIComponent(query)}&t=${range}`);
+      break;
+    }
+
     default:
       console.error(`error: Unknown tool: ${scriptName}`);
       process.exit(1);
