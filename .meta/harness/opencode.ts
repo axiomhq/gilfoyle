@@ -17,7 +17,7 @@ import { createServer } from 'node:net';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILL_PATH = join(__dirname, '../../SKILL.md');
-const MOCK_TOOL_PATH = join(__dirname, '../toolbox/mock-tool-v2.ts');
+const MOCK_TOOL_PATH = join(__dirname, '../toolbox/mock-tool.ts');
 
 const DEFAULT_PROVIDER = 'xai';
 const DEFAULT_MODEL = 'grok-4-1-fast';
