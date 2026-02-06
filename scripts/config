@@ -170,12 +170,12 @@ case "$TOOL" in
             exit 1
         fi
         echo "GRAFANA_URL=\"$URL\""
-        [[ -n "$TOKEN" ]] && echo "GRAFANA_TOKEN=\"$TOKEN\""
-        [[ -n "$ACCESS_CMD" ]] && echo "GRAFANA_ACCESS_CMD=\"$ACCESS_CMD\""
-        [[ -n "$CF_ACCESS_CLIENT_ID" ]] && echo "GRAFANA_CF_ACCESS_CLIENT_ID=\"$CF_ACCESS_CLIENT_ID\""
-        [[ -n "$CF_ACCESS_CLIENT_SECRET" ]] && echo "GRAFANA_CF_ACCESS_CLIENT_SECRET=\"$CF_ACCESS_CLIENT_SECRET\""
-        [[ -n "$USERNAME" ]] && echo "GRAFANA_USERNAME=\"$USERNAME\""
-        [[ -n "$PASSWORD" ]] && echo "GRAFANA_PASSWORD=\"$PASSWORD\""
+        [[ -n "$TOKEN" ]] && echo "GRAFANA_TOKEN=\"$TOKEN\"" || true
+        [[ -n "$ACCESS_CMD" ]] && echo "GRAFANA_ACCESS_CMD=\"$ACCESS_CMD\"" || true
+        [[ -n "$CF_ACCESS_CLIENT_ID" ]] && echo "GRAFANA_CF_ACCESS_CLIENT_ID=\"$CF_ACCESS_CLIENT_ID\"" || true
+        [[ -n "$CF_ACCESS_CLIENT_SECRET" ]] && echo "GRAFANA_CF_ACCESS_CLIENT_SECRET=\"$CF_ACCESS_CLIENT_SECRET\"" || true
+        [[ -n "$USERNAME" ]] && echo "GRAFANA_USERNAME=\"$USERNAME\"" || true
+        [[ -n "$PASSWORD" ]] && echo "GRAFANA_PASSWORD=\"$PASSWORD\"" || true
         ;;
     
     pyroscope)
@@ -189,12 +189,12 @@ case "$TOOL" in
             exit 1
         fi
         echo "PYROSCOPE_URL=\"$URL\""
-        [[ -n "$TOKEN" ]] && echo "PYROSCOPE_TOKEN=\"$TOKEN\""
-        [[ -n "$ACCESS_CMD" ]] && echo "PYROSCOPE_ACCESS_CMD=\"$ACCESS_CMD\""
-        [[ -n "$CF_ACCESS_CLIENT_ID" ]] && echo "PYROSCOPE_CF_ACCESS_CLIENT_ID=\"$CF_ACCESS_CLIENT_ID\""
-        [[ -n "$CF_ACCESS_CLIENT_SECRET" ]] && echo "PYROSCOPE_CF_ACCESS_CLIENT_SECRET=\"$CF_ACCESS_CLIENT_SECRET\""
-        [[ -n "$USERNAME" ]] && echo "PYROSCOPE_USERNAME=\"$USERNAME\""
-        [[ -n "$PASSWORD" ]] && echo "PYROSCOPE_PASSWORD=\"$PASSWORD\""
+        [[ -n "$TOKEN" ]] && echo "PYROSCOPE_TOKEN=\"$TOKEN\"" || true
+        [[ -n "$ACCESS_CMD" ]] && echo "PYROSCOPE_ACCESS_CMD=\"$ACCESS_CMD\"" || true
+        [[ -n "$CF_ACCESS_CLIENT_ID" ]] && echo "PYROSCOPE_CF_ACCESS_CLIENT_ID=\"$CF_ACCESS_CLIENT_ID\"" || true
+        [[ -n "$CF_ACCESS_CLIENT_SECRET" ]] && echo "PYROSCOPE_CF_ACCESS_CLIENT_SECRET=\"$CF_ACCESS_CLIENT_SECRET\"" || true
+        [[ -n "$USERNAME" ]] && echo "PYROSCOPE_USERNAME=\"$USERNAME\"" || true
+        [[ -n "$PASSWORD" ]] && echo "PYROSCOPE_PASSWORD=\"$PASSWORD\"" || true
         ;;
     
     slack)
