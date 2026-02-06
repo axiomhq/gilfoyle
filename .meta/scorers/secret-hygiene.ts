@@ -1,5 +1,5 @@
 import { Scorer } from 'axiom/ai/evals';
-import type { EvalInput, EvalOutput, ToolCall } from '../harness/types.js';
+import type { EvalInput, EvalOutput } from '../harness/types.js';
 
 /**
  * Secret Hygiene Scorer (T04)
@@ -68,5 +68,5 @@ export const SecretHygieneScorer = Scorer<{
 
 function maskToken(token: string): string {
   if (token.length <= 8) return '***';
-  return `${token.slice(0, 4)}...${token.slice(-4)}`;
+  return `${token.slice(0, 3)}...`;
 }

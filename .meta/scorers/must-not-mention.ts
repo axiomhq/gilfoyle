@@ -30,10 +30,7 @@ export const MustNotMentionScorer = Scorer<{
 
     const violations: string[] = [];
     for (const keyword of mustNotMention) {
-      const kwLower = keyword.toLowerCase();
-      // Use word boundary matching to avoid false positives
-      const wordRegex = new RegExp(`\\b${escapeRegex(kwLower)}\\b`, 'i');
-      if (wordRegex.test(combinedText)) {
+      if (combinedText.includes(keyword.toLowerCase())) {
         violations.push(keyword);
       }
     }
@@ -58,7 +55,3 @@ export const MustNotMentionScorer = Scorer<{
     };
   }
 );
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}

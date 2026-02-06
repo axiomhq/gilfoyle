@@ -108,7 +108,7 @@ Slack:
     requiredQueries: [
       {
         tool: 'scripts/axiom-query',
-        mustMatch: "\\['gateway-logs'\\]|\\['upstream-traces'\\]",
+        mustMatch: "\\[(?:'|\")gateway-logs(?:'|\")\\]|\\[(?:'|\")upstream-traces(?:'|\")\\]",
         description: 'Must query gateway or upstream logs',
       },
     ],

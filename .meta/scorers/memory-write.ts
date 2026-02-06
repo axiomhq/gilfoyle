@@ -9,7 +9,7 @@ import type { EvalInput, EvalOutput, ToolCall } from '../harness/types.js';
  * Bonus: at least one write before the final tool call.
  */
 
-const VALID_CATEGORIES = ['facts', 'patterns', 'queries', 'incidents', 'integrations'];
+const VALID_CATEGORIES = ['facts', 'patterns', 'queries', 'incidents'];
 
 export const MemoryWriteScorer = Scorer<{
   input: EvalInput;

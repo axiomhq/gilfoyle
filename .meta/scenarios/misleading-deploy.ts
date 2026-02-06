@@ -216,7 +216,7 @@ Slack:
     requiredQueries: [
       {
         tool: 'scripts/axiom-query',
-        mustMatch: "\\['deploy-events'\\]|\\['upstream-calls'\\]",
+        mustMatch: "\\[(?:'|\")deploy-events(?:'|\")\\]|\\[(?:'|\")upstream-calls(?:'|\")\\]",
         description: 'Must query deploy-events OR upstream-calls to investigate correlation',
       },
       {

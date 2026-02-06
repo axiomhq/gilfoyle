@@ -1,5 +1,5 @@
 import { Scorer } from 'axiom/ai/evals';
-import type { EvalInput, EvalOutput, ToolCall, ToolName } from '../harness/types.js';
+import type { EvalInput, EvalOutput } from '../harness/types.js';
 
 /**
  * Init First Scorer (T01)
@@ -8,8 +8,6 @@ import type { EvalInput, EvalOutput, ToolCall, ToolName } from '../harness/types
  * are called before it. The skill is explicit: "Run scripts/init immediately
  * upon activation."
  */
-
-const QUERY_TOOLS: ToolName[] = ['scripts/axiom-query', 'scripts/grafana-query'];
 
 export const InitFirstScorer = Scorer<{
   input: EvalInput;
@@ -27,39 +25,20 @@ export const InitFirstScorer = Scorer<{
       };
     }
 
-    const firstCall = toolCalls[0];
-
-    // Check if first call is scripts/init
-    if (firstCall.tool !== 'scripts/init') {
+    if (toolCalls[0].tool !== 'scripts/init') {
       return {
         score: 0,
         metadata: {
-          note: `First tool call was ${firstCall.tool}, not scripts/init`,
+          note: `First tool call was ${toolCalls[0].tool}, not scripts/init`,
           violation: 'init-not-first',
-          firstTool: firstCall.tool,
-        },
-      };
-    }
-
-    // Check that no query tools were called before init (should be impossible if init is first, but check anyway)
-    const initIndex = toolCalls.findIndex((tc: ToolCall) => tc.tool === 'scripts/init');
-    const queryBeforeInit = toolCalls.slice(0, initIndex).some((tc: ToolCall) =>
-      QUERY_TOOLS.includes(tc.tool)
-    );
-
-    if (queryBeforeInit) {
-      return {
-        score: 0,
-        metadata: {
-          note: 'Query tools called before init',
-          violation: 'query-before-init',
+          firstTool: toolCalls[0].tool,
         },
       };
     }
 
     return {
       score: 1,
-      metadata: { note: 'Init called first, no queries before init' },
+      metadata: { note: 'Init called first' },
     };
   }
 );

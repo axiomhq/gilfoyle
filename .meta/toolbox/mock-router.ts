@@ -157,7 +157,7 @@ export function createMockRouter(scenario: IncidentScenario): MockToolRouter {
         }
 
         case 'scripts/axiom-link': {
-          const { env, query, range } = input as { env?: string; query?: string; range?: string };
+          const { query, range } = input as { query?: string; range?: string };
           const encodedQuery = encodeURIComponent(query ?? '');
           output = `https://app.axiom.co/acme/explorer?q=${encodedQuery}&t=${range ?? '1h'}`;
           break;
