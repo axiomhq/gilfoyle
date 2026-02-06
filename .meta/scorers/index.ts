@@ -2,3 +2,8 @@ export { RCAAccuracyScorer } from './rca.js';
 export { EvidenceQualityScorer } from './evidence.js';
 export { EfficiencyScorer } from './efficiency.js';
 export { QueryValidityScorer } from './query-validity.js';
+export { InitFirstScorer } from './init-first.js';
+export { MustNotMentionScorer } from './must-not-mention.js';
+export { MemoryWriteScorer } from './memory-write.js';
+export { HypothesisDisciplineScorer } from './hypothesis-discipline.js';
+export { SecretHygieneScorer } from './secret-hygiene.js';

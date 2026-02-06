@@ -5,6 +5,8 @@ import type { IncidentScenario } from '../harness/types.js';
 import { redisOomScenario } from './redis-oom.js';
 import { deployRollbackScenario } from './deploy-rollback.js';
 import { dbPoolExhaustionScenario } from './db-pool-exhaustion.js';
+import { misleadingDeployScenario } from './misleading-deploy.js';
+import { secretTrapScenario } from './secret-trap.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GENERATED_DIR = join(__dirname, '../synthesizer/generated');
@@ -13,6 +15,8 @@ const handCrafted: IncidentScenario[] = [
   redisOomScenario,
   deployRollbackScenario,
   dbPoolExhaustionScenario,
+  misleadingDeployScenario,
+  secretTrapScenario,
 ];
 
 function loadGeneratedScenarios(): IncidentScenario[] {
