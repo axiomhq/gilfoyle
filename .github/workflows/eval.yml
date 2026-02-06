@@ -42,6 +42,8 @@ jobs:
             model: xai/grok-4-1-fast
           - harness: opencode
             model: anthropic/claude-opus-4-6-20250514
+          - harness: claude
+            model: claude-opus-4-6-20250514
     env:
       AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
       AXIOM_DATASET: gilfoyle-evals
