@@ -85,6 +85,14 @@ Eval<EvalInput, ExpectedOutput, EvalOutput>('gilfoyle-sre-incidents', {
     const rootCause = extractRootCause(trace.finalText);
     const evidence = extractEvidence(trace.finalText);
 
+    if (process.env.DEBUG_EVAL === '1') {
+      console.error(`\n=== ${scenario.id} ===`);
+      console.error(`Tool calls: ${trace.toolCalls.length}`);
+      console.error(`Final text (first 500 chars): ${trace.finalText.slice(0, 500)}`);
+      console.error(`Extracted root cause: ${rootCause.slice(0, 200)}`);
+      console.error(`Expected keywords: ${scenario.expected.rootCauseMustMention.join(', ')}`);
+    }
+
     return {
       trace,
       rootCause,

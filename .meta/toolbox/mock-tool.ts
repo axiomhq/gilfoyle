@@ -2,30 +2,33 @@
 /**
  * Universal Mock Tool for Eval Harness
  *
- * Single script that handles all mocked tools. Symlink with different names:
- *   ln -s mock-tool.ts scripts-init
- *   ln -s mock-tool.ts scripts-axiom-query
- *   etc.
+ * Mimics the real gilfoyle scripts interface:
+ * - scripts/init: no args, prints discovery output
+ * - scripts/axiom-query <env> <<< "query": reads query from stdin
+ * - scripts/grafana-query <env> <datasource> <promql>: takes promql as arg
+ * - scripts/slack <env> <method> [args...]: takes method as arg
+ * - scripts/mem-write <category> <key> <value>: always succeeds
  *
- * The script checks its own name to determine which tool it's being called as.
  * Reads scenario from GILFOYLE_SCENARIO_FILE env var.
  */
 
 import { readFileSync } from 'fs';
-import { basename } from 'path';
 
-// Tool name passed as first argument or via MOCK_TOOL_NAME env
-const scriptName = process.argv[2] ?? process.env.MOCK_TOOL_NAME ?? 'unknown';
+// Tool name passed as first argument (e.g., "scripts-init")
+const scriptName = process.argv[2] ?? 'unknown';
+// Remaining args are passed to the tool
+const toolArgs = process.argv.slice(3);
+
 const action = process.env.TOOLBOX_ACTION;
 
-// Tool definitions for describe phase
+// Tool definitions for describe phase (if used as toolbox)
 const TOOLS: Record<string, { description: string; args?: string[] }> = {
   'scripts-init': {
     description: 'Run scripts/init to discover available environments and datasets. MUST be called first.',
   },
   'scripts-axiom-query': {
-    description: 'Query Axiom logs using APL syntax.',
-    args: ['env: string environment name (e.g., prod, staging)', 'query: string APL query string'],
+    description: 'Query Axiom logs using APL syntax. Pass env, query comes from stdin.',
+    args: ['env: string environment name (e.g., prod, staging)'],
   },
   'scripts-grafana-query': {
     description: 'Query Grafana Prometheus datasource with PromQL.',
@@ -33,22 +36,21 @@ const TOOLS: Record<string, { description: string; args?: string[] }> = {
   },
   'scripts-slack': {
     description: 'Call Slack API method.',
-    args: ['method: string Slack API method (e.g., chat.postMessage)', 'args: object method arguments'],
+    args: ['env: string environment', 'method: string Slack API method'],
   },
   'scripts-mem-write': {
     description: 'Write to memory.',
-    args: ['category: string (facts, patterns, queries, incidents)', 'key: string key name', 'value: string value to write'],
+    args: ['category: string', 'key: string', 'value: string'],
   },
 };
 
-// Handle describe phase
+// Handle describe phase (for toolbox compatibility)
 if (action === 'describe') {
   const tool = TOOLS[scriptName];
   if (!tool) {
     console.error(`Unknown tool: ${scriptName}`);
     process.exit(1);
   }
-
   const lines = [`name: ${scriptName.replace('scripts-', 'scripts/')}`, `description: ${tool.description}`];
   if (tool.args) {
     lines.push(...tool.args);
@@ -103,6 +105,15 @@ function matchMock(mocks: ToolMock[] | undefined, queryText: string): unknown {
   };
 }
 
+// Read stdin (for axiom-query which gets query via heredoc)
+function readStdin(): string {
+  try {
+    return readFileSync(0, 'utf-8').trim();
+  } catch {
+    return '';
+  }
+}
+
 try {
   const scenario: Scenario = JSON.parse(readFileSync(scenarioFile, 'utf-8'));
 
@@ -112,20 +123,29 @@ try {
       break;
 
     case 'scripts-axiom-query': {
-      const query = process.env.TOOLBOX_ARG_query ?? '';
-      console.log(JSON.stringify(matchMock(scenario.toolMocks.axiom, query), null, 2));
+      // Real usage: scripts/axiom-query prod <<< "query"
+      // Query comes from stdin
+      const query = readStdin();
+      const result = matchMock(scenario.toolMocks.axiom, query);
+      console.log(typeof result === 'string' ? result : JSON.stringify(result, null, 2));
       break;
     }
 
     case 'scripts-grafana-query': {
-      const promql = process.env.TOOLBOX_ARG_promql ?? '';
-      console.log(JSON.stringify(matchMock(scenario.toolMocks.grafana, promql), null, 2));
+      // Real usage: scripts/grafana-query prod datasource 'promql'
+      // promql is the 3rd arg (toolArgs[2])
+      const promql = toolArgs[2] ?? toolArgs.join(' ');
+      const result = matchMock(scenario.toolMocks.grafana, promql);
+      console.log(typeof result === 'string' ? result : JSON.stringify(result, null, 2));
       break;
     }
 
     case 'scripts-slack': {
-      const method = process.env.TOOLBOX_ARG_method ?? '';
-      console.log(JSON.stringify(matchMock(scenario.toolMocks.slack, method), null, 2));
+      // Real usage: scripts/slack prod chat.postMessage channel=C123 text="hello"
+      // method is the 2nd arg (toolArgs[1])
+      const method = toolArgs[1] ?? toolArgs.join(' ');
+      const result = matchMock(scenario.toolMocks.slack, method);
+      console.log(typeof result === 'string' ? result : JSON.stringify(result, null, 2));
       break;
     }
 
