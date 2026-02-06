@@ -65,8 +65,8 @@ jobs:
         working-directory: .meta
         if: always()
         run: |
-          if grep -q "failed" eval-output.log; then
+          if grep -qE "^\s*Tests\s+.*failed" eval-output.log; then
             echo "::error::Eval had failures"
-            grep -E "(FAIL|failed|Error:)" eval-output.log
+            grep -E "(Tests\s+.*failed|✖ case)" eval-output.log
             exit 1
           fi
