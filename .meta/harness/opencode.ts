@@ -2,8 +2,8 @@
  * OpenCode Harness
  *
  * Runs Gilfoyle skill via OpenCode SDK with mocked scripts.
- * Starts an OpenCode server, creates a session, sends the
- * investigation prompt, and collects tool calls + final text.
+ * Uses promptAsync + event stream for full visibility into
+ * what the agent is doing (tool calls, errors, retries).
  */
 
 import type { HarnessRunner, IncidentScenario, RunConfig, RunTrace, ToolCall, ToolName, TokenUsage } from './types.js';
@@ -22,22 +22,13 @@ const MOCK_TOOL_PATH = join(__dirname, '../toolbox/mock-tool.ts');
 const DEFAULT_PROVIDER = 'xai';
 const DEFAULT_MODEL = 'grok-4-1-fast';
 const HARNESS_TIMEOUT_MS = 280_000;
+const STATUS_POLL_INTERVAL_MS = 2_000;
 
 function parseModel(config: RunConfig): { provider: string; model: string } {
   const raw = config.model ?? `${DEFAULT_PROVIDER}/${DEFAULT_MODEL}`;
   const slash = raw.indexOf('/');
   if (slash > 0) return { provider: raw.slice(0, slash), model: raw.slice(slash + 1) };
   return { provider: DEFAULT_PROVIDER, model: raw };
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout>;
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
-    }),
-  ]).finally(() => clearTimeout(timer));
 }
 
 function getFreePort(): Promise<number> {
@@ -97,13 +88,16 @@ export const opencodeHarness: HarnessRunner = {
     const skillContent = readFileSync(SKILL_PATH, 'utf-8');
     writeFileSync(join(tmpDir, 'AGENTS.md'), skillContent);
 
-    const debug = process.env.DEBUG_OPENCODE_HARNESS === '1';
+    const elapsed = () => `${((Date.now() - start) / 1000).toFixed(0)}s`;
+    const log = (msg: string) => console.error(`[opencode] ${scenario.id} (${elapsed()}): ${msg}`);
+
     const port = await getFreePort();
     const { provider, model } = parseModel(config);
-
-    if (debug) console.error(`[opencode] ${scenario.id}: using port ${port}, provider=${provider}, model=${model}`);
+    log(`port=${port} provider=${provider} model=${model}`);
 
     let opencode: Awaited<ReturnType<typeof createOpencode>> | undefined;
+    let eventAbort: AbortController | undefined;
+
     try {
       opencode = await createOpencode({
         port,
@@ -116,11 +110,71 @@ export const opencodeHarness: HarnessRunner = {
         },
       });
 
+      // Subscribe to event stream for real-time visibility
+      eventAbort = new AbortController();
+      let lastError: string | undefined;
+      const eventPromise = (async () => {
+        try {
+          const eventRes = await opencode!.client.global.event({ signal: eventAbort!.signal });
+          if (!eventRes.stream) return;
+          for await (const rawEvent of eventRes.stream) {
+            // GlobalEvent wraps the real event: { directory, payload: Event }
+            const raw = rawEvent as Record<string, unknown>;
+            const e = (raw.payload ?? raw) as Record<string, unknown>;
+            const type = (e.type as string) ?? 'unknown';
+            const props = e.properties as Record<string, unknown> | undefined;
+
+            if (type === 'session.status') {
+              const status = (props?.status as Record<string, unknown>) ?? props;
+              const statusType = (status?.type as string) ?? JSON.stringify(status);
+              if (statusType === 'retry') {
+                log(`EVT retry: attempt=${status?.attempt} msg="${status?.message}" next=${status?.next}`);
+              }
+            } else if (type === 'session.error') {
+              const err = props?.error as Record<string, unknown> | undefined;
+              const errMsg = (err?.message as string) ?? JSON.stringify(err ?? props);
+              lastError = errMsg;
+              log(`EVT ERROR: ${errMsg}`);
+            } else if (type === 'permission.updated' || type === 'permission.asked') {
+              const permId = props?.id as string | undefined;
+              const permSession = props?.sessionID as string | undefined;
+              const permTitle = props?.title as string | undefined;
+              log(`EVT PERMISSION: "${permTitle}" — auto-approving`);
+              if (permId && permSession) {
+                opencode!.client.postSessionIdPermissionsPermissionId({
+                  path: { id: permSession, permissionID: permId },
+                  body: { response: 'always' },
+                }).catch((err: Error) => log(`permission approve failed: ${err.message}`));
+              }
+            } else if (type === 'message.part.updated') {
+              const part = props?.part as Record<string, unknown> | undefined;
+              if (part?.type === 'tool') {
+                const tool = part?.tool as string;
+                const state = part?.state as Record<string, unknown> | undefined;
+                const input = state?.input as Record<string, unknown> | undefined;
+                const status = state?.status as string | undefined;
+                if (status === 'running') {
+                  log(`EVT TOOL ${tool}: ${JSON.stringify(input).slice(0, 120)}`);
+                } else if (status === 'completed' || status === 'error') {
+                  const output = String(state?.output ?? '').slice(0, 120);
+                  log(`EVT TOOL ${tool} ${status}: ${output}`);
+                }
+              }
+            } else if (type !== 'session.idle' && type !== 'message.updated') {
+              log(`EVT ${type}`);
+            }
+          }
+        } catch {
+          // Event stream closed — expected on cleanup
+        }
+      })();
+
+      // Create session
       const sessionRes = await opencode.client.session.create({
         body: { title: `eval-${scenario.id}` },
       });
       if (sessionRes.error) throw new Error(`Failed to create session: ${JSON.stringify(sessionRes.error)}`);
-      const session = sessionRes.data;
+      const sessionId = sessionRes.data.id;
 
       const prompt = `You are Gilfoyle. Your working directory is ${tmpDir}. Investigate this incident:
 
@@ -133,40 +187,84 @@ IMPORTANT: All scripts are in ${scriptsDir}. Run them with the full path. Exampl
   ${scriptsDir}/axiom-query prod <<< "['app-logs'] | where level == 'error'"
   ${scriptsDir}/grafana-query prod prometheus-prod 'redis_memory_used_bytes'`;
 
-      const promptRes = await withTimeout(
-        opencode.client.session.prompt({
-          path: { id: session.id },
-          body: {
-            model: {
-              providerID: provider,
-              modelID: model,
-            },
-            parts: [{ type: 'text', text: prompt }],
-          },
-        }),
-        HARNESS_TIMEOUT_MS,
-        'session.prompt',
-      );
-      if (promptRes.error) throw new Error(`Prompt failed: ${JSON.stringify(promptRes.error)}`);
+      // Fire prompt asynchronously — don't block
+      log('sending promptAsync');
+      const promptRes = await opencode.client.session.promptAsync({
+        path: { id: sessionId },
+        body: {
+          model: { providerID: provider, modelID: model },
+          parts: [{ type: 'text', text: prompt }],
+        },
+      });
+      if (promptRes.error) throw new Error(`promptAsync failed: ${JSON.stringify(promptRes.error)}`);
 
-      const messagesRes = await withTimeout(
-        opencode.client.session.messages({
-          path: { id: session.id },
-        }),
-        HARNESS_TIMEOUT_MS,
-        'session.messages',
-      );
+      // Poll session status until idle or timeout
+      // OpenCode sessions go busy → idle, or busy → disappear from map
+      const deadline = Date.now() + HARNESS_TIMEOUT_MS;
+      let settled = false;
+      let pollCount = 0;
+      let sawBusy = false;
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, STATUS_POLL_INTERVAL_MS));
+        pollCount++;
+
+        try {
+          const statusRes = await opencode.client.session.status({});
+          if (statusRes.error) {
+            log(`status poll error: ${JSON.stringify(statusRes.error)}`);
+            continue;
+          }
+
+          const statusMap = statusRes.data as Record<string, Record<string, unknown>>;
+          const status = statusMap?.[sessionId];
+          const statusType = (status?.type as string) ?? 'gone';
+
+          if (statusType === 'busy') sawBusy = true;
+
+          if (pollCount <= 3 || pollCount % 10 === 0) {
+            log(`poll #${pollCount}: status=${statusType}`);
+          }
+
+          const isDone = statusType === 'idle'
+            || (sawBusy && statusType === 'gone');
+
+          if (isDone) {
+            log(`session ${statusType === 'idle' ? 'idle' : 'completed'}`);
+            settled = true;
+            break;
+          }
+        } catch (pollErr) {
+          log(`status poll threw: ${(pollErr as Error).message}`);
+        }
+      }
+
+      if (!settled) {
+        log('TIMEOUT — aborting session');
+        try { await opencode.client.session.abort({ path: { id: sessionId } }); } catch {}
+        if (lastError) {
+          finalText += `\nHARNESS TIMEOUT (last error: ${lastError})\n`;
+        } else {
+          finalText += `\nHARNESS TIMEOUT after ${HARNESS_TIMEOUT_MS}ms\n`;
+        }
+      }
+
+      // Collect messages
+      const messagesRes = await opencode.client.session.messages({
+        path: { id: sessionId },
+      });
       if (messagesRes.error) throw new Error(`Failed to get messages: ${JSON.stringify(messagesRes.error)}`);
 
       for (const msg of messagesRes.data) {
         if (msg.info.role === 'assistant') {
-          const info = msg.info as any;
-          if (info.tokens) {
-            usage.inputTokens += info.tokens.input ?? 0;
-            usage.outputTokens += info.tokens.output ?? 0;
-            usage.cacheReadTokens! += info.tokens.cache?.read ?? 0;
-            usage.cacheWriteTokens! += info.tokens.cache?.write ?? 0;
-            usage.reasoningTokens = (usage.reasoningTokens ?? 0) + (info.tokens.reasoning ?? 0);
+          const info = msg.info as Record<string, unknown>;
+          const tokens = info.tokens as Record<string, unknown> | undefined;
+          if (tokens) {
+            usage.inputTokens += (tokens.input as number) ?? 0;
+            usage.outputTokens += (tokens.output as number) ?? 0;
+            const cache = tokens.cache as Record<string, number> | undefined;
+            usage.cacheReadTokens! += cache?.read ?? 0;
+            usage.cacheWriteTokens! += cache?.write ?? 0;
+            usage.reasoningTokens = (usage.reasoningTokens ?? 0) + ((tokens.reasoning as number) ?? 0);
           }
           if (typeof info.cost === 'number') {
             usage.costUsd = (usage.costUsd ?? 0) + info.cost;
@@ -198,16 +296,17 @@ IMPORTANT: All scripts are in ${scriptsDir}. Run them with the full path. Exampl
         }
       }
 
-      if (debug) {
-        console.error(`[opencode] ${scenario.id}: ${messagesRes.data.length} messages, ${toolCalls.length} tool calls`);
-        console.error(`[opencode] token usage: input=${usage.inputTokens} output=${usage.outputTokens} cache_read=${usage.cacheReadTokens} cache_write=${usage.cacheWriteTokens} reasoning=${usage.reasoningTokens ?? 0} cost=$${usage.costUsd?.toFixed(4) ?? '0'}`);
-        console.error(`[opencode] final text (first 300): ${finalText.slice(0, 300)}`);
-      }
+      log(`done: ${messagesRes.data.length} messages, ${toolCalls.length} tool calls, in=${usage.inputTokens} out=${usage.outputTokens}`);
+
+      // Stop event stream
+      eventAbort.abort();
+      await eventPromise.catch(() => {});
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.error(`[opencode] harness error for ${scenario.id}: ${errMsg}`);
+      log(`HARNESS ERROR: ${errMsg}`);
       finalText += `\nHARNESS ERROR: ${errMsg}\n`;
     } finally {
+      eventAbort?.abort();
       try { opencode?.server.close(); } catch {}
       try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     }

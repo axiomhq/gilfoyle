@@ -1,3 +1,11 @@
+/**
+ * Amp Harness
+ *
+ * Runs Gilfoyle skill via the Amp SDK (@sourcegraph/amp-sdk).
+ * Streams messages, logs tool calls + errors in real time,
+ * collects token usage, and returns a RunTrace.
+ */
+
 import type { HarnessRunner, IncidentScenario, RunConfig, RunTrace, ToolCall, ToolName, TokenUsage } from './types.js';
 import { execute } from '@sourcegraph/amp-sdk';
 import { writeFileSync, mkdirSync, rmSync, copyFileSync, chmodSync } from 'node:fs';
@@ -43,12 +51,14 @@ export const ampHarness: HarnessRunner = {
       chmodSync(scriptPath, 0o755);
     }
 
-    const debug = process.env.DEBUG_AMP_HARNESS === '1';
+    const elapsed = () => `${((Date.now() - start) / 1000).toFixed(0)}s`;
+    const log = (msg: string) => console.error(`[amp] ${scenario.id} (${elapsed()}): ${msg}`);
     const pendingTools = new Map<string, { tool: ToolName; input: unknown }>();
 
     try {
       const prompt = `You are Gilfoyle. Investigate this incident:\n\n${scenario.prompt}\n\nRun scripts/init first to discover available environments, then use scripts/axiom-query and scripts/grafana-query to investigate. State your ROOT CAUSE clearly with evidence.`;
 
+      log('starting');
       for await (const message of execute({
         prompt,
         options: {
@@ -56,7 +66,6 @@ export const ampHarness: HarnessRunner = {
           skills: tmpDir,
           env: { GILFOYLE_SCENARIO_FILE: scenarioFile },
           dangerouslyAllowAll: true,
-          logLevel: debug ? 'debug' : undefined,
         },
       })) {
         if (message.type === 'assistant') {
@@ -66,7 +75,6 @@ export const ampHarness: HarnessRunner = {
             usage.outputTokens += msgUsage.output_tokens ?? 0;
             usage.cacheReadTokens! += msgUsage.cache_read_input_tokens ?? 0;
             usage.cacheWriteTokens! += msgUsage.cache_creation_input_tokens ?? 0;
-            if (debug) console.error(`[amp] assistant usage: in=${msgUsage.input_tokens} out=${msgUsage.output_tokens} cache_read=${msgUsage.cache_read_input_tokens} cache_write=${msgUsage.cache_creation_input_tokens}`);
           }
           for (const block of message.message.content) {
             if (block.type === 'text') {
@@ -75,7 +83,10 @@ export const ampHarness: HarnessRunner = {
               if (block.name === 'Bash' && typeof block.input === 'object' && block.input !== null) {
                 const cmd = (block.input as { cmd?: string }).cmd ?? '';
                 const scriptName = extractScriptFromBashCmd(cmd);
-                if (scriptName) pendingTools.set(block.id, { tool: scriptName, input: cmd });
+                if (scriptName) {
+                  log(`TOOL ${scriptName}: ${cmd.slice(0, 120)}`);
+                  pendingTools.set(block.id, { tool: scriptName, input: cmd });
+                }
               }
             }
           }
@@ -86,6 +97,7 @@ export const ampHarness: HarnessRunner = {
               if (pending) {
                 const outputStr = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
                 const isError = outputStr.startsWith('error:');
+                if (isError) log(`TOOL ${pending.tool} ERROR: ${outputStr.slice(0, 120)}`);
                 const errorMessages = isError
                   ? outputStr.split('\n').filter(l => l.startsWith('error:')).map(l => l.slice(7).trim())
                   : [];
@@ -107,20 +119,22 @@ export const ampHarness: HarnessRunner = {
             usage.outputTokens += resultUsage.output_tokens ?? 0;
             usage.cacheReadTokens! += resultUsage.cache_read_input_tokens ?? 0;
             usage.cacheWriteTokens! += resultUsage.cache_creation_input_tokens ?? 0;
-            if (debug) console.error(`[amp] result usage: in=${resultUsage.input_tokens} out=${resultUsage.output_tokens}`);
           }
-          if (debug) console.error(`[amp] total usage so far: in=${usage.inputTokens} out=${usage.outputTokens} cache_read=${usage.cacheReadTokens} cache_write=${usage.cacheWriteTokens}`);
+          if (message.is_error) {
+            log(`RESULT ERROR: ${message.error}`);
+          }
           finalText += (message.is_error ? `\nError: ${message.error}\n` : `${message.result}\n`);
         }
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.error(`[amp] harness error for ${scenario.id}: ${errMsg}`);
+      log(`HARNESS ERROR: ${errMsg}`);
       finalText += `\nHARNESS ERROR: ${errMsg}\n`;
     } finally {
       try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     }
 
+    log(`done: ${toolCalls.length} tool calls, in=${usage.inputTokens} out=${usage.outputTokens}`);
     return { finalText: finalText.trim(), toolCalls, elapsedMs: Date.now() - start, usage };
   },
 };
