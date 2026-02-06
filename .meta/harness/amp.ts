@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILL_PATH = join(__dirname, '../../SKILL.md');
-const MOCK_TOOL_PATH = join(__dirname, '../toolbox/mock-tool-v2.ts');
+const MOCK_TOOL_PATH = join(__dirname, '../toolbox/mock-tool.ts');
 
 function extractScriptFromBashCmd(cmd: string): ToolName | null {
   const match = cmd.match(/scripts\/(init|axiom-query|grafana-query|slack|mem-write)/);

@@ -137,7 +137,7 @@ Init output shows Grafana timed out. Only Axiom available. Scenario needs metric
 **Covers:** §2 (prerequisite)
 **Depends on:** nothing
 
-Add three tool paths to `toolbox/mock-tool-v2.ts`:
+Add three tool paths to `toolbox/mock-tool.ts`:
 - `scripts-rollback` → `{ ok: true, rolled_back_to: <version> }`
 - `scripts-flag-revert` → `{ ok: true, reverted: <flag> }`
 - `scripts-axiom-link` → `"https://app.axiom.co/acme/explorer?q=<query>&t=<range>"`
