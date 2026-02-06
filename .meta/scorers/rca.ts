@@ -50,13 +50,14 @@ export const RCAAccuracyScorer = Scorer<{
       .replace('{agent_conclusion}', output.rootCause);
 
     try {
-      const { text } = await generateText({
+      const { text: rawText } = await generateText({
         model: wrapAISDKModel(google('gemini-3-flash-preview')),
         prompt,
-        maxOutputTokens: 500,
+        maxOutputTokens: 1000,
       });
+      const text = rawText.replace(/```(?:json)?\s*/g, '').trim();
       const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error(`Gemini response contained no JSON: ${text.slice(0, 200)}`);
+      if (!jsonMatch) throw new Error(`Gemini response contained no JSON: ${rawText.slice(0, 300)}`);
       const judgment = JSON.parse(jsonMatch[0]);
       const rawScore = typeof judgment.score === 'number' ? judgment.score : NaN;
       const score = Number.isFinite(rawScore) ? Math.max(0, Math.min(1, rawScore / 100)) : 0;
