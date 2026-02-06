@@ -40,5 +40,18 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
         working-directory: .meta
-      - run: npx axiom eval
+      - name: Install OpenCode CLI
+        if: matrix.harness == 'opencode'
+        run: npm install -g opencode-ai
+      - name: Run eval
         working-directory: .meta
+        run: npx axiom eval 2>&1 | tee eval-output.log
+      - name: Check for failures
+        working-directory: .meta
+        if: always()
+        run: |
+          if grep -q "failed" eval-output.log; then
+            echo "::error::Eval had failures"
+            grep -E "(FAIL|failed|Error:)" eval-output.log
+            exit 1
+          fi
