@@ -2,7 +2,7 @@
  * Optimizer Types
  */
 
-import type { IncidentScenario, RunTrace, EvalOutput } from '../harness/types.js';
+import type { IncidentScenario, EvalOutput } from '../harness/types.js';
 
 export interface FailedScenario {
   scenario: IncidentScenario;

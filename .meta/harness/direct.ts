@@ -5,12 +5,12 @@
  * Supports multiple providers (Anthropic, xAI, Google).
  */
 
-import type { HarnessRunner, IncidentScenario, RunConfig, RunTrace, ToolCall, ToolName } from './types.js';
+import type { HarnessRunner, IncidentScenario, RunConfig, RunTrace, ToolCall, } from './types.js';
 import { createMockTools } from '../tools/mock-tools.js';
-import { readFile } from 'fs/promises';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { generateText, tool } from 'ai';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { generateText, tool, stepCountIs, type LanguageModel } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createXai } from '@ai-sdk/xai';
 import { z } from 'zod';
@@ -41,7 +41,7 @@ Available tools:
 When you reach a conclusion, clearly state the ROOT CAUSE with evidence.`;
 }
 
-function getModel(modelName: string) {
+function getModel(modelName: string): LanguageModel {
   if (modelName.startsWith('claude')) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
@@ -54,7 +54,7 @@ function getModel(modelName: string) {
     const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) throw new Error('XAI_API_KEY not set');
     const xai = createXai({ apiKey });
-    return xai('grok-4-0709');
+    return xai('grok-4-0709') as unknown as LanguageModel;
   }
 
   throw new Error(`Unsupported model: ${modelName}`);
@@ -69,19 +69,41 @@ export const directHarness: HarnessRunner = {
     const mockTools = createMockTools(scenario);
     const toolCalls: ToolCall[] = [];
 
-    const model = getModel(config.model);
+    const model = getModel(config.model ?? 'claude-sonnet-4');
     const systemPrompt = buildSystemPrompt(skill, scenario.initOutput);
+
+    const axiomParams = z.object({
+      env: z.string().optional().describe('Environment name (e.g., prod, staging)'),
+      query: z.string().describe('APL query string'),
+    });
+
+    const grafanaParams = z.object({
+      env: z.string().optional().describe('Environment name'),
+      datasource: z.string().optional().describe('Datasource UID'),
+      promql: z.string().describe('PromQL query'),
+    });
+
+    const slackParams = z.object({
+      method: z.string().describe('Slack API method (e.g., chat.postMessage)'),
+      args: z.record(z.string()).optional().describe('Method arguments'),
+    });
+
+    const memWriteParams = z.object({
+      category: z.string().describe('Category (facts, patterns, queries, incidents)'),
+      key: z.string().describe('Key name'),
+      value: z.string().describe('Value to write'),
+    });
 
     const result = await generateText({
       model,
       system: systemPrompt,
       prompt: scenario.prompt,
-      maxSteps: 20,
+      stopWhen: stepCountIs(20),
       tools: {
         scripts_init: tool({
           description: 'Run scripts/init to discover available environments and datasets',
-          parameters: z.object({}),
-          execute: async () => {
+          inputSchema: z.object({}),
+          execute: async (): Promise<string> => {
             const callStart = Date.now();
             const output = await mockTools.call('scripts/init', {});
             toolCalls.push({
@@ -90,16 +112,13 @@ export const directHarness: HarnessRunner = {
               output,
               durationMs: Date.now() - callStart,
             });
-            return output;
+            return output as string;
           },
         }),
         scripts_axiom_query: tool({
           description: 'Query Axiom logs. Use APL syntax.',
-          parameters: z.object({
-            env: z.string().optional().describe('Environment name (e.g., prod, staging)'),
-            query: z.string().describe('APL query string'),
-          }),
-          execute: async (input) => {
+          inputSchema: axiomParams,
+          execute: async (input: z.infer<typeof axiomParams>): Promise<string> => {
             const callStart = Date.now();
             const output = await mockTools.call('scripts/axiom-query', input);
             toolCalls.push({
@@ -108,17 +127,13 @@ export const directHarness: HarnessRunner = {
               output,
               durationMs: Date.now() - callStart,
             });
-            return output;
+            return output as string;
           },
         }),
         scripts_grafana_query: tool({
           description: 'Query Grafana Prometheus datasource',
-          parameters: z.object({
-            env: z.string().optional().describe('Environment name'),
-            datasource: z.string().optional().describe('Datasource UID'),
-            promql: z.string().describe('PromQL query'),
-          }),
-          execute: async (input) => {
+          inputSchema: grafanaParams,
+          execute: async (input: z.infer<typeof grafanaParams>): Promise<string> => {
             const callStart = Date.now();
             const output = await mockTools.call('scripts/grafana-query', input);
             toolCalls.push({
@@ -127,16 +142,13 @@ export const directHarness: HarnessRunner = {
               output,
               durationMs: Date.now() - callStart,
             });
-            return output;
+            return output as string;
           },
         }),
         scripts_slack: tool({
           description: 'Call Slack API method',
-          parameters: z.object({
-            method: z.string().describe('Slack API method (e.g., chat.postMessage)'),
-            args: z.record(z.string()).optional().describe('Method arguments'),
-          }),
-          execute: async (input) => {
+          inputSchema: slackParams,
+          execute: async (input: z.infer<typeof slackParams>): Promise<string> => {
             const callStart = Date.now();
             const output = await mockTools.call('scripts/slack', input);
             toolCalls.push({
@@ -145,17 +157,13 @@ export const directHarness: HarnessRunner = {
               output,
               durationMs: Date.now() - callStart,
             });
-            return output;
+            return output as string;
           },
         }),
         scripts_mem_write: tool({
           description: 'Write to memory',
-          parameters: z.object({
-            category: z.string().describe('Category (facts, patterns, queries, incidents)'),
-            key: z.string().describe('Key name'),
-            value: z.string().describe('Value to write'),
-          }),
-          execute: async (input) => {
+          inputSchema: memWriteParams,
+          execute: async (input: z.infer<typeof memWriteParams>): Promise<string> => {
             const callStart = Date.now();
             const output = await mockTools.call('scripts/mem-write', input);
             toolCalls.push({
@@ -164,7 +172,7 @@ export const directHarness: HarnessRunner = {
               output,
               durationMs: Date.now() - callStart,
             });
-            return output;
+            return output as string;
           },
         }),
       },
@@ -174,9 +182,8 @@ export const directHarness: HarnessRunner = {
       finalText: result.text,
       toolCalls,
       usage: {
-        inputTokens: result.usage?.promptTokens,
-        outputTokens: result.usage?.completionTokens,
-        totalTokens: result.usage ? result.usage.promptTokens + result.usage.completionTokens : undefined,
+        inputTokens: result.totalUsage.inputTokens ?? 0,
+        outputTokens: result.totalUsage.outputTokens ?? 0,
       },
       elapsedMs: Date.now() - start,
     };

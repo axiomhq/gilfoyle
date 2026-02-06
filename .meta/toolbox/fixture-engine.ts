@@ -8,7 +8,7 @@
  * This is what separates a real eval from a retrieval game.
  */
 
-import type { LogRow, MetricSeries, ScenarioFixtures, DataSourceInfo } from '../harness/types.js';
+import type { LogRow, MetricSeries, ScenarioFixtures, } from '../harness/types.js';
 
 // ─── APL Parser ──────────────────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ export function validateAPL(query: string, fixtures: ScenarioFixtures): APLValid
         if (stage.type === 'where' && /\band\b/i.test(stageText)) {
           const parts = stageText.trim().replace(/^where\s+/i, '').split(/\s+and\s+/i);
           for (const part of parts) {
-            const sub = parseAPLStage('where ' + part.trim());
+            const sub = parseAPLStage(`where ${part.trim()}`);
             if (sub) stages.push(sub);
           }
         } else {
@@ -136,7 +136,7 @@ function parseAPLStage(text: string): APLStage {
   // take/limit
   const takeMatch = lower.match(/^(?:take|limit)\s+(\d+)/);
   if (takeMatch) {
-    return { type: 'take', count: parseInt(takeMatch[1]) };
+    return { type: 'take', count: parseInt(takeMatch[1], 10) };
   }
 
   // summarize
@@ -172,7 +172,7 @@ function parseAPLStage(text: string): APLStage {
   // top
   const topMatch = lower.match(/^top\s+(\d+)\s+by\s+(\w+)/);
   if (topMatch) {
-    return { type: 'top', count: parseInt(topMatch[1]), by: topMatch[2] };
+    return { type: 'top', count: parseInt(topMatch[1], 10), by: topMatch[2] };
   }
 
   return { type: 'raw', text };
@@ -299,25 +299,25 @@ function computeAgg(rows: LogRow[], agg: string): LogRow {
   const avgMatch = agg.match(/^avg\((\w+)\)$/i);
   if (avgMatch) {
     const field = avgMatch[1];
-    const vals = rows.map(r => Number(r[field])).filter(v => !isNaN(v));
+    const vals = rows.map(r => Number(r[field])).filter(v => !Number.isNaN(v));
     return { _time: rows[0]?._time ?? '', [`avg_${field}`]: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0 };
   }
   const sumMatch = agg.match(/^sum\((\w+)\)$/i);
   if (sumMatch) {
     const field = sumMatch[1];
-    const vals = rows.map(r => Number(r[field])).filter(v => !isNaN(v));
+    const vals = rows.map(r => Number(r[field])).filter(v => !Number.isNaN(v));
     return { _time: rows[0]?._time ?? '', [`sum_${field}`]: vals.reduce((a, b) => a + b, 0) };
   }
   const maxMatch = agg.match(/^max\((\w+)\)$/i);
   if (maxMatch) {
     const field = maxMatch[1];
-    const vals = rows.map(r => Number(r[field])).filter(v => !isNaN(v));
+    const vals = rows.map(r => Number(r[field])).filter(v => !Number.isNaN(v));
     return { _time: rows[0]?._time ?? '', [`max_${field}`]: Math.max(...vals) };
   }
   const minMatch = agg.match(/^min\((\w+)\)$/i);
   if (minMatch) {
     const field = minMatch[1];
-    const vals = rows.map(r => Number(r[field])).filter(v => !isNaN(v));
+    const vals = rows.map(r => Number(r[field])).filter(v => !Number.isNaN(v));
     return { _time: rows[0]?._time ?? '', [`min_${field}`]: Math.min(...vals) };
   }
   // Fallback: just count
@@ -356,7 +356,7 @@ export function validatePromQL(query: string, fixtures: ScenarioFixtures): PromQ
 
   // Extract base metric name (handles functions wrapping metrics)
   let metricName: string | undefined;
-  let labels: Record<string, { op: string; value: string }> = {};
+  const labels: Record<string, { op: string; value: string }> = {};
 
   // Try to find metric name inside functions or at top level
   // Patterns: metric_name, metric_name{...}, func(metric_name{...}[5m])
@@ -376,7 +376,7 @@ export function validatePromQL(query: string, fixtures: ScenarioFixtures): PromQ
 
   if (!metricName) {
     // Could be a complex expression - try to find any metric-like identifier
-    const anyMetric = trimmed.match(/([a-zA-Z_:][a-zA-Z0-9_:]*)\s*[\[{(]/);
+    const anyMetric = trimmed.match(/([a-zA-Z_:][a-zA-Z0-9_:]*)\s*[[{(]/);
     if (anyMetric) {
       const candidate = anyMetric[1];
       // Skip known PromQL functions
@@ -557,7 +557,7 @@ export function validateGrafanaCLI(args: string[], fixtures: ScenarioFixtures): 
  */
 export function formatAxiomOutput(rows: LogRow[], totalRows: number): string {
   const header = `# ${rows.length}/${totalRows} rows, ${Math.floor(Math.random() * 50 + 10)}ms`;
-  if (rows.length === 0) return header + '\n(no results)';
+  if (rows.length === 0) return `${header}\n(no results)`;
 
   const lines = rows.map(row => {
     return Object.entries(row)

@@ -35,6 +35,7 @@ export default defineConfig({
       const tracer = trace.getTracer('gilfoyle-evals');
       initAxiomAI({ tracer });
 
+      // biome-ignore lint/complexity/useLiteralKeys: accessing private SDK internals
       return { provider: sdk['_tracerProvider'] };
     },
   },

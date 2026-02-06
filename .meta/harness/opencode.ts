@@ -9,11 +9,11 @@
 import type { HarnessRunner, IncidentScenario, RunConfig, RunTrace, ToolCall, ToolName, TokenUsage } from './types.js';
 import { createOpencode } from '@opencode-ai/sdk';
 import type { Part, ToolPart } from '@opencode-ai/sdk';
-import { writeFileSync, mkdirSync, rmSync, readFileSync, copyFileSync, chmodSync } from 'fs';
-import { tmpdir } from 'os';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { createServer } from 'net';
+import { writeFileSync, mkdirSync, rmSync, readFileSync, copyFileSync, chmodSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createServer } from 'node:net';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILL_PATH = join(__dirname, '../../SKILL.md');
@@ -76,7 +76,7 @@ export const opencodeHarness: HarnessRunner = {
     const start = Date.now();
     const toolCalls: ToolCall[] = [];
     let finalText = '';
-    let usage: TokenUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
+    const usage: TokenUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
 
     const tmpDir = join(tmpdir(), `gilfoyle-eval-oc-${Date.now()}`);
     const scriptsDir = join(tmpDir, 'scripts');
@@ -172,7 +172,7 @@ IMPORTANT: All scripts are in ${scriptsDir}. Run them with the full path. Exampl
           }
           for (const part of msg.parts) {
             if (part.type === 'text') {
-              finalText += part.text + '\n';
+              finalText += `${part.text}\n`;
             } else if (isToolPart(part) && part.tool === 'bash') {
               const state = part.state as Record<string, unknown>;
               const cmd = ((state.input as { command?: string })?.command) ?? '';
