@@ -10,10 +10,15 @@ import type { HarnessRunner, IncidentScenario, RunConfig, RunTrace, ToolCall, To
 import { createOpencode } from '@opencode-ai/sdk';
 import type { Part, ToolPart } from '@opencode-ai/sdk';
 import { writeFileSync, mkdirSync, rmSync, readFileSync, copyFileSync, chmodSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:net';
+
+const OPENCODE_CACHE_PACKAGE_JSON = JSON.stringify({
+  dependencies: { 'opencode-anthropic-auth': '0.0.13', 'jose': '^5.9.6' },
+});
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILL_PATH = join(__dirname, '../../SKILL.md');
@@ -97,8 +102,19 @@ export const opencodeHarness: HarnessRunner = {
 
     let opencode: Awaited<ReturnType<typeof createOpencode>> | undefined;
     let eventAbort: AbortController | undefined;
+    const prevXdgCache = process.env.XDG_CACHE_HOME;
 
     try {
+      // Isolate each server's cache to prevent concurrent processes from
+      // corrupting each other's jose/opencode-anthropic-auth installs.
+      const cacheHome = join(tmpDir, '.cache');
+      const ocCacheDir = join(cacheHome, 'opencode');
+      mkdirSync(ocCacheDir, { recursive: true });
+      writeFileSync(join(ocCacheDir, 'package.json'), OPENCODE_CACHE_PACKAGE_JSON);
+      execSync('bun install', { cwd: ocCacheDir, stdio: 'pipe' });
+      process.env.XDG_CACHE_HOME = cacheHome;
+      log(`isolated cache: ${cacheHome}`);
+
       opencode = await createOpencode({
         port,
         config: {
@@ -109,6 +125,10 @@ export const opencodeHarness: HarnessRunner = {
           },
         },
       });
+
+      // Restore XDG_CACHE_HOME now that the server process has inherited it
+      if (prevXdgCache !== undefined) process.env.XDG_CACHE_HOME = prevXdgCache;
+      else delete process.env.XDG_CACHE_HOME;
 
       // Subscribe to event stream for real-time visibility
       eventAbort = new AbortController();
@@ -331,6 +351,8 @@ IMPORTANT: All scripts are in ${scriptsDir}. Run them with the full path. Exampl
       log(`HARNESS ERROR: ${errMsg}`);
       finalText += `\nHARNESS ERROR: ${errMsg}\n`;
     } finally {
+      if (prevXdgCache !== undefined) process.env.XDG_CACHE_HOME = prevXdgCache;
+      else delete process.env.XDG_CACHE_HOME;
       eventAbort?.abort();
       try { opencode?.server.close(); } catch {}
       try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
