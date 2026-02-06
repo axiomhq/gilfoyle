@@ -2,7 +2,7 @@ import { Eval } from 'axiom/ai/evals';
 import { withSpan } from 'axiom/ai';
 import { loadScenarios } from './scenarios/index.js';
 import { getHarness, type EvalInput, type EvalOutput, type HarnessName, type ModelName } from './harness/index.js';
-import { RCAAccuracyScorer, EvidenceQualityScorer, EfficiencyScorer, QueryValidityScorer, InitFirstScorer, MustNotMentionScorer, MemoryWriteScorer, HypothesisDisciplineScorer, SecretHygieneScorer } from './scorers/index.js';
+import { RCAAccuracyScorer, EvidenceQualityScorer, EfficiencyScorer, QueryValidityScorer, InitFirstScorer, MustNotMentionScorer, MemoryWriteScorer, HypothesisDisciplineScorer, SecretHygieneScorer, TriageFirstScorer, SlackCommsScorer, MemoryDistillationScorer } from './scorers/index.js';
 
 const DEFAULT_HARNESS: HarnessName = 'amp';
 const DEFAULT_MODEL = 'xai/grok-4-1-fast';
@@ -93,7 +93,7 @@ Eval<EvalInput, ExpectedOutput, EvalOutput>(evalName, {
     return result;
   },
 
-  scorers: [QueryValidityScorer, RCAAccuracyScorer, EvidenceQualityScorer, EfficiencyScorer, InitFirstScorer, MustNotMentionScorer, MemoryWriteScorer, HypothesisDisciplineScorer, SecretHygieneScorer],
+  scorers: [QueryValidityScorer, RCAAccuracyScorer, EvidenceQualityScorer, EfficiencyScorer, InitFirstScorer, MustNotMentionScorer, MemoryWriteScorer, HypothesisDisciplineScorer, SecretHygieneScorer, TriageFirstScorer, SlackCommsScorer, MemoryDistillationScorer],
   timeout: 300_000, // 5 minutes per scenario — LLM investigations take time
   metadata: { description: 'Evaluate Gilfoyle SRE skill incident investigation', version: '0.2.0', harness: harnessName, ...(modelName && { model: modelName }) },
 });

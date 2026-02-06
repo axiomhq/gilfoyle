@@ -126,7 +126,7 @@ Wire into scorers array.
 
 ---
 
-### T07 — Access missing → escalate scenario
+### T07 — Access missing → escalate scenario ✅
 
 **Size:** S
 **Covers:** §3 permissions
@@ -140,6 +140,8 @@ Init output shows Grafana timed out. Only Axiom available. Scenario needs metric
 - Expected behavior: partial investigation, then escalate with exact command for user
 
 **Acceptance:** `bun run check` passes. Scenario loads.
+
+**Status:** Implemented in `scenarios/missing-access.ts`. Kafka consumer lag scenario with Grafana timed out, empty datasources array. Agent must diagnose consumer group rebalancing from Axiom logs alone.
 
 ---
 
@@ -162,7 +164,7 @@ Add `'scripts/rollback' | 'scripts/flag-revert' | 'scripts/axiom-link'` to `Tool
 
 ---
 
-### T09 — P1 rollback-before-debug scenario + TriageFirstScorer
+### T09 — P1 rollback-before-debug scenario + TriageFirstScorer ✅
 
 **Size:** M–L
 **Covers:** §2 triage, §12 comms
@@ -176,9 +178,11 @@ Add `scenarios/p1-rollback.ts` and `scorers/triage-first.ts`.
 
 **Acceptance:** `bun run check` passes.
 
+**Status:** Implemented scenario in `scenarios/p1-rollback.ts` (broken auth middleware deploy, severity P1), scorer in `scorers/triage-first.ts`. Wired into eval.
+
 ---
 
-### T10 — SlackCommsScorer + comms-required scenario
+### T10 — SlackCommsScorer + comms-required scenario ✅
 
 **Size:** M
 **Covers:** §12 communication
@@ -192,9 +196,11 @@ Add `scorers/slack-comms.ts` and `scenarios/comms-required.ts`.
 
 **Acceptance:** `bun run check` passes.
 
+**Status:** Implemented scorer in `scorers/slack-comms.ts`, scenario in `scenarios/comms-required.ts` (disk space exhaustion on log aggregator). Wired into eval.
+
 ---
 
-### T11 — MemoryDistillationScorer
+### T11 — MemoryDistillationScorer ✅
 
 **Size:** M
 **Covers:** §6
@@ -205,6 +211,8 @@ Add `scorers/memory-distillation.ts`.
 At end of investigation, require ≥1 `mem-write incidents`, ≥1 `mem-write facts`, ≥1 `mem-write queries`. At least one saved query must match (normalized) an actual tool call input.
 
 **Acceptance:** `bun run check` passes.
+
+**Status:** Implemented in `scorers/memory-distillation.ts`. Scores category coverage (incidents/facts/queries) plus query-matching bonus. Wired into eval.
 
 ---
 
@@ -297,7 +305,7 @@ Update `synthesizer/synthesize.ts` prompt to incorporate these knobs.
 
 ---
 
-### T18 — Anti-gaming: counterfactual RCA judging
+### T18 — Anti-gaming: counterfactual RCA judging ✅
 
 **Size:** M
 **Covers:** anti-gaming
@@ -308,6 +316,8 @@ Update `scorers/rca.ts` judge prompt to add: "If the root cause were [wrong caus
 Pass `rootCauseMustNotMention` to the judge as the counterfactual causes.
 
 **Acceptance:** `bun run check` passes. Agent that cites generic evidence scores lower.
+
+**Status:** Updated `scorers/rca.ts` judge prompt with counterfactual wrong causes section and discriminative evidence check. Passes `rootCauseMustNotMention` as counterfactual causes.
 
 ---
 
