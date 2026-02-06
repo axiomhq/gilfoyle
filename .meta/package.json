@@ -13,10 +13,12 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.0.0",
+    "@ai-sdk/google": "3.0.21",
+    "@ai-sdk/openai": "3.0.25",
     "@ai-sdk/xai": "^1.0.0",
     "@anthropic-ai/sdk": "^0.30.0",
     "@sourcegraph/amp-sdk": "0.1.0-20260205201419-gbab39ed",
-    "ai": "^4.0.0",
+    "ai": "6.0.73",
     "axiom": "^0.38.0",
     "zod": "^3.23.0"
   },
