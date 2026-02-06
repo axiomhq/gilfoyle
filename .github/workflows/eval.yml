@@ -22,10 +22,10 @@ jobs:
         working-directory: .meta
       - name: Typecheck
         working-directory: .meta
-        run: npx tsc --noEmit
+        run: bunx tsc --noEmit
       - name: Lint
         working-directory: .meta
-        run: npx biome lint .
+        run: bunx biome lint .
 
   eval:
     runs-on: ubuntu-latest
@@ -60,7 +60,7 @@ jobs:
         run: bun install -g opencode-ai
       - name: Run eval
         working-directory: .meta
-        run: npx axiom eval 2>&1 | tee eval-output.log
+        run: bunx axiom eval 2>&1 | tee eval-output.log
       - name: Check for failures
         working-directory: .meta
         if: always()
