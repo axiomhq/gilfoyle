@@ -52,10 +52,7 @@ scripts/mem-write --org axiom patterns "timeout-pattern" "How to detect timeouts
 | "save for the team" | Org | "Save this pattern for the team" |
 | Auto-learning | Personal | Query worked → saved automatically |
 
-After writing to Org tier, push changes:
-```bash
-scripts/mem-share axiom "Added pattern: connection pool exhaustion"
-```
+Org writes are automatically committed and pushed — no extra step needed.
 
 ## First-Time Setup
 

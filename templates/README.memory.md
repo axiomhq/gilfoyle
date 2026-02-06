@@ -125,10 +125,7 @@ This will:
 
 **Promote:** Move valuable journal entries to appropriate `kb/*.md` file.
 
-**Share:** Commit org memory changes:
-```bash
-scripts/mem-share <org-name> "commit message"
-```
+**Share:** Org writes are automatically committed and pushed by `mem-write --org`.
 
 ---
 
@@ -150,7 +147,7 @@ When an entry is critical and should never be archived:
 | `scripts/setup` | Initialize memory system |
 | `scripts/org-add` | Add an org for shared memory |
 | `scripts/mem-sync` | Pull org memory updates |
-| `scripts/mem-share` | Commit and push org changes |
+| `scripts/mem-share` | Batch commit and push org changes (rarely needed — `mem-write --org` auto-shares) |
 | `scripts/sleep` | Consolidation pass |
 | `scripts/mem-doctor` | Health check |
 
