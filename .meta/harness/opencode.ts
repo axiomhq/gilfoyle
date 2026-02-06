@@ -169,7 +169,32 @@ export const opencodeHarness: HarnessRunner = {
         }
       })();
 
-      // Create session
+      // Wait for API readiness via /global/health — createOpencode resolves when
+      // the port is listening, but routes aren't registered yet (known SDK issue,
+      // see github.com/anomalyco/opencode/issues/7060). Without this, the first
+      // session.create hits Bun's HTML fallback instead of JSON.
+      const healthUrl = `${opencode.server.url}/global/health`;
+      const MAX_READY_ATTEMPTS = 20;
+      const READY_DELAY_MS = 250;
+      for (let attempt = 1; attempt <= MAX_READY_ATTEMPTS; attempt++) {
+        try {
+          const res = await fetch(healthUrl);
+          if (res.ok) {
+            const body = await res.json() as { healthy?: boolean };
+            if (body.healthy) {
+              log(`API ready (attempt ${attempt})`);
+              break;
+            }
+          }
+        } catch {
+          // fetch throws on connection refused — server not listening yet
+        }
+        if (attempt === MAX_READY_ATTEMPTS) {
+          throw new Error(`Server never became healthy after ${MAX_READY_ATTEMPTS * READY_DELAY_MS}ms`);
+        }
+        await new Promise(r => setTimeout(r, READY_DELAY_MS));
+      }
+
       const sessionRes = await opencode.client.session.create({
         body: { title: `eval-${scenario.id}` },
       });
