@@ -67,8 +67,10 @@ jobs:
         if: matrix.harness == 'opencode'
         run: |
           bun install -g opencode-ai
-          mkdir -p ~/.cache/opencode/node_modules
-          cd ~/.cache/opencode && bun install jose
+          mkdir -p ~/.cache/opencode
+          printf '{"dependencies":{"opencode-anthropic-auth":"0.0.13","jose":"^5.9.6"}}\n' > ~/.cache/opencode/package.json
+          cd ~/.cache/opencode && bun install
+          node -e "require.resolve('jose', {paths:['$HOME/.cache/opencode/node_modules']})" || (echo "::error::jose not found in opencode cache" && exit 1)
       - name: Run eval
         working-directory: .meta
         run: bunx axiom eval 2>&1 | tee eval-output.log
