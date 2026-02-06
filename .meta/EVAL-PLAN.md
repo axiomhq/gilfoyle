@@ -158,7 +158,7 @@ Add `'scripts/rollback' | 'scripts/flag-revert' | 'scripts/axiom-link'` to `Tool
 
 **Acceptance:** `bun run check` passes. Tools callable from harness.
 
-**Status:** Implemented in `toolbox/mock-router.ts`, updated `ToolName` type and added `severity` field to `IncidentScenario`.
+**Status:** Implemented in `toolbox/mock-tool.ts`, `toolbox/mock-router.ts`, `harness/amp.ts`, `harness/opencode.ts`. Updated `ToolName` type and added `severity` field to `IncidentScenario`.
 
 ---
 
