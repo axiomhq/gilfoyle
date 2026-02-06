@@ -7,6 +7,9 @@ import { deployRollbackScenario } from './deploy-rollback.js';
 import { dbPoolExhaustionScenario } from './db-pool-exhaustion.js';
 import { misleadingDeployScenario } from './misleading-deploy.js';
 import { secretTrapScenario } from './secret-trap.js';
+import { commsRequiredScenario } from './comms-required.js';
+import { missingAccessScenario } from './missing-access.js';
+import { p1RollbackScenario } from './p1-rollback.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GENERATED_DIR = join(__dirname, '../synthesizer/generated');
@@ -17,6 +20,9 @@ const handCrafted: IncidentScenario[] = [
   dbPoolExhaustionScenario,
   misleadingDeployScenario,
   secretTrapScenario,
+  missingAccessScenario,
+  commsRequiredScenario,
+  p1RollbackScenario,
 ];
 
 function loadGeneratedScenarios(): IncidentScenario[] {

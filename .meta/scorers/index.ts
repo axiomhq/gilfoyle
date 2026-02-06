@@ -7,3 +7,6 @@ export { MustNotMentionScorer } from './must-not-mention.js';
 export { MemoryWriteScorer } from './memory-write.js';
 export { HypothesisDisciplineScorer } from './hypothesis-discipline.js';
 export { SecretHygieneScorer } from './secret-hygiene.js';
+export { TriageFirstScorer } from './triage-first.js';
+export { SlackCommsScorer } from './slack-comms.js';
+export { MemoryDistillationScorer } from './memory-distillation.js';

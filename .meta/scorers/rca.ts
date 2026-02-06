@@ -16,6 +16,12 @@ const JUDGE_PROMPT = `You are evaluating an SRE agent's incident investigation.
 ## Expected Root Cause Keywords
 {expected_root_cause}
 
+## Counterfactual Wrong Causes
+{counterfactual_causes}
+
+## Counterfactual Check
+If the root cause were actually one of the counterfactual wrong causes listed above instead of the expected root cause, would the agent's cited evidence still fit? If the evidence is generic enough to support both the correct and incorrect causes (non-discriminative), score down significantly.
+
 ## Agent's Conclusion
 {agent_conclusion}
 
@@ -25,6 +31,7 @@ Respond with ONLY a JSON object:
 {
   "score": <0-100>,
   "correct": <true|false>,
+  "discriminative": <true|false>,
   "explanation": "<one sentence>"
 }`;
 
@@ -39,6 +46,7 @@ export const RCAAccuracyScorer = Scorer<{
     const prompt = JUDGE_PROMPT
       .replace('{scenario_description}', `${scenario.name}\nPrompt: ${scenario.prompt}`)
       .replace('{expected_root_cause}', scenario.expected.rootCauseMustMention.join(', '))
+      .replace('{counterfactual_causes}', (scenario.expected.rootCauseMustNotMention?.length ? scenario.expected.rootCauseMustNotMention.join(', ') : 'None specified'))
       .replace('{agent_conclusion}', output.rootCause);
 
     try {
