@@ -9,8 +9,8 @@
  */
 
 import type { IncidentScenario, LogRow } from '../harness/types.js';
-import type { ScenarioBlueprint, InvestigationStep } from './types.js';
-import { validateAPL, executeAPL, validatePromQL, executePromQL } from '../toolbox/fixture-engine.js';
+import type { ScenarioBlueprint, } from './types.js';
+import { validateAPL, executeAPL, validatePromQL, } from '../toolbox/fixture-engine.js';
 
 export interface ValidationResult {
   solvable: boolean;

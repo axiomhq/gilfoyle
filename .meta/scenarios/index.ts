@@ -1,6 +1,6 @@
-import { existsSync, readdirSync, readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { IncidentScenario } from '../harness/types.js';
 import { redisOomScenario } from './redis-oom.js';
 import { deployRollbackScenario } from './deploy-rollback.js';
@@ -34,10 +34,7 @@ function loadGeneratedScenarios(): IncidentScenario[] {
 }
 
 export function loadScenarios(): IncidentScenario[] {
-  const useSynthesized = process.env.EVAL_SYNTHESIZED === '1';
   const synthOnly = process.env.EVAL_SYNTH_ONLY === '1';
-
   if (synthOnly) return loadGeneratedScenarios();
-  if (useSynthesized) return [...handCrafted, ...loadGeneratedScenarios()];
-  return handCrafted;
+  return [...handCrafted, ...loadGeneratedScenarios()];
 }

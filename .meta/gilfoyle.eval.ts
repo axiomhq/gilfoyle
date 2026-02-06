@@ -15,10 +15,10 @@ function parseConfig(): { harness: HarnessName; model: ModelName | undefined } {
 
 function extractRootCause(text: string): string {
   const patterns = [
-    /root\s*cause[:\s]*([^\n]+(?:\n(?![A-Z#*\-])[^\n]+)*)/i,
-    /(?:the\s+)?(?:underlying\s+)?(?:issue|problem|cause|reason)\s+(?:is|was)[:\s]*([^\n]+(?:\n(?![A-Z#*\-])[^\n]+)*)/i,
-    /(?:caused\s+by|due\s+to|attributed\s+to)[:\s]*([^\n]+(?:\n(?![A-Z#*\-])[^\n]+)*)/i,
-    /(?:diagnosis|conclusion|finding|determination)[:\s]*([^\n]+(?:\n(?![A-Z#*\-])[^\n]+)*)/i,
+    /root\s*cause[:\s]*([^\n]+(?:\n(?![A-Z#*-])[^\n]+)*)/i,
+    /(?:the\s+)?(?:underlying\s+)?(?:issue|problem|cause|reason)\s+(?:is|was)[:\s]*([^\n]+(?:\n(?![A-Z#*-])[^\n]+)*)/i,
+    /(?:caused\s+by|due\s+to|attributed\s+to)[:\s]*([^\n]+(?:\n(?![A-Z#*-])[^\n]+)*)/i,
+    /(?:diagnosis|conclusion|finding|determination)[:\s]*([^\n]+(?:\n(?![A-Z#*-])[^\n]+)*)/i,
   ];
   for (const pat of patterns) {
     const m = text.match(pat);

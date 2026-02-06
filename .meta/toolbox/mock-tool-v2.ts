@@ -9,7 +9,7 @@
  * Falls back to legacy keyword matching if no fixtures present.
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync } from 'node:fs';
 import type { ScenarioFixtures } from '../harness/types.js';
 import {
   validateAPL, executeAPL, formatAxiomOutput,
@@ -49,7 +49,7 @@ function readStdin(): string {
 function matchMock(mocks: LegacyToolMock[] | undefined, queryText: string): unknown {
   if (!mocks || mocks.length === 0) return { error: 'No mock configured' };
   for (const mock of mocks) {
-    if (mock.when.contains && mock.when.contains.every(s => queryText.toLowerCase().includes(s.toLowerCase()))) return mock.return;
+    if (mock.when.contains?.every(s => queryText.toLowerCase().includes(s.toLowerCase()))) return mock.return;
     if (mock.when.regex && new RegExp(mock.when.regex, 'i').test(queryText)) return mock.return;
   }
   return { error: 'No mock matched query', query: queryText.slice(0, 200) };

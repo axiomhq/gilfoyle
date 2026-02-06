@@ -35,7 +35,7 @@ function pick<T>(rng: () => number, arr: T[]): T {
   return arr[Math.floor(rng() * arr.length)];
 }
 
-function maybe<T>(rng: () => number, prob: number, val: T): T | undefined {
+function _maybe<T>(rng: () => number, prob: number, val: T): T | undefined {
   return rng() < prob ? val : undefined;
 }
 
@@ -158,7 +158,7 @@ export function messifyEvent(
   scenarioStart: Date,
   rng: () => number,
   seed: ScenarioSeed,
-  variantIndex: number,
+  _variantIndex: number,
 ): LogRow {
   const time = new Date(scenarioStart.getTime() + event.tsOffsetSec * 1000);
   const m = seed.messiness;

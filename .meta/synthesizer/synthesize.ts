@@ -12,9 +12,9 @@
 
 import { generateText } from 'ai';
 import { google } from '@ai-sdk/google';
-import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { ScenarioSeed, ScenarioBlueprint } from './types.js';
 import { expandBlueprint } from './messifier.js';
 import { validateScenario } from './validator.js';
@@ -109,11 +109,11 @@ function extractJSON(text: string): unknown {
 
   let depth = 0;
   let inString = false;
-  let escape = false;
+  let escaped = false;
   for (let i = start; i < stripped.length; i++) {
     const ch = stripped[i];
-    if (escape) { escape = false; continue; }
-    if (ch === '\\') { escape = true; continue; }
+    if (escaped) { escaped = false; continue; }
+    if (ch === '\\') { escaped = true; continue; }
     if (ch === '"') { inString = !inString; continue; }
     if (inString) continue;
     if (ch === '{') depth++;
@@ -213,10 +213,10 @@ async function main() {
   mkdirSync(outputDir, { recursive: true });
 
   let seedFiles: string[] = [];
-  const variantCount = parseInt(args.find(a => a.startsWith('--variants='))?.split('=')[1] ?? '3');
+  const variantCount = parseInt(args.find(a => a.startsWith('--variants='))?.split('=')[1] ?? '3', 10);
 
   if (args.includes('--all')) {
-    const { readdirSync } = await import('fs');
+    const { readdirSync } = await import('node:fs');
     seedFiles = readdirSync(seedsDir).filter(f => f.endsWith('.ts'));
   } else {
     const seedArg = args.find(a => a.startsWith('--seed='))?.split('=')[1];

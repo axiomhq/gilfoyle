@@ -5,7 +5,7 @@
  * Used by all harnesses to ensure deterministic, reproducible evals.
  */
 
-import type { IncidentScenario, ToolCall, ToolMock, ToolName, RunTrace } from '../harness/types.js';
+import type { IncidentScenario, ToolCall, ToolMock, ToolName, } from '../harness/types.js';
 
 export interface MockToolRouter {
   call(tool: ToolName, input: unknown): Promise<unknown>;
@@ -36,7 +36,7 @@ export function createMockTools(scenario: IncidentScenario): MockToolRouter {
     return {
       error: 'No mock matched query',
       query: queryText.slice(0, 200),
-      hint: 'Try querying for: ' + (mocks[0]?.when.contains?.join(', ') ?? 'unknown'),
+      hint: `Try querying for: ${mocks[0]?.when.contains?.join(', ') ?? 'unknown'}`,
     };
   }
 

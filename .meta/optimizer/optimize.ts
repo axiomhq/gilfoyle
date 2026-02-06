@@ -5,9 +5,9 @@
  * Based on webhook/router_optimize_test.go pattern.
  */
 
-import { readFile, writeFile } from 'fs/promises';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { readFile, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
 import { loadScenarios } from '../scenarios/index.js';
 import { getHarness } from '../harness/index.js';
@@ -113,7 +113,7 @@ function scoreEfficiency(scenario: IncidentScenario, output: EvalOutput): { scor
     failures.push(`Exceeded tool call budget: ${toolCalls} > ${maxToolCalls}`);
   }
 
-  const totalTokens = output.trace.usage?.totalTokens ?? 0;
+  const totalTokens = (output.trace.usage?.inputTokens ?? 0) + (output.trace.usage?.outputTokens ?? 0);
   const maxTokens = budgets.maxTotalTokens ?? 10000;
 
   if (totalTokens > maxTokens) {
@@ -230,7 +230,7 @@ CRITICAL:
     messages: [{ role: 'user', content: prompt }],
   });
 
-  const textBlock = response.content.find((b) => b.type === 'text');
+  const textBlock = response.content.find((b: Anthropic.ContentBlock) => b.type === 'text');
   if (!textBlock || textBlock.type !== 'text') {
     return null;
   }

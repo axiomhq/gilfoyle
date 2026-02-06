@@ -1,9 +1,9 @@
 import type { HarnessRunner, IncidentScenario, RunConfig, RunTrace, ToolCall, ToolName, TokenUsage } from './types.js';
 import { execute } from '@sourcegraph/amp-sdk';
-import { writeFileSync, mkdirSync, rmSync, copyFileSync, chmodSync } from 'fs';
-import { tmpdir } from 'os';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { writeFileSync, mkdirSync, rmSync, copyFileSync, chmodSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILL_PATH = join(__dirname, '../../SKILL.md');
@@ -22,11 +22,11 @@ function createMockScript(name: string): string {
 export const ampHarness: HarnessRunner = {
   name: 'amp',
 
-  async run(scenario: IncidentScenario, config: RunConfig): Promise<RunTrace> {
+  async run(scenario: IncidentScenario, _config: RunConfig): Promise<RunTrace> {
     const start = Date.now();
     const toolCalls: ToolCall[] = [];
     let finalText = '';
-    let usage: TokenUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
+    const usage: TokenUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
 
     const tmpDir = join(tmpdir(), `gilfoyle-eval-${Date.now()}`);
     const scriptsDir = join(tmpDir, 'scripts');
@@ -70,7 +70,7 @@ export const ampHarness: HarnessRunner = {
           }
           for (const block of message.message.content) {
             if (block.type === 'text') {
-              finalText += block.text + '\n';
+              finalText += `${block.text}\n`;
             } else if (block.type === 'tool_use') {
               if (block.name === 'Bash' && typeof block.input === 'object' && block.input !== null) {
                 const cmd = (block.input as { cmd?: string }).cmd ?? '';
@@ -110,7 +110,7 @@ export const ampHarness: HarnessRunner = {
             if (debug) console.error(`[amp] result usage: in=${resultUsage.input_tokens} out=${resultUsage.output_tokens}`);
           }
           if (debug) console.error(`[amp] total usage so far: in=${usage.inputTokens} out=${usage.outputTokens} cache_read=${usage.cacheReadTokens} cache_write=${usage.cacheWriteTokens}`);
-          finalText += (message.is_error ? `\nError: ${message.error}\n` : message.result + '\n');
+          finalText += (message.is_error ? `\nError: ${message.error}\n` : `${message.result}\n`);
         }
       }
     } finally {

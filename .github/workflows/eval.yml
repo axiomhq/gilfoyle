@@ -12,6 +12,21 @@ on:
       - '.meta/**'
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+        working-directory: .meta
+      - name: Typecheck
+        working-directory: .meta
+        run: npx tsc --noEmit
+      - name: Lint
+        working-directory: .meta
+        run: npx biome lint .
+
   eval:
     runs-on: ubuntu-latest
     timeout-minutes: 30

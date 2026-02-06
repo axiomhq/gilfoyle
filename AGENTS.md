@@ -43,8 +43,14 @@ npx axiom eval
 EVAL_HARNESS=amp npx axiom eval
 EVAL_HARNESS=opencode EVAL_MODEL=xai/grok-4-1-fast npx axiom eval
 
-# Typecheck
+# Typecheck + lint (run before committing)
+bun run check
+
+# Typecheck only
 bun run typecheck
+
+# Lint only
+bun run lint
 
 # Debug opencode harness
 DEBUG_OPENCODE_HARNESS=1 EVAL_HARNESS=opencode npx axiom eval

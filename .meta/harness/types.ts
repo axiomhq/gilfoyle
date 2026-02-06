@@ -1,4 +1,4 @@
-export type HarnessName = 'amp' | 'opencode';
+export type HarnessName = 'amp' | 'opencode' | 'direct';
 export type ModelName = string;
 export type ToolName = 'scripts/init' | 'scripts/axiom-query' | 'scripts/grafana-query' | 'scripts/slack' | 'scripts/mem-write';
 
@@ -8,6 +8,8 @@ export interface ToolCall {
   output?: unknown;
   queryValid?: boolean;
   queryErrors?: string[];
+  durationMs?: number;
+  error?: string;
 }
 
 export interface TokenUsage {
@@ -90,6 +92,7 @@ export interface IncidentScenario {
 export interface RunConfig {
   harness: HarnessName;
   model?: ModelName;
+  skillPath?: string;
 }
 
 export interface EvalInput {
