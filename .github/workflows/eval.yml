@@ -57,7 +57,7 @@ jobs:
         working-directory: .meta
       - name: Install OpenCode CLI
         if: matrix.harness == 'opencode'
-        run: npm install -g opencode-ai jose
+        run: bun install -g opencode-ai
       - name: Run eval
         working-directory: .meta
         run: npx axiom eval 2>&1 | tee eval-output.log
