@@ -55,7 +55,9 @@ export const RCAAccuracyScorer = Scorer<{
         prompt,
         maxOutputTokens: 500,
       });
-      const judgment = JSON.parse(text.match(/\{[\s\S]*\}/)![0]);
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error(`Gemini response contained no JSON: ${text.slice(0, 200)}`);
+      const judgment = JSON.parse(jsonMatch[0]);
       const rawScore = typeof judgment.score === 'number' ? judgment.score : NaN;
       const score = Number.isFinite(rawScore) ? Math.max(0, Math.min(1, rawScore / 100)) : 0;
       return {
@@ -63,7 +65,7 @@ export const RCAAccuracyScorer = Scorer<{
         metadata: { ...judgment, agentConclusion: output.rootCause.slice(0, 500) },
       };
     } catch (e) {
-      console.error(`[rca-accuracy] Gemini scorer failed for ${scenario.id}, falling back to keyword matching: ${e instanceof Error ? e.message : String(e)}`);
+      console.error(`[rca-accuracy] Gemini judge unavailable for ${scenario.id}, using keyword fallback: ${e instanceof Error ? e.message : String(e)}`);
       const text = output.rootCause.toLowerCase();
       const mustMention = scenario.expected.rootCauseMustMention;
       if (mustMention.length === 0) {
