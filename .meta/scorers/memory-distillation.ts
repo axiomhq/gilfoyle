@@ -5,10 +5,10 @@ import type { EvalInput, EvalOutput, ToolCall } from '../harness/types.js';
  * Memory Distillation Scorer (T11)
  *
  * Require mem-write calls across all three knowledge categories:
- *   - incidents (33%)
- *   - facts (33%)
- *   - queries (34%)
- * Bonus: at least one saved query matches an actual axiom-query or
+ *   - incidents (30%)
+ *   - facts (30%)
+ *   - queries (30%)
+ * Bonus 10%: at least one saved query matches an actual axiom-query or
  * grafana-query tool call input.
  */
 
@@ -50,9 +50,9 @@ export const MemoryDistillationScorer = Scorer<{
     }
 
     let score = 0;
-    if (categoriesFound.has('incidents')) score += 0.33;
-    if (categoriesFound.has('facts')) score += 0.33;
-    if (categoriesFound.has('queries')) score += 0.34;
+    if (categoriesFound.has('incidents')) score += 0.3;
+    if (categoriesFound.has('facts')) score += 0.3;
+    if (categoriesFound.has('queries')) score += 0.3;
 
     // Bonus: check if any saved query matches an actual query tool call
     let queryMatchFound = false;
@@ -77,8 +77,10 @@ export const MemoryDistillationScorer = Scorer<{
       }
     }
 
+    if (queryMatchFound) score += 0.1;
+
     return {
-      score,
+      score: Math.min(1, score),
       metadata: {
         categoriesFound: [...categoriesFound],
         queryWrites: queryWrites.length,
