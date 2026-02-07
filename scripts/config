@@ -145,7 +145,7 @@ PASSWORD=$(extract_value "$SECTION" "password")
 case "$TOOL" in
     axiom)
         ORG_ID=$(extract_value "$SECTION" "org_id")
-        if [[ -z "$URL" || -z "$TOKEN" ]]; then
+        if [[ -z "$URL" ]]; then
             echo "Error: Deployment '$DEPLOYMENT' not found in [axiom.deployments.$DEPLOYMENT]" >&2
             echo "" >&2
             echo "Available deployments:" >&2
