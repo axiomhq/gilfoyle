@@ -10,7 +10,7 @@
  * See wasm/VERSION for source commits and wasm/build.sh to rebuild.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -30,9 +30,15 @@ let aplInitialized = false;
 let promqlInitialized = false;
 
 async function loadWasm(wasmFile: string, shimFile: string, globalName: string): Promise<ValidateFn> {
+  const wasmPath = join(WASM_DIR, wasmFile);
+  if (!existsSync(wasmPath)) {
+    throw new Error(
+      `${wasmFile} not found — WASM binaries are stored in Git LFS. Run: git lfs pull`,
+    );
+  }
   await import(join(WASM_DIR, shimFile));
   const go = new (globalThis as any).Go();
-  const wasmBuf = readFileSync(join(WASM_DIR, wasmFile));
+  const wasmBuf = readFileSync(wasmPath);
   const result = await WebAssembly.instantiate(wasmBuf, go.importObject);
   go.run(result.instance);
   const fn = (globalThis as any)[globalName];

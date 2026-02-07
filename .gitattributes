@@ -1,0 +1,2 @@
+.meta/toolbox/wasm/*.wasm filter=lfs diff=lfs merge=lfs -text
+.meta/toolbox/wasm/wasm_exec*.js filter=lfs diff=lfs merge=lfs -text
