@@ -9,7 +9,7 @@
  */
 
 import type { LogRow, MetricSeries, ScenarioFixtures, } from '../harness/types.js';
-import { validateAPLSyntax } from './apl-validator.js';
+import { validateAPLSyntax, validatePromQLSyntax } from './apl-validator.js';
 
 // ─── APL Parser ──────────────────────────────────────────────────────────
 
@@ -362,16 +362,21 @@ export function validatePromQL(query: string, fixtures: ScenarioFixtures): PromQ
     return { valid: false, errors };
   }
 
+  // Real parser syntax check (Prometheus PromQL parser via WASM)
+  const syntaxCheck = validatePromQLSyntax(trimmed);
+  if (!syntaxCheck.valid) {
+    errors.push(`PromQL syntax error: ${syntaxCheck.error}`);
+    return { valid: false, errors };
+  }
+
   // Extract base metric name (handles functions wrapping metrics)
   let metricName: string | undefined;
   const labels: Record<string, { op: string; value: string }> = {};
 
-  // Try to find metric name inside functions or at top level
-  // Patterns: metric_name, metric_name{...}, func(metric_name{...}[5m])
   const metricPatterns = [
-    /^([a-zA-Z_:][a-zA-Z0-9_:]*)\s*(?:\{|$)/,  // bare metric or metric{
-    /\(([a-zA-Z_:][a-zA-Z0-9_:]*)\s*(?:\{|\[|$|\))/,  // func(metric
-    /\(([a-zA-Z_:][a-zA-Z0-9_:]*)\s*\{/,  // func(metric{
+    /^([a-zA-Z_:][a-zA-Z0-9_:]*)\s*(?:\{|$)/,
+    /\(([a-zA-Z_:][a-zA-Z0-9_:]*)\s*(?:\{|\[|$|\))/,
+    /\(([a-zA-Z_:][a-zA-Z0-9_:]*)\s*\{/,
   ];
 
   for (const pat of metricPatterns) {
@@ -383,11 +388,9 @@ export function validatePromQL(query: string, fixtures: ScenarioFixtures): PromQ
   }
 
   if (!metricName) {
-    // Could be a complex expression - try to find any metric-like identifier
     const anyMetric = trimmed.match(/([a-zA-Z_:][a-zA-Z0-9_:]*)\s*[[{(]/);
     if (anyMetric) {
       const candidate = anyMetric[1];
-      // Skip known PromQL functions
       const funcs = ['rate', 'increase', 'sum', 'avg', 'max', 'min', 'count',
         'histogram_quantile', 'irate', 'delta', 'deriv', 'abs', 'ceil', 'floor',
         'round', 'clamp', 'clamp_min', 'clamp_max', 'label_replace', 'label_join',
@@ -399,7 +402,6 @@ export function validatePromQL(query: string, fixtures: ScenarioFixtures): PromQ
     }
   }
 
-  // Parse label matchers if present
   const labelBlock = trimmed.match(/\{([^}]*)\}/);
   if (labelBlock) {
     const labelStr = labelBlock[1];
@@ -409,33 +411,14 @@ export function validatePromQL(query: string, fixtures: ScenarioFixtures): PromQ
     }
   }
 
-  // Validate metric exists in fixtures
   if (metricName) {
     const knownMetrics = Object.keys(fixtures.metrics);
     if (knownMetrics.length > 0 && !knownMetrics.includes(metricName)) {
-      // Check if it's a partial match or the metric is wrapped in a function
       const anyMatch = knownMetrics.some(m => m === metricName || m.startsWith(metricName));
       if (!anyMatch) {
         errors.push(`Unknown metric '${metricName}'. Available: ${knownMetrics.join(', ')}`);
       }
     }
-  }
-
-  // Basic syntax checks
-  const openParens = (trimmed.match(/\(/g) || []).length;
-  const closeParens = (trimmed.match(/\)/g) || []).length;
-  if (openParens !== closeParens) {
-    errors.push(`Unbalanced parentheses: ${openParens} open vs ${closeParens} close`);
-  }
-  const openBraces = (trimmed.match(/\{/g) || []).length;
-  const closeBraces = (trimmed.match(/\}/g) || []).length;
-  if (openBraces !== closeBraces) {
-    errors.push(`Unbalanced braces: ${openBraces} open vs ${closeBraces} close`);
-  }
-  const openBrackets = (trimmed.match(/\[/g) || []).length;
-  const closeBrackets = (trimmed.match(/\]/g) || []).length;
-  if (openBrackets !== closeBrackets) {
-    errors.push(`Unbalanced brackets: ${openBrackets} open vs ${closeBrackets} close`);
   }
 
   return { valid: errors.length === 0, errors, metricName, labels };

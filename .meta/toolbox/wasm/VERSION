@@ -1,5 +1,13 @@
-axiom1 commit: 8097e5fd422096be4ee9f9e4f96e8a73f6024d97
-go version: go1.25.3
-tinygo version: 0.40.1
-built: 2026-02-07
-source: pkg/kirby/apl/parser/ast/v2
+apl-parser.wasm:
+  source: axiom1 pkg/kirby/apl/parser/ast/v2
+  axiom1 commit: 8097e5fd422096be4ee9f9e4f96e8a73f6024d97
+  compiler: tinygo 0.40.1
+  built: 2026-02-07
+
+promql-parser.wasm:
+  source: github.com/prometheus/prometheus v0.304.1 promql/parser
+  compiler: go1.25.3
+  built: 2026-02-07
+
+wasm_exec.js: tinygo 0.40.1 (for apl-parser.wasm)
+wasm_exec_go.js: go1.25.3 (for promql-parser.wasm)
