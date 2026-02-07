@@ -26,7 +26,7 @@ KB_DIR="$MEMORY_DIR/kb"
 ORGS_DIR="$MEMORY_DIR/orgs"
 
 # Defaults
-ORG=""
+ORG="${MEMORY_ORG_NAME:-}"
 TYPE="fact"
 TAGS=""
 PINNED="false"
@@ -64,7 +64,7 @@ if [[ $# -lt 3 ]]; then
   echo "Usage: mem-write [options] <file> <id> <content|->"
   echo ""
   echo "Options:"
-  echo "  --org <name>    Write to org tier (default: personal)"
+  echo "  --org <name>    Write to org tier (default: \$MEMORY_ORG_NAME or personal)"
   echo "  --type <type>   fact, pattern, query, incident, note (default: fact)"
   echo "  --tags <tags>   Comma-separated tags"
   echo "  --pin           Mark as pinned"
