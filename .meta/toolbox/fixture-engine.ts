@@ -9,6 +9,7 @@
  */
 
 import type { LogRow, MetricSeries, ScenarioFixtures, } from '../harness/types.js';
+import { validateAPLSyntax } from './apl-validator.js';
 
 // ─── APL Parser ──────────────────────────────────────────────────────────
 
@@ -36,6 +37,13 @@ export interface APLValidation {
 export function validateAPL(query: string, fixtures: ScenarioFixtures): APLValidation {
   const errors: string[] = [];
   const trimmed = query.trim();
+
+  // Real parser syntax check (Axiom APL parser via WASM)
+  const syntaxCheck = validateAPLSyntax(trimmed);
+  if (!syntaxCheck.valid) {
+    errors.push(`APL syntax error: ${syntaxCheck.error}`);
+    return { valid: false, errors };
+  }
 
   // Must start with dataset reference: ['dataset-name']
   const datasetMatch = trimmed.match(/^\[['"]([^'"]+)['"]\]/);

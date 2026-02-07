@@ -16,6 +16,7 @@ import {
   validatePromQL, executePromQL, formatGrafanaOutput,
   validateAxiomCLI, validateGrafanaCLI,
 } from './fixture-engine.js';
+import { initAPLValidator } from './apl-validator.js';
 
 const scriptName = process.argv[2] ?? 'unknown';
 const toolArgs = process.argv.slice(3);
@@ -56,6 +57,7 @@ function matchMock(mocks: LegacyToolMock[] | undefined, queryText: string): unkn
 }
 
 try {
+  await initAPLValidator();
   const scenario: Scenario = JSON.parse(readFileSync(scenarioFile, 'utf-8'));
   const fixtures = scenario.fixtures;
 
@@ -75,7 +77,6 @@ try {
           process.exit(1);
         }
 
-        // Validate and execute APL
         const aplCheck = validateAPL(stdinQuery, fixtures);
         if (!aplCheck.valid) {
           console.error(`error: ${aplCheck.errors.join('; ')}`);

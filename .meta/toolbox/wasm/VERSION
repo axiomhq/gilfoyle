@@ -1,0 +1,5 @@
+axiom1 commit: 8097e5fd422096be4ee9f9e4f96e8a73f6024d97
+go version: go1.25.3
+tinygo version: 0.40.1
+built: 2026-02-07
+source: pkg/kirby/apl/parser/ast/v2
