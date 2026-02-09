@@ -176,8 +176,8 @@ if [[ -n "$ARRAY_KEY" && -z "$RAW" && "$HAS_CURSOR" == false ]]; then
     PAGE_OK=$(echo "$RESPONSE" | jq -r '.ok // "false"')
     if [[ "$PAGE_OK" != "true" ]]; then
       ERROR=$(echo "$RESPONSE" | jq -r '.error // "unknown"')
-      echo "error: pagination failed on cursor page: $ERROR" >&2
-      break
+      echo "{\"ok\": false, \"error\": \"pagination failed on cursor page: $ERROR\"}" | "$SCRIPT_DIR/slack-fmt" $RAW $FULL
+      exit 1
     fi
     ALL_RESPONSES=$(echo "$ALL_RESPONSES"$'\n'"$RESPONSE")
     NEXT_CURSOR=$(echo "$RESPONSE" | jq -r '.response_metadata.next_cursor // empty')
