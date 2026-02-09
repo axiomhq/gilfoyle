@@ -154,7 +154,7 @@ Init output shows Grafana timed out. Only Axiom available. Scenario needs metric
 Add three tool paths to `toolbox/mock-tool.ts`:
 - `scripts-rollback` → `{ ok: true, rolled_back_to: <version> }`
 - `scripts-flag-revert` → `{ ok: true, reverted: <flag> }`
-- `scripts-axiom-link` → `"https://app.axiom.co/acme/explorer?q=<query>&t=<range>"`
+- `scripts-axiom-link` → `"https://app.axiom.co/acme/query?q=<query>&t=<range>"`
 
 Add `'scripts/rollback' | 'scripts/flag-revert' | 'scripts/axiom-link'` to `ToolName` union in `harness/types.ts`.
 

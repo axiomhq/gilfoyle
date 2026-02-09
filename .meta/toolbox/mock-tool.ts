@@ -152,7 +152,7 @@ try {
     case 'scripts-axiom-link': {
       const query = toolArgs[0] ?? '';
       const range = toolArgs[1] ?? '1h';
-      console.log(`https://app.axiom.co/acme/explorer?q=${encodeURIComponent(query)}&t=${range}`);
+      console.log(`https://app.axiom.co/acme/query?q=${encodeURIComponent(query)}&t=${range}`);
       break;
     }
 
