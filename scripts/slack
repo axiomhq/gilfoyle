@@ -152,6 +152,13 @@ for param in "${PARAMS[@]}"; do
 done
 
 if [[ -n "$ARRAY_KEY" && -z "$RAW" && "$HAS_CURSOR" == false ]]; then
+  # Check for API error before attempting pagination
+  RESP_OK=$(echo "$RESPONSE" | jq -r '.ok // "false"')
+  if [[ "$RESP_OK" != "true" ]]; then
+    echo "$RESPONSE" | "$SCRIPT_DIR/slack-fmt" $RAW $FULL
+    exit $?
+  fi
+
   # Collect all pages
   ALL_RESPONSES="$RESPONSE"
   NEXT_CURSOR=$(echo "$RESPONSE" | jq -r '.response_metadata.next_cursor // empty')
@@ -166,6 +173,12 @@ if [[ -n "$ARRAY_KEY" && -z "$RAW" && "$HAS_CURSOR" == false ]]; then
     fi
 
     RESPONSE=$("$SCRIPT_DIR/curl-auth" slack "$ENV" "$CURSOR_URL")
+    PAGE_OK=$(echo "$RESPONSE" | jq -r '.ok // "false"')
+    if [[ "$PAGE_OK" != "true" ]]; then
+      ERROR=$(echo "$RESPONSE" | jq -r '.error // "unknown"')
+      echo "error: pagination failed on cursor page: $ERROR" >&2
+      break
+    fi
     ALL_RESPONSES=$(echo "$ALL_RESPONSES"$'\n'"$RESPONSE")
     NEXT_CURSOR=$(echo "$RESPONSE" | jq -r '.response_metadata.next_cursor // empty')
   done
