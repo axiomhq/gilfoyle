@@ -49,7 +49,7 @@ discover_dep() {
         END_TIME=$(current_time_ms)
         DURATION=$(( END_TIME - START_TIME ))
         
-        count=$(echo "$response" | jq -r 'length' 2>/dev/null || echo "0")
+        count=$(echo "$response" | jq -r 'if type == "array" then length else 0 end' 2>/dev/null || echo "0")
         
         if [[ "$count" -gt 0 ]]; then
             echo -e "  ${GREEN}$count datasources found${NC} (${DURATION}ms)"

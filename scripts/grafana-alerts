@@ -50,7 +50,7 @@ if command -v jq &>/dev/null; then
     
     if [[ "$num_alerts" -gt 0 ]]; then
         echo "$alerts" | jq -r '.[] | 
-            "[\(.status.state | ascii_upcase)] \(.labels.alertname // "unknown")\n  Severity: \(.labels.severity // "N/A")\n  Summary: \(.annotations.summary // .annotations.description // "N/A")\n  Started: \(.startsAt // "N/A")\n"'
+            "[\(.status.state | ascii_upcase)] \(.labels.alertname // "unknown")\n  Severity: \(.labels.severity // "N/A")\n  Summary: \(.annotations.summary // .annotations.description // "N/A")\n  Started: \(.startsAt // "N/A")\n"' || true
     fi
 else
     echo "$result"

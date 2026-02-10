@@ -68,7 +68,7 @@ discover_dep() {
             END_FALLBACK=$(current_time_ms)
             DURATION_FALLBACK=$(( END_FALLBACK - END_QUERY ))
             
-            count=$(echo "$response" | jq -r 'length' 2>/dev/null || echo "0")
+            count=$(echo "$response" | jq -r 'if type == "array" then length else 0 end' 2>/dev/null || echo "0")
             
             if [[ "$count" -gt 0 ]]; then
                 echo -e "  ${GREEN}$count datasets found${NC} (query: ${DURATION_QUERY}ms, fallback: ${DURATION_FALLBACK}ms)"
