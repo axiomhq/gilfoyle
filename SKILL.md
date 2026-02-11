@@ -285,48 +285,15 @@ Trace IDs for successful queries:
 scripts/axiom-query <env> --trace <<< "['dataset'] | take 1"
 ```
 
-### B. RED METHOD (Services/Grafana)
+### B. RED & USE METHODS (Grafana)
 
-| Signal | PromQL Pattern |
-|:-------|:---------------|
-| **Rate** | `sum(rate(http_requests_total[5m])) by (service)` |
-| **Errors** | `sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))` |
-| **Duration** | `histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service))` |
+See `reference/grafana.md` for RED (Rate/Errors/Duration) and USE (Utilization/Saturation/Errors) PromQL patterns.
 
-### C. USE METHOD (Resources/Grafana)
+### C. DIFFERENTIAL ANALYSIS (Spotlight)
 
-| Signal | PromQL Pattern |
-|:-------|:---------------|
-| **Utilization** | `1 - (rate(node_cpu_seconds_total{mode="idle"}[5m]))` |
-| **Saturation** | `node_load1` or `node_memory_MemAvailable_bytes` |
-| **Errors** | `rate(node_network_receive_errs_total[5m])` |
+See `reference/apl.md` → Differential Analysis section for spotlight queries, jq parsing, and interpretation.
 
-### D. DIFFERENTIAL ANALYSIS (Spotlight)
-
-```bash
-# Compare last 30m (bad) to the 30m before that (good)
-scripts/axiom-query <env> <<< "['dataset'] | where _time > ago(1h) | summarize spotlight(_time > ago(30m), service, user_agent, region, status)"
-```
-
-**Parsing Spotlight with jq:**
-```bash
-# Summary: all dimensions with top finding
-scripts/axiom-query <env> "..." --raw | jq '.. | objects | select(.differences?)
-  | {dim: .dimension, effect: .delta_score,
-     top: (.differences | sort_by(-.frequency_ratio) | .[0] | {v: .value[0:60], r: .frequency_ratio, c: .comparison_count})}'
-
-# Top 5 OVER-represented values (ratio=1 means ONLY during problem)
-scripts/axiom-query <env> "..." --raw | jq '.. | objects | select(.differences?)
-  | {dim: .dimension, over: [.differences | sort_by(-.frequency_ratio) | .[:5] | .[]
-     | {v: .value[0:60], r: .frequency_ratio, c: .comparison_count}]}'
-```
-
-**Interpreting Spotlight:**
-- `frequency_ratio > 0`: Value appears MORE during problem (potential cause)
-- `frequency_ratio < 0`: Value appears LESS during problem
-- `effect_size`: How strongly dimension explains difference (higher = more important)
-
-### E. CODE FORENSICS
+### D. CODE FORENSICS
 
 - **Log to Code:** Grep for exact static string part of log message
 - **Metric to Code:** Grep for metric name to find instrumentation point
@@ -336,32 +303,15 @@ scripts/axiom-query <env> "..." --raw | jq '.. | objects | select(.differences?)
 
 ## 9. APL ESSENTIALS
 
-### Time Ranges (CRITICAL)
-```apl
-['logs'] | where _time between (ago(1h) .. now())
-```
+See `reference/apl.md` for full operator, function, and pattern reference.
 
-### Operators
-`where`, `summarize`, `extend`, `project`, `top N by`, `order by`, `take`
-
-### SRE Aggregations
-`spotlight()`, `percentiles_array()`, `topk()`, `histogram()`, `rate()`
-
-### Field Escaping
-- Fields with dots need escaping: `['kubernetes.node_labels.nodepool\\.axiom\\.co/name']`
-- In bash, use `$'...'` with quadruple backslashes
-
-### Performance Tips
-- **Time filter FIRST**—always filter `_time` before other conditions
-- **Sample before filtering**—use `| distinct ['field']` to see variety before building predicates
-- **Use duration literals**—`where duration > 10s` not `extend duration_s = todouble(['duration']) / 1000000000`
-- Most selective filters first—discard most rows early
-- Use `has_cs` over `contains` (5-10x faster, case-sensitive)
-- Prefer `_cs` operators—case-sensitive variants are faster
-- **Avoid `search`**—scans ALL fields, very slow. Last resort only.
-- **Avoid `project *`**—specify only fields you need
-- **Avoid regex when simple filters work**—`has_cs` beats `matches regex`
-- Limit results—use `take 10` for debugging
+**Critical rules:**
+- **Time filter FIRST**—always `where _time between (ago(1h) .. now())` before other conditions
+- **Use `has_cs` over `contains`**—5-10x faster, case-sensitive
+- **Prefer `_cs` operators**—case-sensitive variants are always faster
+- **Use duration literals**—`where duration > 10s` not manual conversion
+- **Avoid `search`**—scans ALL fields. Last resort only.
+- **Field escaping**—dots need `\\.`: `['kubernetes.node_labels.nodepool\\.axiom\\.co/name']`
 
 ---
 
@@ -535,8 +485,14 @@ aws --profile prod cloudwatch get-metric-statistics ...
 
 ## Reference Files
 
-- `reference/api-capabilities.md`—All 70+ API endpoints
-- `reference/apl-operators.md`—APL operators summary
-- `reference/apl-functions.md`—APL functions summary
+- `reference/apl.md`—APL operators, functions, and spotlight analysis
+- `reference/axiom.md`—Axiom API endpoints (70+)
+- `reference/blocks.md`—Slack Block Kit formatting
 - `reference/failure-modes.md`—Common failure patterns
+- `reference/grafana.md`—Grafana queries, PromQL patterns, RED/USE methods
 - `reference/memory-system.md`—Full memory documentation
+- `reference/postmortem-template.md`—Incident retrospective template
+- `reference/pyroscope.md`—Continuous profiling with Pyroscope
+- `reference/query-patterns.md`—Ready-to-use APL investigation queries
+- `reference/slack.md`—Slack script usage and operations
+- `reference/slack-api.md`—Slack API method reference

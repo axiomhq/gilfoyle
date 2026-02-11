@@ -193,5 +193,5 @@ ts=1234567890.123456 channel=C01234567
 
 ## References
 
-- `reference/api-methods.md` — Full method reference
+- `reference/slack-api.md` — Full method reference
 - `reference/blocks.md` — Block Kit formatting
