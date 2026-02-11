@@ -45,7 +45,7 @@ description: {{SKILL_DESCRIPTION}}
 scripts/init
 ```
 
-**First run:** If no config exists, `scripts/init` creates `~/.config/gilfoyle/config.toml` and memory directories automatically. If no deployments are configured, it prints setup guidance and exits early (no point discovering nothing). Walk the user through adding at least one tool (Axiom, Grafana, Slack) to the config, then re-run `scripts/init`.
+**First run:** If no config exists, `scripts/init` creates `{{CONFIG_PATH}}` and memory directories automatically. If no deployments are configured, it prints setup guidance and exits early (no point discovering nothing). Walk the user through adding at least one tool (Axiom, Grafana, Slack) to the config, then re-run `scripts/init`.
 
 **Why?**
 - Lists your ACTUAL datasets, datasources, and environments.

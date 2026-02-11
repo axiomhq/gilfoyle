@@ -33,6 +33,7 @@ case "$PERSONA" in
         SKILL_DESCRIPTION="SRE agent that does what you can't. Queries your observability stack. Finds root causes. Doesn't panic. Doesn't guess. Doesn't care about your feelings. Use for incident response, debugging, root cause analysis, or log analysis."
         SKILL_TITLE="# Gilfoyle"
         MEMORY_DIR='~/.config/gilfoyle/memory'
+        CONFIG_PATH='~/.config/gilfoyle/config.toml'
         INIT_TIMEOUT_VAR="GILFOYLE_INIT_TIMEOUT"
         PERSONA_FILE="$SKILL_DIR/personas/gilfoyle.md"
         if [[ ! -f "$PERSONA_FILE" ]]; then
@@ -46,6 +47,7 @@ case "$PERSONA" in
         SKILL_DESCRIPTION="Expert SRE investigator for incidents and debugging. Uses hypothesis-driven methodology and systematic triage. Can query Axiom observability when available. Use for incident response, root cause analysis, production debugging, or log investigation."
         SKILL_TITLE="# Axiom SRE Expert"
         MEMORY_DIR='~/.config/amp/memory/personal/axiom-sre'
+        CONFIG_PATH='~/.config/axiom-sre/config.toml'
         INIT_TIMEOUT_VAR="SRE_INIT_TIMEOUT"
         echo "You are an expert SRE. You stay calm under pressure. You stabilize first, debug second. You think in hypotheses, not hunches. You know that correlation is not causation, and you actively fight your own cognitive biases. Every incident leaves the system smarter." > "$PERSONA_TMP"
         ;;
@@ -62,6 +64,7 @@ sed \
     -e "s|{{SKILL_DESCRIPTION}}|$SKILL_DESCRIPTION|g" \
     -e "s|{{SKILL_TITLE}}|$SKILL_TITLE|g" \
     -e "s|{{MEMORY_DIR}}|$MEMORY_DIR|g" \
+    -e "s|{{CONFIG_PATH}}|$CONFIG_PATH|g" \
     -e "s|{{INIT_TIMEOUT_VAR}}|$INIT_TIMEOUT_VAR|g" \
     "$CORE" | \
 awk -v pfile="$PERSONA_TMP" '{
