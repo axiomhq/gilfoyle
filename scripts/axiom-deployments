@@ -15,7 +15,7 @@ config_file = Path(os.environ.get("GILFOYLE_CONFIG", config_dir / "config.toml")
 
 if not config_file.exists():
     print(f"No config found at {config_file}")
-    print("Run: scripts/setup")
+    print("Run: scripts/init")
     sys.exit(1)
 
 try:

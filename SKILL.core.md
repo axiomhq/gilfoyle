@@ -45,13 +45,15 @@ description: {{SKILL_DESCRIPTION}}
 scripts/init
 ```
 
+**First run:** If no config exists, `scripts/init` creates `~/.config/gilfoyle/config.toml` and memory directories automatically. If no deployments are configured, it prints setup guidance and exits early (no point discovering nothing). Walk the user through adding at least one tool (Axiom, Grafana, Slack) to the config, then re-run `scripts/init`.
+
 **Why?**
 - Lists your ACTUAL datasets, datasources, and environments.
 - **DO NOT GUESS** dataset names like `['logs']`.
 - **DO NOT GUESS** Grafana datasource UIDs.
 - Use ONLY the names from `scripts/init` output.
 
-**Requirement:** `timeout` (GNU coreutils). On macOS, install with `brew install coreutils` (provides `gtimeout`).
+**Requirement:** `timeout` (GNU coreutils). On macOS, install with `brew install coreutils` (provides `gtimeout`). Setup checks for missing dependencies automatically.
 
 **If init times out:**
 - Some discovery sections may be partial or missing. Do NOT guess.

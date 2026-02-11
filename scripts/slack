@@ -34,7 +34,7 @@ show_usage() {
   echo "  slack work users.list" >&2
   echo "" >&2
   echo "Available workspaces:" >&2
-  "$SCRIPT_DIR/config" --list slack 2>/dev/null | sed 's/^/  /' >&2 || echo "  (run scripts/setup to configure)" >&2
+  "$SCRIPT_DIR/config" --list slack 2>/dev/null | sed 's/^/  /' >&2 || echo "  (run scripts/init to configure)" >&2
   exit 1
 }
 

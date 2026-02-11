@@ -118,7 +118,7 @@ else
   TARGET_DIR="$MEMORY_DIR"
   if [[ ! -d "$KB_DIR" ]]; then
     echo "Error: Memory not found at $KB_DIR"
-    echo "Run: scripts/setup"
+    echo "Run: scripts/init"
     exit 1
   fi
   TIER="personal"

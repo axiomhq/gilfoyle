@@ -6,8 +6,8 @@ Verify the consolidated skill actually works end-to-end.
 
 ### Smoke test all scripts
 
-- [ ] `scripts/setup` — Creates config and memory directories
-- [ ] `scripts/setup --migrate` — Migrates from legacy configs (~/.axiom.toml, etc.)
+- [ ] `scripts/init` — Creates config, memory directories, discovers environments
+- [ ] `scripts/init --migrate` — Migrates from legacy configs (~/.axiom.toml, etc.)
 - [ ] `scripts/config axiom <deployment>` — Returns correct env vars
 - [ ] `scripts/axiom-query` — Runs APL query successfully
 - [ ] `scripts/axiom-api` — Makes API call successfully

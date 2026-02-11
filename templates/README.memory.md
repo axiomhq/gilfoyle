@@ -144,7 +144,7 @@ When an entry is critical and should never be archived:
 
 | Command | Purpose |
 |---------|---------|
-| `scripts/setup` | Initialize memory system |
+| `scripts/init` | Initialize memory + config |
 | `scripts/org-add` | Add an org for shared memory |
 | `scripts/mem-sync` | Pull org memory updates |
 | `scripts/mem-share` | Batch commit and push org changes (rarely needed — `mem-write --org` auto-shares) |

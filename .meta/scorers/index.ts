@@ -10,3 +10,4 @@ export { SecretHygieneScorer } from './secret-hygiene.js';
 export { TriageFirstScorer } from './triage-first.js';
 export { SlackCommsScorer } from './slack-comms.js';
 export { MemoryDistillationScorer } from './memory-distillation.js';
+export { FirstRunScorer } from './first-run.js';

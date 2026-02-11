@@ -57,7 +57,7 @@ Org writes are automatically committed and pushed — no extra step needed.
 ## First-Time Setup
 
 ```bash
-scripts/setup    # Personal tier + orgs config
+scripts/init    # Personal tier + orgs config
 ```
 
 ## Org Setup

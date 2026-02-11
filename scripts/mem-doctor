@@ -50,7 +50,7 @@ if [[ -d "$KB_DIR" ]]; then
   check_ok "Exists at $MEMORY_DIR ($entries entries)"
 else
   check_fail "Not found at $KB_DIR"
-  echo "   Run: scripts/setup"
+  echo "   Run: scripts/init"
 fi
 
 echo ""

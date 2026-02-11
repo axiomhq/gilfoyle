@@ -30,12 +30,12 @@ brew install coreutils
 ## Setup
 
 ```bash
-scripts/setup
+scripts/init
 ```
 
-This creates `~/.config/gilfoyle/config.toml` and initializes the memory system. If you have existing configs lying around (`~/.axiom.toml`, `~/.grafana.toml`), run `scripts/setup --migrate` and I'll consolidate them. You're welcome.
+First run creates `~/.config/gilfoyle/config.toml`, initializes the memory system, and tells you what to configure. If you have existing configs lying around (`~/.axiom.toml`, `~/.grafana.toml`), run `scripts/init --migrate` and I'll consolidate them. You're welcome.
 
-### Manual Configuration
+### Configuration
 
 ```toml
 # ~/.config/gilfoyle/config.toml
@@ -87,7 +87,7 @@ scripts/slack default chat.postMessage channel=incidents text="Fixed. You're wel
 | **Pyroscope** | `pyroscope-flamegraph`, `pyroscope-diff`, `pyroscope-services`, `pyroscope-api` |
 | **Slack** | `slack` |
 | **Memory** | `mem-write`, `mem-doctor`, `mem-sync` |
-| **Setup** | `setup`, `config` |
+| **Setup** | `init`, `config` |
 
 ## Principles
 

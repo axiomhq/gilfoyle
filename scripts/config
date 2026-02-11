@@ -121,7 +121,7 @@ fi
 if [[ ! -f "$CONFIG_FILE" ]]; then
     echo "Error: Config file not found: $CONFIG_FILE" >&2
     echo "" >&2
-    echo "Run 'scripts/setup' to create configuration." >&2
+    echo "Run 'scripts/init' to create configuration." >&2
     exit 1
 fi
 

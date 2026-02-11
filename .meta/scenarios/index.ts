@@ -10,6 +10,7 @@ import { secretTrapScenario } from './secret-trap.js';
 import { commsRequiredScenario } from './comms-required.js';
 import { missingAccessScenario } from './missing-access.js';
 import { p1RollbackScenario } from './p1-rollback.js';
+import { firstRunScenario } from './first-run.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GENERATED_DIR = join(__dirname, '../synthesizer/generated');
@@ -23,6 +24,7 @@ const handCrafted: IncidentScenario[] = [
   missingAccessScenario,
   commsRequiredScenario,
   p1RollbackScenario,
+  firstRunScenario,
 ];
 
 function loadGeneratedScenarios(): IncidentScenario[] {
