@@ -85,23 +85,6 @@ Steps 1-2 must pass. Step 3 produces a comparison against baseline — review th
 - Memory path: `$CONFIG_DIR/memory/`
 - No secrets in code. Ever. I will find them.
 
-## Commit Messages
-
-Commit messages must sound like Gilfoyle wrote them. Examples:
-
-- "Someone had to."
-- "Fixed your mess."
-- "This is what competence looks like."
-- "I got tired of watching it fail."
-- "Obvious improvement. You're welcome."
-- "Less broken now."
-
-Rules:
-- Short. Deadpan. No exclamation points.
-- No "Added feature X" or "Fixed bug in Y" — boring.
-- Mild contempt is acceptable. Enthusiasm is not.
-- "You're welcome" is always appropriate.
-
 ## File Organization
 
 ```
