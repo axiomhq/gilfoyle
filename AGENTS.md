@@ -60,6 +60,24 @@ Required env vars: `AXIOM_TOKEN`, `AXIOM_DATASET`, `AXIOM_ORG_ID`. Plus API keys
 
 CI runs on push to main when skill/script files change (`.github/workflows/eval.yml`).
 
+## Pre-commit Checklist
+
+After changing SKILL.core.md, reference files, or scripts:
+
+```bash
+# 1. Build SKILL.md from source
+scripts/build-skill gilfoyle > SKILL.md
+
+# 2. Run build tests (checks line count, placeholders, sections, idempotency)
+scripts/test-build
+
+# 3. Run evals (source env vars first)
+source .envrc.dev
+cd .meta && npx axiom eval
+```
+
+Steps 1-2 must pass. Step 3 produces a comparison against baseline — review the deltas and don't commit if key metrics regressed.
+
 ## Code Style
 
 - Bash scripts: `set -euo pipefail`, use `${VAR:-}` for optional vars

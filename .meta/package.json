@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.37",
-    "@ai-sdk/google": "^3.0.21",
+    "@ai-sdk/google": "3.0.24",
     "@ai-sdk/xai": "^1.0.0",
     "@anthropic-ai/claude-agent-sdk": "^0.2.31",
     "@anthropic-ai/sdk": "0.73.0",
