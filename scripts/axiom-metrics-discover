@@ -84,8 +84,12 @@ if [[ -n "$RANGE" && ( -n "$START_TIME" || -n "$END_TIME" ) ]]; then
 fi
 
 if [[ -n "$RANGE" ]]; then
-  START_TIME=$(range_to_rfc3339 "$RANGE")
-  END_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  START_TIME=$(range_to_rfc3339 "$RANGE") || exit 1
+  END_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) || exit 1
+  if [[ -z "$START_TIME" || -z "$END_TIME" ]]; then
+    echo "Error: Failed to compute time range from '$RANGE'." >&2
+    exit 1
+  fi
 elif [[ -n "$START_TIME" && -n "$END_TIME" ]]; then
   : # explicit start/end provided
 elif [[ -n "$START_TIME" || -n "$END_TIME" ]]; then
@@ -93,8 +97,12 @@ elif [[ -n "$START_TIME" || -n "$END_TIME" ]]; then
   exit 1
 else
   # Default to 1h
-  START_TIME=$(range_to_rfc3339 "1h")
-  END_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  START_TIME=$(range_to_rfc3339 "1h") || exit 1
+  END_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) || exit 1
+  if [[ -z "$START_TIME" || -z "$END_TIME" ]]; then
+    echo "Error: Failed to compute default time range." >&2
+    exit 1
+  fi
 fi
 
 # URL-encode a path segment
