@@ -79,7 +79,9 @@ trap cleanup EXIT
 # --spec: fetch MPL language specification via OPTIONS and exit
 if [[ "$FETCH_SPEC" == true ]]; then
   HTTP_CODE=$(curl -sS -o "$RESP_BODY" -D "$RESP_HEADERS" -w "%{http_code}" \
-    -X OPTIONS "$AXIOM_URL/v1/query/_metrics")
+    -X OPTIONS "$AXIOM_URL/v1/query/_metrics" \
+    -H "Authorization: Bearer $AXIOM_TOKEN" \
+    -H "X-Axiom-Org-Id: $AXIOM_ORG_ID")
 
   if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
     msg=$(jq -r '.message // empty' "$RESP_BODY" 2>/dev/null)
