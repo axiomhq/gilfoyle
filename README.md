@@ -13,6 +13,7 @@ You're welcome.
 - **Finds root causes** — Hypothesis-driven investigation. No hunches. No vibes. Data.
 - **Systematic triage** — Golden signals, USE/RED methods. The stuff you should already know.
 - **Remembers everything** — Persistent memory for patterns, queries, and incidents. Unlike you, I learn.
+- **Metrics querying** — OTel metrics via MPL. Logs via APL. One agent, both engines.
 - **Unified observability** — One config, all your tools. Because having four config files is amateur hour.
 
 ## Installation
@@ -67,8 +68,11 @@ Auth options per deployment:
 ## Usage
 
 ```bash
-# Query logs
+# Query logs (APL)
 scripts/axiom-query prod "['dataset'] | where _time > ago(1h) | where status >= 500 | project _time, message, status | take 10"
+
+# Query metrics (MPL)
+scripts/axiom-metrics-query prod --range 1h <<< "otel-metrics:http.server.request.duration | align to 5m using avg | group by service.name"
 
 # Check what's on fire
 scripts/grafana-alerts prod firing
@@ -84,7 +88,7 @@ scripts/slack default chat.postMessage channel=incidents text="Fixed. You're wel
 
 | Category | Scripts |
 |----------|---------|
-| **Axiom** | `axiom-query`, `axiom-api`, `axiom-link`, `axiom-deployments` |
+| **Axiom** | `axiom-query`, `axiom-metrics-query`, `axiom-api`, `axiom-link`, `axiom-deployments` |
 | **Grafana** | `grafana-query`, `grafana-alerts`, `grafana-datasources`, `grafana-api` |
 | **Pyroscope** | `pyroscope-flamegraph`, `pyroscope-diff`, `pyroscope-services`, `pyroscope-api` |
 | **Slack** | `slack` |
@@ -97,7 +101,7 @@ scripts/slack default chat.postMessage channel=incidents text="Fixed. You're wel
 2. **State facts.** "The logs show X" not "this is probably X."
 3. **Disprove, don't confirm.** Design queries to falsify your hypothesis.
 4. **Time filter first.** Always. No exceptions.
-5. **Discover schema.** Run `getschema` before querying unfamiliar datasets.
+5. **Discover schema.** Run `getschema` (APL) or `--spec` (MPL) before querying unfamiliar datasets.
 
 ## Memory
 
