@@ -88,6 +88,9 @@ if [[ -n "$RANGE" ]]; then
   END_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 elif [[ -n "$START_TIME" && -n "$END_TIME" ]]; then
   : # explicit start/end provided
+elif [[ -n "$START_TIME" || -n "$END_TIME" ]]; then
+  echo "Error: Both --start and --end are required when specifying explicit times." >&2
+  exit 1
 else
   # Default to 1h
   START_TIME=$(range_to_rfc3339 "1h")
