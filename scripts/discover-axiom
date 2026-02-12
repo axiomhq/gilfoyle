@@ -148,18 +148,26 @@ discover_dep() {
             
             if [[ "$count" -gt 0 ]]; then
                 echo -e "  ${GREEN}$count datasets found${NC} (query: ${DURATION_QUERY}ms, fallback: ${DURATION_FALLBACK}ms)"
-                echo "$response" | jq -r '.[] | "  - " + .name' | sort | head -n 10
+
+                # Identify MetricsDB datasets (otel-metrics-v1)
+                metrics_datasets=$(echo "$response" | jq -r '.[] | select(.kind == "otel-metrics-v1") | .name' 2>/dev/null || echo "")
+
+                # Tag MetricsDB datasets inline, consistent with Strategy 1
+                echo "$response" | jq -r '.[] | .name' | sort | while IFS= read -r ds; do
+                    if [[ -n "$metrics_datasets" ]] && echo "$metrics_datasets" | grep -qxF "$ds"; then
+                        echo "  - [MPL] $ds"
+                    else
+                        echo "  - $ds"
+                    fi
+                done | head -n 10
                 if [[ "$count" -gt 10 ]]; then
                     echo "  - ... (and $((count - 10)) more)"
                     echo -e "  ${BOLD}To search:${NC} scripts/axiom-api $dep GET \"/v1/datasets\" | jq -r '.[].name' | grep \"pattern\""
                 fi
 
-                # Identify MetricsDB datasets (otel-metrics-v1)
-                metrics_datasets=$(echo "$response" | jq -r '.[] | select(.kind == "otel-metrics-v1") | .name' 2>/dev/null || echo "")
                 if [[ -n "$metrics_datasets" ]]; then
                     metrics_count=$(echo "$metrics_datasets" | grep -c .)
-                    echo -e "  ${GREEN}MetricsDB datasets ($metrics_count):${NC}"
-                    echo "$metrics_datasets" | sort | head -n 10 | sed 's/^/  - [MPL] /'
+                    echo -e "  ${GREEN}MetricsDB datasets ($metrics_count total)${NC}"
                 fi
             else
                 echo -e "  ${RED}No datasets found or auth failed${NC} (total: $((DURATION_QUERY + DURATION_FALLBACK))ms)"
