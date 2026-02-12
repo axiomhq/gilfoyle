@@ -116,8 +116,12 @@ if [[ -n "$RANGE" && ( -n "$START_TIME" || -n "$END_TIME" ) ]]; then
 fi
 
 if [[ -n "$RANGE" ]]; then
-  START_TIME=$(range_to_rfc3339 "$RANGE")
-  END_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  START_TIME=$(range_to_rfc3339 "$RANGE") || exit 1
+  END_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) || exit 1
+  if [[ -z "$START_TIME" || -z "$END_TIME" ]]; then
+    echo "Error: Failed to compute time range from '$RANGE'." >&2
+    exit 1
+  fi
 elif [[ -z "$START_TIME" || -z "$END_TIME" ]]; then
   echo "Error: Either (--start + --end) or --range is required." >&2
   exit 1
