@@ -13,15 +13,21 @@ range_to_rfc3339() {
     return 1
   fi
 
+  local label
   case "$suffix" in
-    h) local label="hour" ;;
-    d) local label="day" ;;
-    m) local label="minute" ;;
+    h) label="hour" ;;
+    d) label="day" ;;
+    m) label="minute" ;;
     *)
       echo "Error: Invalid range suffix '$suffix'. Use h (hours), d (days), or m (minutes)." >&2
       return 1
       ;;
   esac
+
+  # Pluralize for values other than 1
+  if [[ "$value" -ne 1 ]]; then
+    label="${label}s"
+  fi
 
   # Try GNU date first (linux, or gdate on macOS), then fall back to macOS date
   if date -u -d "1 hour ago" +%Y-%m-%dT%H:%M:%SZ &>/dev/null; then
