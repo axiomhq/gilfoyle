@@ -26,14 +26,17 @@ const MOCK_TOOL_PATH = join(__dirname, '../toolbox/mock-tool.ts');
 
 const DEFAULT_PROVIDER = 'xai';
 const DEFAULT_MODEL = 'grok-4-1-fast';
-const HARNESS_TIMEOUT_MS = 280_000;
+const DEFAULT_TIMEOUT_MS = 280_000;
+const HARNESS_TIMEOUT_MS = parseInt(process.env.EVAL_TIMEOUT_MS ?? '', 10) || DEFAULT_TIMEOUT_MS;
 const STATUS_POLL_INTERVAL_MS = 2_000;
 
-function parseModel(config: RunConfig): { provider: string; model: string } {
+function parseModel(config: RunConfig): { provider: string; model: string; format: 'colon' | 'slash' } {
   const raw = config.model ?? `${DEFAULT_PROVIDER}/${DEFAULT_MODEL}`;
   const slash = raw.indexOf('/');
-  if (slash > 0) return { provider: raw.slice(0, slash), model: raw.slice(slash + 1) };
-  return { provider: DEFAULT_PROVIDER, model: raw };
+  if (slash > 0) return { provider: raw.slice(0, slash), model: raw.slice(slash + 1), format: 'slash' };
+  const colon = raw.indexOf(':');
+  if (colon > 0) return { provider: raw.slice(0, colon), model: raw.slice(colon + 1), format: 'colon' };
+  return { provider: DEFAULT_PROVIDER, model: raw, format: 'slash' };
 }
 
 function getFreePort(): Promise<number> {
@@ -97,8 +100,8 @@ export const opencodeHarness: HarnessRunner = {
     const log = (msg: string) => console.error(`[opencode] ${scenario.id} (${elapsed()}): ${msg}`);
 
     const port = await getFreePort();
-    const { provider, model } = parseModel(config);
-    log(`port=${port} provider=${provider} model=${model}`);
+    const { provider, model, format } = parseModel(config);
+    log(`port=${port} provider=${provider} model=${model} format=${format}`);
 
     let opencode: Awaited<ReturnType<typeof createOpencode>> | undefined;
     let eventAbort: AbortController | undefined;
@@ -118,7 +121,7 @@ export const opencodeHarness: HarnessRunner = {
       opencode = await createOpencode({
         port,
         config: {
-          model: `${provider}/${model}`,
+          model: format === 'colon' ? `${provider}:${model}` : `${provider}/${model}`,
           permission: {
             bash: 'allow',
             edit: 'allow',
@@ -358,9 +361,13 @@ IMPORTANT: All scripts are in ${scriptsDir}. Run them with the full path. Exampl
       try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     }
 
-    if (usage.inputTokens === 0 && usage.outputTokens === 0) {
+    if (usage.inputTokens === 0 && usage.outputTokens === 0 && !finalText.trim()) {
       const captured = finalText.trim().slice(0, 500);
       throw new Error(`[opencode] ${scenario.id}: zero tokens — the LLM never ran.\n${captured}`);
+    }
+
+    if (usage.inputTokens === 0 && usage.outputTokens === 0) {
+      console.error(`[opencode] ${scenario.id}: warning — zero token usage (model may not report tokens)`);
     }
 
     return {

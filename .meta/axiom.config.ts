@@ -13,6 +13,7 @@ export default defineConfig({
     token: process.env.AXIOM_TOKEN,
     dataset: process.env.AXIOM_DATASET,
     orgId: process.env.AXIOM_ORG_ID,
+    timeoutMs: parseInt(process.env.EVAL_TIMEOUT_MS ?? '', 10) || 600000,
 
     instrumentation: ({ url, token, dataset }) => {
       const exporter = new OTLPTraceExporter({

@@ -46,6 +46,8 @@ jobs:
             model: xai/grok-4-1-fast
           - harness: opencode
             model: anthropic/claude-opus-4-6
+          - harness: opencode
+            model: ollama-cloud/minimax-m2.5:cloud
           - harness: claude
             model: claude-opus-4-6
     env:
@@ -56,8 +58,10 @@ jobs:
       XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
       EVAL_HARNESS: ${{ matrix.harness }}
       EVAL_MODEL: ${{ matrix.model }}
+      EVAL_TIMEOUT_MS: 600000
     steps:
       - uses: actions/checkout@v4
         with:
