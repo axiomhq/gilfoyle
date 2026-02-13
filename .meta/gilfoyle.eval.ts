@@ -77,10 +77,10 @@ Eval<EvalInput, ExpectedOutput, EvalOutput>(evalName, {
           span.setAttribute('gen_ai.usage.output_tokens', trace.usage.outputTokens);
           span.setAttribute('llm.token_count.prompt', trace.usage.inputTokens);
           span.setAttribute('llm.token_count.completion', trace.usage.outputTokens);
-          if (trace.usage.cacheReadTokens) span.setAttribute('gen_ai.usage.cache_read_tokens', trace.usage.cacheReadTokens);
-          if (trace.usage.cacheWriteTokens) span.setAttribute('gen_ai.usage.cache_write_tokens', trace.usage.cacheWriteTokens);
-          if (trace.usage.reasoningTokens) span.setAttribute('gen_ai.usage.reasoning_tokens', trace.usage.reasoningTokens);
-          if (trace.usage.costUsd) span.setAttribute('gen_ai.usage.cost', trace.usage.costUsd);
+          span.setAttribute('gen_ai.usage.cache_read_tokens', trace.usage.cacheReadTokens ?? 0);
+          span.setAttribute('gen_ai.usage.cache_write_tokens', trace.usage.cacheWriteTokens ?? 0);
+          span.setAttribute('gen_ai.usage.reasoning_tokens', trace.usage.reasoningTokens ?? 0);
+          span.setAttribute('gen_ai.usage.cost', trace.usage.costUsd ?? 0);
           console.error(`[eval] ${scenario.id} token usage: in=${trace.usage.inputTokens} out=${trace.usage.outputTokens} cache_read=${trace.usage.cacheReadTokens ?? 0} cache_write=${trace.usage.cacheWriteTokens ?? 0} reasoning=${trace.usage.reasoningTokens ?? 0} cost=$${trace.usage.costUsd?.toFixed(4) ?? 'n/a'}`);
         }
 
@@ -95,5 +95,5 @@ Eval<EvalInput, ExpectedOutput, EvalOutput>(evalName, {
 
   scorers: [QueryValidityScorer, RCAAccuracyScorer, EvidenceQualityScorer, EfficiencyScorer, InitFirstScorer, MustNotMentionScorer, MemoryWriteScorer, HypothesisDisciplineScorer, SecretHygieneScorer, TriageFirstScorer, SlackCommsScorer, MemoryDistillationScorer, FirstRunScorer],
   timeout: 300_000, // 5 minutes per scenario — LLM investigations take time
-  metadata: { description: 'Evaluate Gilfoyle SRE skill incident investigation', version: '0.2.0', harness: harnessName, ...(modelName && { model: modelName }) },
+  metadata: { description: 'Evaluate Gilfoyle SRE skill incident investigation', version: '0.2.0', harness: harnessName, ...(modelName && { model: modelName }), commit: process.env.GIT_COMMIT ?? '', branch: process.env.GIT_BRANCH ?? '' },
 });

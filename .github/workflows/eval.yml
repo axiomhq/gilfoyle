@@ -62,6 +62,8 @@ jobs:
       EVAL_HARNESS: ${{ matrix.harness }}
       EVAL_MODEL: ${{ matrix.model }}
       EVAL_TIMEOUT_MS: 600000
+      GIT_COMMIT: ${{ github.sha }}
+      GIT_BRANCH: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v4
         with:
