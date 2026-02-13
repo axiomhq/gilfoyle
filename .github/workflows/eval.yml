@@ -47,7 +47,7 @@ jobs:
           - harness: opencode
             model: anthropic/claude-opus-4-6
           - harness: opencode
-            model: ollama-cloud/minimax-m2.5:cloud
+            model: ollama-cloud/minimax-m2.5
           - harness: claude
             model: claude-opus-4-6
     env:
