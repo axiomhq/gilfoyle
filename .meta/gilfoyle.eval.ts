@@ -68,6 +68,8 @@ Eval<EvalInput, ExpectedOutput, EvalOutput>(evalName, {
       { capability: 'sre-investigation', step: `${config.harness}-${scenario.id}` },
       async (span) => {
         span.setAttribute('gen_ai.system', config.harness === 'amp' ? 'amp' : 'xai');
+        span.setAttribute('gen_ai.operation.name', 'chat');
+        span.setAttribute('eval.name', evalName);
         span.setAttribute('scenario.id', scenario.id);
 
         const trace = await harness.run(scenario, config);
