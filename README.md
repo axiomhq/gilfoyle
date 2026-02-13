@@ -1,5 +1,7 @@
 # Gilfoyle
 
+[![Evals](https://img.shields.io/badge/evals-live_dashboard-blue)](https://play.axiom.co/axiom-play-qf1k/dashboards/2NztOZ2QWMNZtU83pv)
+
 ![Gilfoyle - SRE Debugging Agent](site/assets/hero.png)
 
 An SRE agent that does what you can't. Queries your observability stack. Finds root causes. Doesn't panic. Doesn't guess. Doesn't care about your feelings.
