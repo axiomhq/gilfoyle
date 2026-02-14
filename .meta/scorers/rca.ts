@@ -58,8 +58,8 @@ export const RCAAccuracyScorer = Scorer<{
     // (matched mid-investigation "root cause" mentions instead of final conclusion).
     // Strip HARNESS ERROR noise so it doesn't confuse the judge.
     const cleanText = output.trace.finalText
-      .replace(/\nHARNESS ERROR:.*$/s, '')
-      .replace(/\nHARNESS TIMEOUT.*$/s, '')
+      .replace(/\s*HARNESS ERROR:.*$/s, '')
+      .replace(/\s*HARNESS TIMEOUT.*$/s, '')
       .trim();
     // Truncate to last 6000 chars to stay within judge context window
     // while keeping the final conclusion (which is always at the end).
