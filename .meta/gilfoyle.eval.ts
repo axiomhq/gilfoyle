@@ -7,9 +7,26 @@ import { RCAAccuracyScorer, EvidenceQualityScorer, EfficiencyScorer, QueryValidi
 const DEFAULT_HARNESS: HarnessName = 'amp';
 const DEFAULT_MODEL = 'xai/grok-4-1-fast';
 
+function defaultModelForHarness(harness: HarnessName): ModelName | undefined {
+  switch (harness) {
+    case 'amp':
+      return undefined;
+    case 'opencode':
+      return DEFAULT_MODEL;
+    case 'claude':
+      return 'claude-opus-4-6';
+    case 'direct':
+      return 'claude-sonnet-4';
+    case 'codex':
+      return 'gpt-5.2-codex';
+    default:
+      return DEFAULT_MODEL;
+  }
+}
+
 function parseConfig(): { harness: HarnessName; model: ModelName | undefined } {
   const harness = (process.env.EVAL_HARNESS ?? DEFAULT_HARNESS) as HarnessName;
-  const model = harness === 'amp' ? undefined : (process.env.EVAL_MODEL ?? DEFAULT_MODEL);
+  const model = process.env.EVAL_MODEL ?? defaultModelForHarness(harness);
   return { harness, model };
 }
 
@@ -67,7 +84,14 @@ Eval<EvalInput, ExpectedOutput, EvalOutput>(evalName, {
     const result = await withSpan(
       { capability: 'sre-investigation', step: `${config.harness}-${scenario.id}` },
       async (span) => {
-        span.setAttribute('gen_ai.system', config.harness === 'amp' ? 'amp' : 'xai');
+        const aiSystem = config.harness === 'amp'
+          ? 'amp'
+          : config.harness === 'codex'
+            ? 'openai'
+            : config.harness === 'claude'
+              ? 'anthropic'
+              : 'xai';
+        span.setAttribute('gen_ai.system', aiSystem);
         span.setAttribute('gen_ai.operation.name', 'chat');
         span.setAttribute('eval.name', evalName);
         span.setAttribute('scenario.id', scenario.id);

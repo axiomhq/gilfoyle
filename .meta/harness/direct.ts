@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path';
 import { generateText, tool, stepCountIs, type LanguageModel } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createXai } from '@ai-sdk/xai';
+import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -42,22 +43,36 @@ When you reach a conclusion, clearly state the ROOT CAUSE with evidence.`;
 }
 
 function getModel(modelName: string): LanguageModel {
-  if (modelName.startsWith('claude')) {
+  const slash = modelName.indexOf('/');
+  const colon = modelName.indexOf(':');
+  const separator = slash > 0 ? slash : colon;
+  const provider = separator > 0 ? modelName.slice(0, separator) : '';
+  const rawId = separator > 0 ? modelName.slice(separator + 1) : modelName;
+
+  if (rawId.startsWith('claude')) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
     const anthropic = createAnthropic({ apiKey });
-    const modelId = modelName === 'claude-opus-4' ? 'claude-opus-4-20250514' : 'claude-sonnet-4-20250514';
+    const modelId = rawId === 'claude-opus-4' ? 'claude-opus-4-20250514' : 'claude-sonnet-4-20250514';
     return anthropic(modelId);
   }
 
-  if (modelName.startsWith('grok')) {
+  if (rawId.startsWith('grok') || provider === 'xai') {
     const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) throw new Error('XAI_API_KEY not set');
     const xai = createXai({ apiKey });
-    return xai('grok-4-0709') as unknown as LanguageModel;
+    const modelId = rawId === 'grok-4-1-fast' ? 'grok-4-0709' : rawId;
+    return xai(modelId) as unknown as LanguageModel;
   }
 
-  throw new Error(`Unsupported model: ${modelName}`);
+  if (provider === 'openai' || rawId.startsWith('gpt-') || rawId.startsWith('codex-')) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error('OPENAI_API_KEY not set');
+    const openai = createOpenAI({ apiKey });
+    return openai(rawId);
+  }
+
+  throw new Error(`Unsupported model: ${modelName}. Try openai/gpt-5.3-codex, xai/grok-4-1-fast, or claude-opus-4`);
 }
 
 function extractToolError(output: unknown): string[] | undefined {

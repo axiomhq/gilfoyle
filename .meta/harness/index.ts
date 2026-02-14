@@ -3,12 +3,14 @@ import { ampHarness } from './amp.js';
 import { opencodeHarness } from './opencode.js';
 import { directHarness } from './direct.js';
 import { claudeHarness } from './claude.js';
+import { codexHarness } from './codex.js';
 
 const harnesses: Record<HarnessName, HarnessRunner> = {
   amp: ampHarness,
   opencode: opencodeHarness,
   direct: directHarness,
   claude: claudeHarness,
+  codex: codexHarness,
 };
 
 export function getHarness(name: HarnessName): HarnessRunner {
@@ -17,5 +19,5 @@ export function getHarness(name: HarnessName): HarnessRunner {
   return harness;
 }
 
-export { ampHarness, opencodeHarness, directHarness, claudeHarness };
+export { ampHarness, opencodeHarness, directHarness, claudeHarness, codexHarness };
 export * from './types.js';

@@ -58,9 +58,10 @@ Most agent evals are a retrieval game in disguise. This one isn't. The agent get
 
 1. **Scenarios** — Hand-crafted incident scenarios (`scenarios/*.ts`) or synthesized from seeds via the two-phase synthesizer (`synthesizer/`). Each scenario includes fixture data: log rows and metric series the agent queries against.
 
-2. **Harnesses** — Run an LLM agent against mock scripts in a temp directory. Two harness implementations:
+2. **Harnesses** — Run an LLM agent against mock scripts in a temp directory.
    - `amp.ts` — Uses `@sourcegraph/amp-sdk` `execute()`. Intercepts tool_use/tool_result messages.
    - `opencode.ts` — Uses `@opencode-ai/sdk` `createOpencode()`. Allocates a random free port per session for parallel runs. Parses tool parts from message stream.
+   - `codex.ts` — Uses direct OpenAI API calls via Vercel AI SDK (`@ai-sdk/openai`) for Codex/GPT model runs.
 
 3. **Mock Tool v2** (`toolbox/mock-tool-v2.ts`) — Replaces simple keyword mocks. Backed by the fixture engine. Validates CLI contracts, parses APL/PromQL, executes queries against fixture data, returns computed results. Falls back to legacy keyword matching if no fixtures present.
 
@@ -424,11 +425,12 @@ Avg: 7212753218.4
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `EVAL_HARNESS` | No | `amp` | Which harness to use: `amp` or `opencode` |
-| `EVAL_MODEL` | No | `claude-opus-4` | Model identifier for the harness |
+| `EVAL_HARNESS` | No | `amp` | Which harness to use: `amp`, `opencode`, `claude`, or `codex` |
+| `EVAL_MODEL` | No | depends on harness | Model identifier for the selected harness |
 | `EVAL_SYNTHESIZED` | No | — | Set to `1` to include synthesized scenarios alongside hand-crafted |
 | `EVAL_SYNTH_ONLY` | No | — | Set to `1` to run only synthesized scenarios |
 | `XAI_API_KEY` | For OpenCode | — | xAI API key (Grok models via OpenCode harness) |
+| `OPENAI_API_KEY` | For Codex | — | OpenAI API key (Codex/GPT models via Codex harness) |
 | `GEMINI_API_KEY` | For scorers/synth | — | Google Gemini API key (RCA scorer + synthesizer) |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | Alt for Gemini | — | Alternative env var for Gemini (auto-set from `GEMINI_API_KEY`) |
 | `DEBUG_OPENCODE_HARNESS` | No | — | Set to `1` for verbose OpenCode harness logging |

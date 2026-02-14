@@ -42,6 +42,7 @@ npx axiom eval
 # Run specific harness
 EVAL_HARNESS=amp npx axiom eval
 EVAL_HARNESS=opencode EVAL_MODEL=xai/grok-4-1-fast npx axiom eval
+EVAL_HARNESS=codex EVAL_MODEL=gpt-5.2-codex npx axiom eval
 
 # Typecheck + lint (run before committing)
 bun run check
@@ -56,7 +57,7 @@ bun run lint
 DEBUG_OPENCODE_HARNESS=1 EVAL_HARNESS=opencode npx axiom eval
 ```
 
-Required env vars: `AXIOM_TOKEN`, `AXIOM_DATASET`, `AXIOM_ORG_ID`. Plus API keys for the harness (`AMP_API_KEY`, `XAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`).
+Required env vars: `AXIOM_TOKEN`, `AXIOM_DATASET`, `AXIOM_ORG_ID`. Plus API keys for the harness (`AMP_API_KEY`, `XAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`).
 
 CI runs on push to main when skill/script files change (`.github/workflows/eval.yml`).
 
