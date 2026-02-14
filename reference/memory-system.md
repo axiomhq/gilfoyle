@@ -139,10 +139,20 @@ Connection pool exhausted. Found leak in payment handler.
 
 Run after incidents or periodically:
 ```bash
-scripts/sleep    # Review recent additions for consolidation
+scripts/sleep                           # default full preset: clean + share + prompt
+scripts/sleep --org axiom               # same full preset, scoped to one org
+scripts/sleep --org axiom --dry-run     # analyze + prompt only
 ```
 
-This will dump recent memory additions for you to review and synthesize into patterns.
+Deep sleep phases:
+- `N1 review` recent entries in the selected window.
+- `N2 analysis` entry counts, duplicate keys, and type drift.
+- `N3 apply` deterministic cleanup (keep newest duplicate, drop `Supersedes` targets, normalize `type` in incidents/patterns/queries).
+- `REM share` commit/push org repo changes.
+
+Safety defaults:
+- no mode flags => full preset.
+- `--dry-run` never modifies files and never pushes.
 
 ## Health Check
 

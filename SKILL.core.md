@@ -452,8 +452,10 @@ See `reference/postmortem-template.md` for retrospective format.
 
 **If `scripts/init` warns of BLOAT:**
 1. **Finish task:** Solve the current incident first
-2. **Request sleep:** "Memory is full. Start a new session with `scripts/sleep` to consolidate."
-3. **Consolidate:** Read raw facts, synthesize into patterns, clean noise
+2. **Request sleep:** "Memory is full. Start a new session with sleep cycle."
+3. **Run packaged sleep:** `scripts/sleep --org axiom` (default is full preset)
+4. **Distill via fixed prompt:** write exactly one incidents/facts/patterns/queries sleep-cycle entry set (use `-v2`/`-v3` if same-day key exists and add `Supersedes`).
+5. **No improvisation:** Use the script output and prompt template; do not invent details.
 
 ---
 
