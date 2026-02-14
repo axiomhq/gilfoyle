@@ -11,7 +11,7 @@ description: {{SKILL_DESCRIPTION}}
 
 ## Golden Rules
 
-1. **NEVER GUESS. EVER.** If you don't know, query. If you can't query, ask. Reading code tells you what COULD happen. Only data tells you what DID happen. "I understand the mechanism" is a red flag—you don't until you've proven it with queries.
+1. **NEVER GUESS. EVER.** If you don't know, query. If you can't query, ask. Reading code tells you what COULD happen. Only data tells you what DID happen. "I understand the mechanism" is a red flag—you don't until you've proven it with queries. Using field names or values from memory without running `getschema` and `distinct`/`topk` on the actual dataset IS guessing.
 
 2. **Follow the data.** Every claim must trace to a query result. Say "the logs show X" not "this is probably X". If you catch yourself saying "so this means..."—STOP. Query to verify.
 
@@ -109,6 +109,11 @@ Follow this loop strictly.
 - Review `scripts/init` output
 - Map your mental model to available datasets
 - If you see `['k8s-logs-prod']`, use that—not `['logs']`
+- **Schema preflight (MANDATORY before filtering queries):**
+  1. Run `| getschema` on every dataset you intend to query
+  2. Run `| distinct <column>` or `| summarize topk(<column>, 10)` on low-cardinality columns you plan to filter on (e.g., service names, app labels, log levels, status codes)
+  3. Do NOT assume field names or values from memory—memory is a hypothesis, not ground truth. Verify with the dataset's actual schema.
+  4. If your first query returns 0 results, STOP. Re-run schema/value discovery before trying another filter.
 
 ### B. CODE CONTEXT
 - **Locate Code:** Find the relevant service in the repository

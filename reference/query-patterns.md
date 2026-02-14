@@ -1,5 +1,26 @@
 # Signal Reading Query Patterns
 
+## Schema & Value Discovery (MANDATORY FIRST STEP)
+
+**Always run these before writing filter queries.** Do not assume field names or values from memory.
+
+```apl
+// 1. Get schema with types — run this FIRST on every dataset you query
+['dataset'] | getschema
+
+// 2. Discover actual values of low-cardinality columns you plan to filter on
+['dataset'] | where _time between (ago(1h) .. now()) | summarize topk(field, 10)
+
+// 3. Sample data to see field structure
+['dataset'] | where _time between (ago(1h) .. now()) | project _time, message, level | take 5
+
+// 4. What services/apps exist? Discover before filtering.
+['dataset'] | where _time between (ago(1h) .. now()) | summarize count() by service
+['dataset'] | where _time between (ago(1h) .. now()) | distinct ['kubernetes.labels.app']
+```
+
+**Rule:** If your first filter query returns 0 results, run schema discovery before trying another filter.
+
 Ready-to-use APL queries for common investigation scenarios.
 
 ## Error Analysis
@@ -112,18 +133,3 @@ Ready-to-use APL queries for common investigation scenarios.
 | project _time, request_id, service, uri, status
 ```
 
-## Schema Discovery
-
-```apl
-// Get schema with types (Fastest)
-['dataset'] | getschema
-
-// Sample data to see specific fields
-['dataset'] | where _time between (ago(1h) .. now()) | project _time, message, level | take 5
-
-// Top values for a field
-['dataset'] | where _time between (ago(1h) .. now()) | summarize topk(field, 10)
-
-// What services exist?
-['dataset'] | where _time between (ago(1h) .. now()) | summarize count() by service
-```
