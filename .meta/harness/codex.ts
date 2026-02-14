@@ -140,9 +140,12 @@ export const codexHarness: HarnessRunner = {
             });
           }
         } else if (event.type === 'turn.completed') {
-          usage.inputTokens += event.usage.input_tokens ?? 0;
+          const cachedInput = event.usage.cached_input_tokens ?? 0;
+          // OpenAI includes cached tokens inside input_tokens — subtract
+          // them so inputTokens means "net new" like other providers.
+          usage.inputTokens += Math.max(0, (event.usage.input_tokens ?? 0) - cachedInput);
           usage.outputTokens += event.usage.output_tokens ?? 0;
-          usage.cacheReadTokens += event.usage.cached_input_tokens ?? 0;
+          usage.cacheReadTokens += cachedInput;
         } else if (event.type === 'turn.failed') {
           finalText += `\nHARNESS ERROR: ${event.error.message}\n`;
         } else if (event.type === 'error') {
