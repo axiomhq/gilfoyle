@@ -45,7 +45,7 @@ description: {{SKILL_DESCRIPTION}}
 scripts/init
 ```
 
-**First run:** If no config exists, `scripts/init` creates `{{CONFIG_PATH}}` and memory directories automatically. If no deployments are configured, it prints setup guidance and exits early (no point discovering nothing). Walk the user through adding at least one tool (Axiom, Grafana, Slack) to the config, then re-run `scripts/init`.
+**First run:** If no config exists, `scripts/init` creates `{{CONFIG_PATH}}` and memory directories automatically. If no deployments are configured, it prints setup guidance and exits early (no point discovering nothing). Walk the user through adding at least one tool (Axiom, Grafana, Pyroscope, Sentry, or Slack) to the config, then re-run `scripts/init`.
 
 **Why?**
 - Lists your ACTUAL datasets, datasources, and environments.
@@ -448,6 +448,12 @@ scripts/grafana-query <env> prometheus 'rate(http_requests_total[5m])'
 scripts/pyroscope-diff <env> <app_name> -2h -1h -1h now
 ```
 
+### Sentry (Errors & Events)
+```bash
+scripts/sentry-api <env> GET "/organizations/<org>/issues/?query=is:unresolved&sort=freq"
+scripts/sentry-api <env> GET "/issues/<issue_id>/events/latest/"
+```
+
 ### Slack (Communication)
 ```bash
 scripts/slack <env> chat.postMessage channel=C1234 text="Message" thread_ts=1234567890.123456
@@ -470,5 +476,6 @@ scripts/slack-upload <env> <channel> ./file.png --comment "Description" --thread
 - `reference/postmortem-template.md`—Incident retrospective template
 - `reference/pyroscope.md`—Continuous profiling with Pyroscope
 - `reference/query-patterns.md`—Ready-to-use APL investigation queries
+- `reference/sentry.md`—Sentry API endpoints and examples
 - `reference/slack.md`—Slack script usage and operations
 - `reference/slack-api.md`—Slack API method reference

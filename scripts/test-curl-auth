@@ -26,6 +26,12 @@ token = "glsa_test_token_12345"
 url = "https://pyroscope.test"
 token = "pyro-test-token"
 
+[sentry.deployments.test]
+url = "https://example-org.sentry.io"
+token = "sntryu_test_sentry_token_12345"
+organization_slug = "example-org"
+project_slug = "example-project"
+
 [slack.workspaces.test]
 token = "xoxb-test-slack-token"
 EOF
@@ -43,6 +49,10 @@ result=$("$SCRIPT_DIR/config" --list grafana)
 
 echo -n "config --list pyroscope: "
 result=$("$SCRIPT_DIR/config" --list pyroscope)
+[[ "$result" == "test" ]] && echo "OK" || { echo "FAIL: $result"; exit 1; }
+
+echo -n "config --list sentry: "
+result=$("$SCRIPT_DIR/config" --list sentry)
 [[ "$result" == "test" ]] && echo "OK" || { echo "FAIL: $result"; exit 1; }
 
 echo -n "config --list slack: "
@@ -63,6 +73,11 @@ expected="https://grafana.test|glsa_test_token_12345"
 echo -n "config pyroscope test: "
 output=$(eval "$("$SCRIPT_DIR/config" pyroscope test)" && echo "$PYROSCOPE_URL|$PYROSCOPE_TOKEN")
 expected="https://pyroscope.test|pyro-test-token"
+[[ "$output" == "$expected" ]] && echo "OK" || { echo "FAIL"; exit 1; }
+
+echo -n "config sentry test: "
+output=$(eval "$("$SCRIPT_DIR/config" sentry test)" && echo "$SENTRY_URL|$SENTRY_TOKEN|$SENTRY_ORG_SLUG|$SENTRY_PROJECT_SLUG")
+expected="https://example-org.sentry.io|sntryu_test_sentry_token_12345|example-org|example-project"
 [[ "$output" == "$expected" ]] && echo "OK" || { echo "FAIL"; exit 1; }
 
 echo -n "config slack test: "
@@ -103,6 +118,10 @@ result=$("$SCRIPT_DIR/curl-auth" pyroscope test -X POST -d '{}' "https://pyrosco
 [[ "$result" == *"POST"* ]] && echo -n "" || { echo "FAIL: not POST"; exit 1; }
 [[ "$result" == *"Authorization: Bearer"* ]] && echo "OK" || { echo "FAIL: no auth header"; exit 1; }
 
+echo -n "curl-auth sentry GET: "
+result=$("$SCRIPT_DIR/curl-auth" sentry test "https://example-org.sentry.io/api/0/issues/" 2>&1)
+[[ "$result" == *"Authorization: Bearer"* ]] && echo "OK" || { echo "FAIL: no auth header"; exit 1; }
+
 echo -n "curl-auth slack GET: "
 result=$("$SCRIPT_DIR/curl-auth" slack test "https://slack.com/api/users.list" 2>&1)
 [[ "$result" == *"Authorization: Bearer"* ]] && echo "OK" || { echo "FAIL: no auth header"; exit 1; }
@@ -118,6 +137,10 @@ result=$("$SCRIPT_DIR/grafana-api" 2>&1 || true)
 echo -n "pyroscope-services help doesn't leak: "
 result=$("$SCRIPT_DIR/pyroscope-services" 2>&1 || true)
 [[ "$result" != *"pyro-test"* ]] && echo "OK" || { echo "FAIL: token leaked"; exit 1; }
+
+echo -n "sentry-api help doesn't leak: "
+result=$("$SCRIPT_DIR/sentry-api" 2>&1 || true)
+[[ "$result" != *"sntryu_test_sentry_token_12345"* ]] && echo "OK" || { echo "FAIL: token leaked"; exit 1; }
 
 echo -n "slack help doesn't leak: "
 result=$("$SCRIPT_DIR/slack" 2>&1 || true)

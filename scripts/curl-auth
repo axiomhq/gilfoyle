@@ -16,6 +16,7 @@
 # Examples:
 #   curl-auth grafana prod https://grafana.internal/api/health
 #   curl-auth grafana prod -X POST -d '{"query":"..."}' https://grafana.internal/api/ds/query
+#   curl-auth sentry prod https://sentry.io/api/0/organizations/my-org/issues/
 
 set -euo pipefail
 
@@ -116,6 +117,14 @@ case "$TOOL" in
             curl "${CURL_ARGS[@]}" -H "Authorization: Bearer $PYROSCOPE_TOKEN" "$URL" "$@"
         elif [[ -n "${PYROSCOPE_USERNAME:-}" ]]; then
             curl "${CURL_ARGS[@]}" -u "$PYROSCOPE_USERNAME:$PYROSCOPE_PASSWORD" "$URL" "$@"
+        else
+            curl "${CURL_ARGS[@]}" "$URL" "$@"
+        fi
+        ;;
+
+    sentry)
+        if [[ -n "${SENTRY_TOKEN:-}" ]]; then
+            curl "${CURL_ARGS[@]}" -H "Authorization: Bearer $SENTRY_TOKEN" "$URL" "$@"
         else
             curl "${CURL_ARGS[@]}" "$URL" "$@"
         fi

@@ -12,6 +12,7 @@
 #             GRAFANA_CF_ACCESS_CLIENT_ID, GRAFANA_CF_ACCESS_CLIENT_SECRET
 #   pyroscope: PYROSCOPE_URL, PYROSCOPE_TOKEN, PYROSCOPE_ACCESS_CMD, PYROSCOPE_USERNAME, PYROSCOPE_PASSWORD,
 #             PYROSCOPE_CF_ACCESS_CLIENT_ID, PYROSCOPE_CF_ACCESS_CLIENT_SECRET
+#   sentry:   SENTRY_URL, SENTRY_TOKEN, SENTRY_ORG_SLUG, SENTRY_PROJECT_SLUG
 #   slack:    SLACK_TOKEN
 #
 # Auth priority: access_command > CF Access headers > token > username/password > none
@@ -39,7 +40,7 @@ show_usage() {
     echo "       config --list <tool>" >&2
     echo "       config --list-tools" >&2
     echo "" >&2
-    echo "Tools: axiom, grafana, pyroscope, slack" >&2
+    echo "Tools: axiom, grafana, pyroscope, sentry, slack" >&2
     exit 1
 }
 
@@ -196,6 +197,27 @@ case "$TOOL" in
         [[ -n "$USERNAME" ]] && echo "PYROSCOPE_USERNAME=\"$USERNAME\"" || true
         [[ -n "$PASSWORD" ]] && echo "PYROSCOPE_PASSWORD=\"$PASSWORD\"" || true
         ;;
+
+    sentry)
+        SENTRY_ORG_SLUG=$(extract_value "$SECTION" "organization_slug")
+        SENTRY_PROJECT_SLUG=$(extract_value "$SECTION" "project_slug")
+        if [[ -z "$URL" && -z "$TOKEN" && -z "$SENTRY_ORG_SLUG" && -z "$SENTRY_PROJECT_SLUG" ]]; then
+            echo "Error: Deployment '$DEPLOYMENT' not found in [sentry.deployments.$DEPLOYMENT]" >&2
+            echo "" >&2
+            echo "Available deployments:" >&2
+            list_deployments sentry >&2
+            echo "" >&2
+            echo "Hint: Run scripts/init to discover available resources." >&2
+            exit 1
+        fi
+        if [[ -z "$URL" ]]; then
+            URL="https://sentry.io"
+        fi
+        echo "SENTRY_URL=\"$URL\""
+        [[ -n "$TOKEN" ]] && echo "SENTRY_TOKEN=\"$TOKEN\"" || true
+        [[ -n "$SENTRY_ORG_SLUG" ]] && echo "SENTRY_ORG_SLUG=\"$SENTRY_ORG_SLUG\"" || true
+        [[ -n "$SENTRY_PROJECT_SLUG" ]] && echo "SENTRY_PROJECT_SLUG=\"$SENTRY_PROJECT_SLUG\"" || true
+        ;;
     
     slack)
         if [[ -z "$TOKEN" ]]; then
@@ -212,7 +234,7 @@ case "$TOOL" in
     
     *)
         echo "Error: Unknown tool '$TOOL'" >&2
-        echo "Available tools: axiom, grafana, pyroscope, slack" >&2
+        echo "Available tools: axiom, grafana, pyroscope, sentry, slack" >&2
         exit 1
         ;;
 esac

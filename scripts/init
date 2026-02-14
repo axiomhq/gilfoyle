@@ -247,7 +247,7 @@ fi
 
 # Warn if config has no active deployments
 # Match actual deployment/workspace sections, not random [ lines or comments
-if [[ -f "$CONFIG_FILE" ]] && ! grep -qE '^[[:space:]]*\[(axiom|grafana|pyroscope)\.deployments\.|^[[:space:]]*\[slack\.workspaces\.' "$CONFIG_FILE"; then
+if [[ -f "$CONFIG_FILE" ]] && ! grep -qE '^[[:space:]]*\[(axiom|grafana|pyroscope|sentry)\.deployments\.|^[[:space:]]*\[slack\.workspaces\.' "$CONFIG_FILE"; then
     echo -e "${YELLOW}⚠️  No deployments configured.${NC}"
     echo ""
     echo "   Edit $CONFIG_FILE and add at least one:"
@@ -260,6 +260,11 @@ if [[ -f "$CONFIG_FILE" ]] && ! grep -qE '^[[:space:]]*\[(axiom|grafana|pyroscop
     echo "     [grafana.deployments.prod]"
     echo "     url = \"https://your-org.grafana.net\""
     echo "     token = \"glsa_xxx\""
+    echo ""
+    echo "     [sentry.deployments.prod]"
+    echo "     url = \"https://your-org.sentry.io\""
+    echo "     token = \"sntryu_xxx\""
+    echo "     organization_slug = \"your-org\""
     echo ""
     echo "     [slack.workspaces.work]"
     echo "     token = \"xoxb-xxx\""
