@@ -27,16 +27,27 @@ export function assessRunHealth(output: EvalOutput): RunHealth {
   const toolCalls = output.trace.toolCalls;
   const usage = output.trace.usage;
 
-  if (!trimmed) {
+  // Strip HARNESS ERROR/TIMEOUT suffixes before checking content quality.
+  // The Amp harness appends "HARNESS ERROR: Amp CLI process exited with code 1"
+  // even after successful investigations — treat it as noise, not a fatal error.
+  const cleaned = trimmed.replace(/\nHARNESS ERROR:.*$/s, '').replace(/\nHARNESS TIMEOUT.*$/s, '').trim();
+
+  if (!cleaned) {
     reasons.push('empty-final-text');
   }
 
-  if (toolCalls.length === 0 && trimmed.length < 20) {
+  if (toolCalls.length === 0 && cleaned.length < 20) {
     reasons.push('no-tool-calls-and-minimal-output');
   }
 
+  // Degenerate output: agent produced tool calls but final text is trivially short
+  // (e.g., ".", "with the oracle.") — not a real investigation conclusion
+  if (toolCalls.length > 0 && cleaned.length < 50) {
+    reasons.push('degenerate-output');
+  }
+
   for (const pattern of RUN_FATAL_PATTERNS) {
-    if (pattern.test(text)) {
+    if (pattern.test(cleaned)) {
       reasons.push(`fatal-pattern:${pattern.source}`);
     }
   }
