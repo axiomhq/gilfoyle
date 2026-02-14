@@ -6,6 +6,7 @@ export { QueryYieldScorer } from './query-yield.js';
 export { QueryRepairScorer } from './query-repair.js';
 export { ExecutorCoverageScorer } from './executor-coverage.js';
 export { InitFirstScorer } from './init-first.js';
+export { SchemaFirstScorer } from './schema-first.js';
 export { CounterfactualRejectionScorer } from './counterfactual-rejection.js';
 export { CausalGroundingScorer } from './causal-grounding.js';
 export { MustNotMentionScorer } from './must-not-mention.js';

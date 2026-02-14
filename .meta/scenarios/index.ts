@@ -11,6 +11,7 @@ import { commsRequiredScenario } from './comms-required.js';
 import { missingAccessScenario } from './missing-access.js';
 import { p1RollbackScenario } from './p1-rollback.js';
 import { firstRunScenario } from './first-run.js';
+import { schemaDiscoveryScenario } from './schema-discovery.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GENERATED_DIR = join(__dirname, '../synthesizer/generated');
@@ -25,6 +26,7 @@ const handCrafted: IncidentScenario[] = [
   commsRequiredScenario,
   p1RollbackScenario,
   firstRunScenario,
+  schemaDiscoveryScenario,
 ];
 
 function loadGeneratedScenarios(): IncidentScenario[] {

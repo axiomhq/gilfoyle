@@ -1,5 +1,50 @@
 # Signal Reading Query Patterns
 
+## Schema & Value Discovery (MANDATORY FIRST STEP)
+
+**Always run schema discovery before writing investigation queries.** Do not guess field names.
+
+```apl
+// Step 1: Get schema with types
+['dataset'] | getschema
+
+// Step 2: Sample raw events to see actual data shape (especially map fields)
+['dataset'] | where _time > ago(15m) | take 1
+
+// Step 3: Discover values of low-cardinality fields you plan to filter on
+['dataset'] | where _time > ago(15m) | distinct ['kubernetes.labels.app']
+['dataset'] | where _time > ago(15m) | summarize count() by ['service.name'] | top 20 by count_
+['dataset'] | where _time > ago(15m) | summarize count() by level | top 10 by count_
+
+// Step 4: Discover keys inside map[string] columns (getschema won't show these)
+// OTel traces datasets commonly have: attributes, attributes.custom, resource
+['dataset'] | where _time > ago(15m) | project ['attributes.custom'] | take 5
+['dataset'] | where _time > ago(15m) | project attributes | take 5
+```
+
+**Rule:** If your first filter query returns 0 results, run schema discovery before trying another filter.
+
+### Map Type Key Discovery (OTel Traces)
+
+Map columns (`map[string]` type) are common in OTel traces datasets. `getschema` shows the column exists but NOT its internal keys. You must sample to discover them.
+
+```apl
+// Sample map column contents
+['traces'] | where _time > ago(15m) | project ['attributes.custom'] | take 3
+
+// Enumerate all distinct keys in a map column
+['traces'] | where _time > ago(15m)
+| extend keys = ['attributes.custom']
+| mv-expand keys
+| summarize count() by tostring(keys)
+| top 30 by count_
+
+// Access specific map values (use bracket notation)
+['traces'] | where _time > ago(15m)
+| extend status = toint(['attributes.custom']['http.response.status_code']),
+         method = tostring(['attributes']['http.method'])
+```
+
 Ready-to-use APL queries for common investigation scenarios.
 
 ## Error Analysis
@@ -112,16 +157,10 @@ Ready-to-use APL queries for common investigation scenarios.
 | project _time, request_id, service, uri, status
 ```
 
-## Schema Discovery
+## General Schema Helpers
 
 ```apl
-// Get schema with types (Fastest)
-['dataset'] | getschema
-
-// Sample data to see specific fields
-['dataset'] | where _time between (ago(1h) .. now()) | project _time, message, level | take 5
-
-// Top values for a field
+// Top values for any field
 ['dataset'] | where _time between (ago(1h) .. now()) | summarize topk(field, 10)
 
 // What services exist?

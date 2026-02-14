@@ -11,7 +11,7 @@ description: {{SKILL_DESCRIPTION}}
 
 ## Golden Rules
 
-1. **NEVER GUESS. EVER.** If you don't know, query. If you can't query, ask. Reading code tells you what COULD happen. Only data tells you what DID happen. "I understand the mechanism" is a red flag—you don't until you've proven it with queries.
+1. **NEVER GUESS. EVER.** If you don't know, query. If you can't query, ask. Reading code tells you what COULD happen. Only data tells you what DID happen. "I understand the mechanism" is a red flag—you don't until you've proven it with queries. Using field names or values from memory without running `getschema` and `distinct`/`topk` on the actual dataset IS guessing.
 
 2. **Follow the data.** Every claim must trace to a query result. Say "the logs show X" not "this is probably X". If you catch yourself saying "so this means..."—STOP. Query to verify.
 
@@ -105,10 +105,38 @@ scripts/init
 
 Follow this loop strictly.
 
-### A. DISCOVER
-- Review `scripts/init` output
-- Map your mental model to available datasets
-- If you see `['k8s-logs-prod']`, use that—not `['logs']`
+### A. DISCOVER (MANDATORY — DO NOT SKIP)
+
+**Before writing ANY query against a dataset, you MUST discover its schema.** This is not optional. Skipping schema discovery is the #1 cause of lazy, wrong queries.
+
+**Step 1: Identify datasets** — Review `scripts/init` output. Use ONLY dataset names from discovery. If you see `['k8s-logs-prod']`, use that—not `['logs']`.
+
+**Step 2: Get schema** — Run `getschema` on every dataset you plan to query:
+```apl
+['dataset'] | getschema
+```
+
+**Step 3: Discover values of low-cardinality fields** — For fields you plan to filter on (service names, labels, status codes, log levels), enumerate their actual values:
+```apl
+['dataset'] | where _time > ago(15m) | distinct field_name
+['dataset'] | where _time > ago(15m) | summarize count() by field_name | top 20 by count_
+```
+
+**Step 4: Discover map type schemas** — Fields typed as `map[string]` (e.g., `attributes.custom`, `attributes`, `resource`) don't show their keys in `getschema`. You MUST sample them to discover their internal structure:
+```apl
+// Sample 1 raw event to see all map keys
+['dataset'] | where _time > ago(15m) | take 1
+
+// If too wide, project just the map column and sample
+['dataset'] | where _time > ago(15m) | project ['attributes.custom'] | take 5
+
+// Discover distinct keys inside a map column
+['dataset'] | where _time > ago(15m) | extend keys = ['attributes.custom'] | mv-expand keys | summarize count() by tostring(keys) | top 20 by count_
+```
+
+**Why this matters:** Map fields (common in OTel traces/spans) contain nested key-value pairs that are invisible to `getschema`. If you query `['attributes.http.status_code']` without first confirming that key exists, you're guessing. The actual field might be `['attributes.http.response.status_code']` or stored inside `['attributes.custom']` as a map key.
+
+**NEVER assume field names inside map types.** Always sample first.
 
 ### B. CODE CONTEXT
 - **Locate Code:** Find the relevant service in the repository
