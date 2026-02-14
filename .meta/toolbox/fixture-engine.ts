@@ -19,11 +19,13 @@ interface ParsedAPL {
 }
 
 type APLStage =
-  | { type: 'where'; field: string; op: string; value: string }
+  | { type: 'where'; expr: string }
   | { type: 'summarize'; agg: string; field?: string; by?: string[] }
   | { type: 'take'; count: number }
   | { type: 'sort'; field: string; order: 'asc' | 'desc' }
   | { type: 'project'; fields: string[] }
+  | { type: 'distinct'; fields: string[] }
+  | { type: 'getschema' }
   | { type: 'extend'; expr: string }
   | { type: 'top'; count: number; by: string }
   | { type: 'raw'; text: string }; // passthrough for unrecognized stages
@@ -72,23 +74,13 @@ export function validateAPL(query: string, fixtures: ScenarioFixtures): APLValid
     const stageTexts = splitPipes(rest.slice(1));
     for (const stageText of stageTexts) {
       const stage = parseAPLStage(stageText.trim());
-      if (stage) {
-        if (stage.type === 'where' && /\band\b/i.test(stageText)) {
-          const parts = stageText.trim().replace(/^where\s+/i, '').split(/\s+and\s+/i);
-          for (const part of parts) {
-            const sub = parseAPLStage(`where ${part.trim()}`);
-            if (sub) stages.push(sub);
-          }
-        } else {
-          stages.push(stage);
-        }
-      }
+      if (stage) stages.push(stage);
     }
   }
 
   for (const stage of stages) {
     if (stage.type === 'raw') {
-      errors.push(`Unsupported APL stage: "${stage.text}". Supported: where, summarize, take, sort, project, extend, top`);
+      errors.push(`Unsupported APL stage: "${stage.text}". Supported: where, summarize, take, sort, project, distinct, getschema, extend, top`);
     }
   }
 
@@ -128,17 +120,46 @@ function splitPipes(text: string): string[] {
   return stages;
 }
 
+function splitTopLevel(text: string, delimiter: string): string[] {
+  const out: string[] = [];
+  let current = '';
+  let depth = 0;
+  let inString = false;
+  let stringChar = '';
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      current += ch;
+      if (ch === stringChar && text[i - 1] !== '\\') inString = false;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      stringChar = ch;
+      current += ch;
+      continue;
+    }
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    if (ch === ')' || ch === ']' || ch === '}') depth--;
+    if (ch === delimiter && depth === 0) {
+      out.push(current);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+
+  out.push(current);
+  return out;
+}
+
 function parseAPLStage(text: string): APLStage {
   const lower = text.toLowerCase().trim();
 
   // where clause
   if (lower.startsWith('where ')) {
-    const expr = text.slice(6).trim();
-    const whereMatch = expr.match(/^([\w.]+)\s*(==|!=|>=|<=|>|<|contains|has|startswith|!contains|!has)\s*(.+)$/i);
-    if (whereMatch) {
-      return { type: 'where', field: whereMatch[1], op: whereMatch[2], value: whereMatch[3].replace(/^["']|["']$/g, '') };
-    }
-    return { type: 'where', field: expr, op: 'expr', value: expr };
+    return { type: 'where', expr: text.slice(6).trim() };
   }
 
   // take/limit
@@ -155,7 +176,7 @@ function parseAPLStage(text: string): APLStage {
       return {
         type: 'summarize',
         agg: byMatch[1].trim(),
-        by: byMatch[2].split(',').map(s => s.trim()),
+        by: splitTopLevel(byMatch[2], ',').map(s => s.trim()).filter(Boolean),
       };
     }
     return { type: 'summarize', agg: sumText };
@@ -169,7 +190,17 @@ function parseAPLStage(text: string): APLStage {
 
   // project
   if (lower.startsWith('project ')) {
-    return { type: 'project', fields: text.slice(8).split(',').map(s => s.trim()) };
+    return { type: 'project', fields: splitTopLevel(text.slice(8), ',').map(s => s.trim()).filter(Boolean) };
+  }
+
+  // distinct
+  if (lower.startsWith('distinct ')) {
+    return { type: 'distinct', fields: splitTopLevel(text.slice(9), ',').map(s => s.trim()).filter(Boolean) };
+  }
+
+  // getschema
+  if (lower === 'getschema') {
+    return { type: 'getschema' };
   }
 
   // extend
@@ -194,15 +225,15 @@ export function executeAPL(parsed: ParsedAPL, fixtures: ScenarioFixtures): LogRo
   for (const stage of parsed.stages) {
     switch (stage.type) {
       case 'where':
-        rows = executeWhere(rows, stage);
+        rows = executeWhere(rows, stage.expr);
         break;
       case 'take':
         rows = rows.slice(0, stage.count);
         break;
       case 'sort':
         rows.sort((a, b) => {
-          const va = a[stage.field] ?? '';
-          const vb = b[stage.field] ?? '';
+          const va = getFieldValue(a, stage.field) ?? '';
+          const vb = getFieldValue(b, stage.field) ?? '';
           const cmp = String(va).localeCompare(String(vb), undefined, { numeric: true });
           return stage.order === 'asc' ? cmp : -cmp;
         });
@@ -219,6 +250,12 @@ export function executeAPL(parsed: ParsedAPL, fixtures: ScenarioFixtures): LogRo
       case 'summarize':
         rows = executeSummarize(rows, stage);
         break;
+      case 'distinct':
+        rows = executeDistinct(rows, stage.fields);
+        break;
+      case 'getschema':
+        rows = executeGetSchema(rows);
+        break;
       case 'top':
         rows = executeTop(rows, stage);
         break;
@@ -229,46 +266,211 @@ export function executeAPL(parsed: ParsedAPL, fixtures: ScenarioFixtures): LogRo
   return rows;
 }
 
-function executeWhere(rows: LogRow[], stage: { field: string; op: string; value: string }): LogRow[] {
-  return rows.filter(row => {
-    let fieldVal = row[stage.field];
-    if (fieldVal === undefined && stage.field.includes('.')) {
-      const parts = stage.field.split('.');
-      let cur: unknown = row;
-      for (const p of parts) {
-        if (cur && typeof cur === 'object' && p in (cur as Record<string, unknown>)) {
-          cur = (cur as Record<string, unknown>)[p];
-        } else {
-          cur = undefined;
-          break;
-        }
+function executeWhere(rows: LogRow[], expr: string): LogRow[] {
+  return rows.filter((row) => evaluateWhereExpression(row, expr));
+}
+
+function evaluateWhereExpression(row: LogRow, expr: string): boolean {
+  const trimmed = trimOuterParens(expr.trim());
+  if (!trimmed) return true;
+
+  const orParts = splitByLogical(trimmed, 'or');
+  if (orParts.length > 1) {
+    return orParts.some((part) => evaluateWhereExpression(row, part));
+  }
+
+  const andParts = splitByLogical(trimmed, 'and');
+  if (andParts.length > 1) {
+    return andParts.every((part) => evaluateWhereExpression(row, part));
+  }
+
+  return evaluateAtomicWhereCondition(row, trimmed);
+}
+
+function evaluateAtomicWhereCondition(row: LogRow, expr: string): boolean {
+  const inMatch = expr.match(/^([\w.]+)\s+in\s*(?:\((.+)\)|\[(.+)\])$/i);
+  if (inMatch) {
+    const field = inMatch[1];
+    const listExpr = inMatch[2] ?? inMatch[3] ?? '';
+    const listValues = splitTopLevel(listExpr, ',')
+      .map((p) => parseLiteral(p.trim()))
+      .filter((v) => v !== undefined);
+    const fieldVal = getFieldValue(row, field);
+    if (fieldVal === undefined) return false;
+    return listValues.some((candidate) => literalEquals(fieldVal, candidate));
+  }
+
+  const cmpMatch = expr.match(/^([\w.]+)\s*(==|!=|>=|<=|>|<|contains_cs|has_cs|contains|has|startswith|!contains|!has|=~|!~)\s*(.+)$/i);
+  if (cmpMatch) {
+    const field = cmpMatch[1];
+    const op = cmpMatch[2].toLowerCase();
+    const right = parseLiteral(cmpMatch[3].trim());
+    const fieldVal = getFieldValue(row, field);
+    if (fieldVal === undefined || right === undefined) return false;
+    return applyWhereOperator(fieldVal, op, right);
+  }
+
+  const rowStr = JSON.stringify(row).toLowerCase();
+  return rowStr.includes(trimmedLower(expr));
+}
+
+function splitByLogical(expr: string, keyword: 'and' | 'or'): string[] {
+  const out: string[] = [];
+  let current = '';
+  let depth = 0;
+  let inString = false;
+  let stringChar = '';
+
+  for (let i = 0; i < expr.length; i++) {
+    const ch = expr[i];
+    if (inString) {
+      current += ch;
+      if (ch === stringChar && expr[i - 1] !== '\\') inString = false;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      stringChar = ch;
+      current += ch;
+      continue;
+    }
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    if (ch === ')' || ch === ']' || ch === '}') depth--;
+
+    if (depth === 0) {
+      const remaining = expr.slice(i);
+      const logical = new RegExp(`^\\s+${keyword}\\s+`, 'i');
+      const m = remaining.match(logical);
+      if (m) {
+        out.push(current.trim());
+        current = '';
+        i += m[0].length - 1;
+        continue;
       }
-      if (cur !== undefined) fieldVal = cur as string | number | boolean;
     }
-    if (fieldVal === undefined) {
-      if (stage.op === 'expr') {
-        const rowStr = JSON.stringify(row).toLowerCase();
-        return rowStr.includes(stage.value.toLowerCase());
+
+    current += ch;
+  }
+
+  out.push(current.trim());
+  return out.filter(Boolean);
+}
+
+function trimOuterParens(expr: string): string {
+  let out = expr.trim();
+  while (out.startsWith('(') && out.endsWith(')')) {
+    let depth = 0;
+    let valid = true;
+    for (let i = 0; i < out.length; i++) {
+      const ch = out[i];
+      if (ch === '(') depth++;
+      if (ch === ')') depth--;
+      if (depth === 0 && i < out.length - 1) {
+        valid = false;
+        break;
       }
-      return false;
     }
-    const val = String(fieldVal).toLowerCase();
-    const target = stage.value.toLowerCase();
-    switch (stage.op) {
-      case '==': return val === target;
-      case '!=': return val !== target;
-      case '>': return Number(fieldVal) > Number(stage.value);
-      case '<': return Number(fieldVal) < Number(stage.value);
-      case '>=': return Number(fieldVal) >= Number(stage.value);
-      case '<=': return Number(fieldVal) <= Number(stage.value);
-      case 'contains': return val.includes(target);
-      case '!contains': return !val.includes(target);
-      case 'has': return val.includes(target);
-      case '!has': return !val.includes(target);
-      case 'startswith': return val.startsWith(target);
-      default: return val.includes(target);
+    if (!valid) break;
+    out = out.slice(1, -1).trim();
+  }
+  return out;
+}
+
+function parseLiteral(value: string): string | number | boolean | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1);
+  }
+  if (/^(true|false)$/i.test(trimmed)) return trimmed.toLowerCase() === 'true';
+  const numeric = Number(trimmed);
+  if (!Number.isNaN(numeric)) return numeric;
+  return trimmed;
+}
+
+function literalEquals(actual: unknown, candidate: string | number | boolean): boolean {
+  if (typeof candidate === 'number') {
+    return Number(actual) === candidate;
+  }
+  if (typeof candidate === 'boolean') {
+    return String(actual).toLowerCase() === String(candidate);
+  }
+  return String(actual) === candidate;
+}
+
+function applyWhereOperator(
+  actual: unknown,
+  op: string,
+  right: string | number | boolean,
+): boolean {
+  const leftText = String(actual);
+  const rightText = String(right);
+  const leftLower = leftText.toLowerCase();
+  const rightLower = rightText.toLowerCase();
+  const leftNum = Number(actual);
+  const rightNum = Number(right);
+  const numeric = !Number.isNaN(leftNum) && !Number.isNaN(rightNum);
+
+  switch (op) {
+    case '==':
+      return numeric ? leftNum === rightNum : leftLower === rightLower;
+    case '!=':
+      return numeric ? leftNum !== rightNum : leftLower !== rightLower;
+    case '>':
+      return numeric ? leftNum > rightNum : leftText > rightText;
+    case '<':
+      return numeric ? leftNum < rightNum : leftText < rightText;
+    case '>=':
+      return numeric ? leftNum >= rightNum : leftText >= rightText;
+    case '<=':
+      return numeric ? leftNum <= rightNum : leftText <= rightText;
+    case 'contains':
+    case 'has':
+      return leftLower.includes(rightLower);
+    case '!contains':
+    case '!has':
+      return !leftLower.includes(rightLower);
+    case 'contains_cs':
+    case 'has_cs':
+      return leftText.includes(rightText);
+    case 'startswith':
+      return leftLower.startsWith(rightLower);
+    case '=~':
+      try {
+        return new RegExp(rightText).test(leftText);
+      } catch {
+        return false;
+      }
+    case '!~':
+      try {
+        return !new RegExp(rightText).test(leftText);
+      } catch {
+        return false;
+      }
+    default:
+      return leftLower.includes(rightLower);
+  }
+}
+
+function getFieldValue(row: LogRow, field: string): unknown {
+  const direct = row[field];
+  if (direct !== undefined) return direct;
+  if (!field.includes('.')) return undefined;
+
+  const parts = field.split('.');
+  let cur: unknown = row;
+  for (const part of parts) {
+    if (cur && typeof cur === 'object' && part in (cur as Record<string, unknown>)) {
+      cur = (cur as Record<string, unknown>)[part];
+    } else {
+      return undefined;
     }
-  });
+  }
+  return cur;
+}
+
+function trimmedLower(text: string): string {
+  return text.trim().toLowerCase();
 }
 
 function executeSummarize(rows: LogRow[], stage: { agg: string; by?: string[] }): LogRow[] {
@@ -276,21 +478,119 @@ function executeSummarize(rows: LogRow[], stage: { agg: string; by?: string[] })
     // Single aggregation
     return [computeAgg(rows, stage.agg)];
   }
+  const groupBy = stage.by;
   // Group by
   const groups = new Map<string, LogRow[]>();
   for (const row of rows) {
-    const key = stage.by.map(f => String(row[f] ?? '')).join('|');
+    const key = groupBy.map((expr) => getGroupValue(row, expr)).join('|');
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(row);
   }
   return Array.from(groups.entries()).map(([key, groupRows]) => {
     const result = computeAgg(groupRows, stage.agg);
     const keyParts = key.split('|');
-    for (let i = 0; i < stage.by!.length; i++) {
-      result[stage.by![i]] = keyParts[i];
+    for (let i = 0; i < groupBy.length; i++) {
+      result[groupColumnName(groupBy[i])] = keyParts[i];
     }
     return result;
   });
+}
+
+function getGroupValue(row: LogRow, expr: string): string {
+  const trimmed = expr.trim();
+  const binMatch = trimmed.match(/^bin\(([\w.]+)\s*,\s*([^)]+)\)$/i);
+  if (binMatch) {
+    const field = binMatch[1];
+    const intervalMs = parseDurationMs(binMatch[2].trim());
+    const value = getFieldValue(row, field);
+    if (value == null) return '';
+    const epoch = valueToEpochMs(value);
+    if (epoch == null || intervalMs == null || intervalMs <= 0) return String(value);
+    const binned = Math.floor(epoch / intervalMs) * intervalMs;
+    return new Date(binned).toISOString();
+  }
+  const value = getFieldValue(row, trimmed);
+  return value == null ? '' : String(value);
+}
+
+function groupColumnName(expr: string): string {
+  const trimmed = expr.trim();
+  const binMatch = trimmed.match(/^bin\(([\w.]+)\s*,\s*([^)]+)\)$/i);
+  if (!binMatch) return trimmed;
+  const field = binMatch[1];
+  if (field === '_time') return '_time';
+  return `bin_${field}`;
+}
+
+function parseDurationMs(raw: string): number | null {
+  const m = raw.trim().match(/^(\d+)\s*(ms|s|m|h|d)$/i);
+  if (!m) return null;
+  const value = Number.parseInt(m[1] ?? '0', 10);
+  const unit = (m[2] ?? 'ms').toLowerCase();
+  const factors: Record<string, number> = {
+    ms: 1,
+    s: 1_000,
+    m: 60_000,
+    h: 3_600_000,
+    d: 86_400_000,
+  };
+  return value * (factors[unit] ?? 1);
+}
+
+function valueToEpochMs(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value * (value > 1e12 ? 1 : 1000) : null;
+  }
+  const asDate = new Date(String(value));
+  const epoch = asDate.getTime();
+  return Number.isFinite(epoch) ? epoch : null;
+}
+
+function executeDistinct(rows: LogRow[], fields: string[]): LogRow[] {
+  if (fields.length === 0) return [];
+  const seen = new Set<string>();
+  const out: LogRow[] = [];
+
+  for (const row of rows) {
+    const keyParts = fields.map((field) => String(getFieldValue(row, field) ?? ''));
+    const key = keyParts.join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const distinctRow: LogRow = { _time: '' };
+    for (let i = 0; i < fields.length; i++) {
+      distinctRow[fields[i]] = keyParts[i];
+    }
+    out.push(distinctRow);
+  }
+
+  return out;
+}
+
+function executeGetSchema(rows: LogRow[]): LogRow[] {
+  const fieldTypes = new Map<string, string>();
+  for (const row of rows) {
+    for (const [key, value] of Object.entries(row)) {
+      if (!fieldTypes.has(key) && value != null) {
+        fieldTypes.set(key, inferType(value));
+      }
+      if (!fieldTypes.has(key)) {
+        fieldTypes.set(key, 'null');
+      }
+    }
+  }
+
+  return Array.from(fieldTypes.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([field, type]) => ({ _time: '', field, type }));
+}
+
+function inferType(value: unknown): string {
+  if (value == null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  const t = typeof value;
+  if (t === 'object') return 'object';
+  return t;
 }
 
 function computeAgg(rows: LogRow[], agg: string): LogRow {
@@ -335,7 +635,7 @@ function computeAgg(rows: LogRow[], agg: string): LogRow {
 function executeTop(rows: LogRow[], stage: { count: number; by: string }): LogRow[] {
   const counts = new Map<string, number>();
   for (const row of rows) {
-    const val = String(row[stage.by] ?? '');
+    const val = String(getFieldValue(row, stage.by) ?? '');
     counts.set(val, (counts.get(val) ?? 0) + 1);
   }
   return Array.from(counts.entries())
@@ -470,28 +770,134 @@ export interface CLIValidation {
   query?: string;
 }
 
-export function validateAxiomCLI(args: string[], stdinQuery: string, fixtures: ScenarioFixtures): CLIValidation {
+interface CLIValidationOptions {
+  fallbackQuery?: string;
+}
+
+function stripWrappingQuotes(value: string): string {
+  let out = value.trim();
+  while (
+    (out.startsWith('"') && out.endsWith('"'))
+    || (out.startsWith("'") && out.endsWith("'"))
+    || (out.startsWith('`') && out.endsWith('`'))
+  ) {
+    out = out.slice(1, -1).trim();
+  }
+  return out;
+}
+
+function normalizeLoose(value: string): string {
+  return stripWrappingQuotes(value).toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function normalizeCompact(value: string): string {
+  return normalizeLoose(value).replace(/[\s_-]+/g, '');
+}
+
+function resolveDeployment(input: string, fixtures: ScenarioFixtures): string | undefined {
+  const requested = stripWrappingQuotes(input);
+  if (!requested) return undefined;
+
+  const exact = fixtures.validDeployments.find(d => d === requested);
+  if (exact) return exact;
+
+  const ci = fixtures.validDeployments.find(d => d.toLowerCase() === requested.toLowerCase());
+  if (ci) return ci;
+
+  const compactRequested = normalizeCompact(requested);
+  const compact = fixtures.validDeployments.find(d => normalizeCompact(d) === compactRequested);
+  if (compact) return compact;
+
+  if (compactRequested === 'prod' || compactRequested === 'production') {
+    const prodLike = fixtures.validDeployments.find(d => /\bprod\b|production/i.test(d));
+    if (prodLike) return prodLike;
+
+    // Synthetic scenarios often expose a single concrete deployment name.
+    if (fixtures.validDeployments.length >= 1) return fixtures.validDeployments[0];
+  }
+
+  return undefined;
+}
+
+function resolveDatasource(input: string, fixtures: ScenarioFixtures): string | undefined {
+  const requested = stripWrappingQuotes(input);
+  if (!requested) return undefined;
+
+  const byUid = fixtures.datasources.find(ds => ds.uid === requested || ds.uid.toLowerCase() === requested.toLowerCase());
+  if (byUid) return byUid.uid;
+
+  const requestedLoose = normalizeLoose(requested);
+  const requestedCompact = normalizeCompact(requested);
+
+  for (const ds of fixtures.datasources) {
+    const aliases = [
+      ds.uid,
+      ds.name,
+      `${ds.name} (${ds.uid})`,
+      `${ds.name} (uid: ${ds.uid})`,
+    ];
+
+    const matched = aliases.some(alias => {
+      const loose = normalizeLoose(alias);
+      const compact = normalizeCompact(alias);
+      return loose === requestedLoose || compact === requestedCompact;
+    });
+
+    if (matched) return ds.uid;
+  }
+
+  const prometheusLike = requestedCompact === 'prometheusprod'
+    || requestedCompact === 'prometheusproduction'
+    || requestedCompact === 'prometheus';
+  if (prometheusLike) {
+    const promDatasources = fixtures.datasources.filter(ds => /prometheus/i.test(ds.name) || /prom/i.test(ds.uid));
+    if (promDatasources.length === 1) return promDatasources[0].uid;
+  }
+
+  if (fixtures.datasources.length === 1) {
+    return fixtures.datasources[0].uid;
+  }
+
+  return undefined;
+}
+
+export function validateAxiomCLI(
+  args: string[],
+  stdinQuery: string,
+  fixtures: ScenarioFixtures,
+  options: CLIValidationOptions = {},
+): CLIValidation {
   const errors: string[] = [];
 
-  // axiom-query <deployment> [options] <<< "query"
+  // axiom-query <deployment> [options]
   if (args.length < 1) {
     errors.push('Missing deployment argument. Usage: axiom-query <deployment> [options]');
     return { valid: false, errors };
   }
 
-  const deployment = args[0];
-  if (!fixtures.validDeployments.includes(deployment)) {
-    errors.push(`Unknown deployment '${deployment}'. Available: ${fixtures.validDeployments.join(', ')}`);
+  const deploymentInput = args[0];
+  const deployment = resolveDeployment(deploymentInput, fixtures);
+  if (!deployment) {
+    errors.push(`Unknown deployment '${deploymentInput}'. Available: ${fixtures.validDeployments.join(', ')}`);
   }
 
-  if (!stdinQuery.trim()) {
-    errors.push('No query provided via stdin. Pipe a query: axiom-query prod <<< "query"');
+  const query = stdinQuery.trim() || options.fallbackQuery?.trim() || '';
+  if (!query) {
+    errors.push('No query provided. Pipe query via stdin or pass --query/--query-file.');
   }
 
   // Check for invalid args
-  const validFlags = ['--raw', '--ndjson', '--full', '--trace'];
+  const validFlags = ['--raw', '--ndjson', '--full', '--trace', '--query', '--query-file'];
   for (let i = 1; i < args.length; i++) {
-    if (args[i].startsWith('--') && !validFlags.includes(args[i])) {
+    const arg = args[i];
+    if (arg === '--query' || arg === '--query-file') {
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith('--query=') || arg.startsWith('--query-file=')) {
+      continue;
+    }
+    if (arg.startsWith('--') && !validFlags.includes(arg)) {
       errors.push(`Unknown flag '${args[i]}'. Valid: ${validFlags.join(', ')}`);
     }
   }
@@ -500,34 +906,39 @@ export function validateAxiomCLI(args: string[], stdinQuery: string, fixtures: S
     valid: errors.length === 0,
     errors,
     deployment,
-    query: stdinQuery.trim(),
+    query,
   };
 }
 
-export function validateGrafanaCLI(args: string[], fixtures: ScenarioFixtures): CLIValidation {
+export function validateGrafanaCLI(
+  args: string[],
+  fixtures: ScenarioFixtures,
+  options: CLIValidationOptions = {},
+): CLIValidation {
   const errors: string[] = [];
 
-  // grafana-query <deployment> <datasource_uid> <query> [options]
-  if (args.length < 3) {
+  // grafana-query <deployment> <datasource_uid> [query] [options]
+  if (args.length < 2) {
     errors.push('Missing arguments. Usage: grafana-query <deployment> <datasource_uid> <query> [options]');
     return { valid: false, errors };
   }
 
-  const deployment = args[0];
-  const datasourceUid = args[1];
-  const query = args[2];
+  const deploymentInput = args[0];
+  const datasourceInput = args[1];
+  const query = args[2]?.trim() || options.fallbackQuery?.trim() || '';
 
-  if (!fixtures.validDeployments.includes(deployment)) {
-    errors.push(`Unknown deployment '${deployment}'. Available: ${fixtures.validDeployments.join(', ')}`);
+  const deployment = resolveDeployment(deploymentInput, fixtures);
+  if (!deployment) {
+    errors.push(`Unknown deployment '${deploymentInput}'. Available: ${fixtures.validDeployments.join(', ')}`);
   }
 
-  const knownDs = fixtures.datasources.map(d => d.uid);
-  if (knownDs.length > 0 && !knownDs.includes(datasourceUid)) {
-    // Also accept name-based references
-    const knownNames = fixtures.datasources.map(d => d.name);
-    if (!knownNames.includes(datasourceUid)) {
-      errors.push(`Unknown datasource '${datasourceUid}'. Available: ${fixtures.datasources.map(d => `${d.name} (${d.uid})`).join(', ')}`);
-    }
+  const datasourceUid = resolveDatasource(datasourceInput, fixtures);
+  if (!datasourceUid) {
+    errors.push(`Unknown datasource '${datasourceInput}'. Available: ${fixtures.datasources.map(d => `${d.name} (${d.uid})`).join(', ')}`);
+  }
+
+  if (!query) {
+    errors.push('No query provided. Pass query as positional arg or --query/--query-file.');
   }
 
   return {

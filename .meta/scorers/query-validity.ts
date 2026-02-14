@@ -1,5 +1,6 @@
 import { Scorer } from 'axiom/ai/evals';
 import type { EvalInput, EvalOutput, ToolCall } from '../harness/types.js';
+import { classifyQueryFailure, isQueryTool, type QueryFailureKind } from './query-error-classification.js';
 
 /**
  * Query Validity Scorer
@@ -19,24 +20,35 @@ export const QueryValidityScorer = Scorer<{
   'query-validity',
   ({ input, output }) => {
     const toolCalls = output.trace.toolCalls;
-    const queryCalls = toolCalls.filter((tc: ToolCall) =>
-      tc.tool === 'scripts/axiom-query' || tc.tool === 'scripts/grafana-query'
-    );
+    const queryCalls = toolCalls.filter((tc: ToolCall) => isQueryTool(tc));
+    const allowNoQueries = input.scenario.scoring?.allowNoQueries === true;
+    const requiredQueries = input.scenario.expected.requiredQueries ?? [];
 
     if (queryCalls.length === 0) {
       return {
-        score: 0,
-        metadata: { note: 'No query tool calls made', totalCalls: toolCalls.length },
+        score: allowNoQueries ? 1 : 0,
+        metadata: {
+          applicable: true,
+          note: allowNoQueries ? 'No query calls expected for this scenario' : 'No query tool calls made',
+          totalCalls: toolCalls.length,
+          allowNoQueries,
+          requiredQueryCount: requiredQueries.length,
+        },
       };
     }
 
-    // Score 1: query syntax validity
-    const validCalls = queryCalls.filter((tc: ToolCall) => tc.queryValid !== false);
-    const invalidCalls = queryCalls.filter((tc: ToolCall) => tc.queryValid === false);
-    const syntaxScore = validCalls.length / queryCalls.length;
+    const failures = queryCalls.map((tc) => {
+      const classified = classifyQueryFailure(tc);
+      return { tc, classified };
+    });
+    const validCalls = failures.filter((f) => !f.classified.hasFailure);
+    const invalidCalls = failures.filter((f) => f.classified.hasFailure);
+    const validityScore = validCalls.length / queryCalls.length;
+    const syntaxFailures = invalidCalls.filter((f) => f.classified.kind === 'syntax').length;
+    const syntaxScore = 1 - (syntaxFailures / queryCalls.length);
+    const failureClassCounts = countFailureClasses(invalidCalls.map((f) => f.classified.kind));
 
     // Score 2: required queries check
-    const requiredQueries = input.scenario.expected.requiredQueries ?? [];
     let requiredScore = 1;
     const requiredResults: { description: string; matched: boolean }[] = [];
 
@@ -56,19 +68,24 @@ export const QueryValidityScorer = Scorer<{
       requiredScore = requiredResults.filter(r => r.matched).length / requiredQueries.length;
     }
 
-    // Combined score: 60% syntax validity, 40% required queries
-    const score = syntaxScore * 0.6 + requiredScore * 0.4;
+    // Combined score: 60% execution validity, 40% required query coverage
+    const score = validityScore * 0.6 + requiredScore * 0.4;
 
     return {
       score,
       metadata: {
+        applicable: true,
+        validityScore,
         syntaxScore,
         requiredScore,
         totalQueryCalls: queryCalls.length,
         validCalls: validCalls.length,
         invalidCalls: invalidCalls.length,
-        invalidDetails: invalidCalls.map((tc: ToolCall) => ({
+        failureClassCounts,
+        invalidDetails: invalidCalls.map(({ tc, classified }) => ({
           tool: tc.tool,
+          class: classified.kind,
+          message: classified.message.slice(0, 300),
           errors: tc.queryErrors,
           input: typeof tc.input === 'string' ? tc.input.slice(0, 200) : JSON.stringify(tc.input).slice(0, 200),
         })),
@@ -77,3 +94,11 @@ export const QueryValidityScorer = Scorer<{
     };
   }
 );
+
+function countFailureClasses(classes: QueryFailureKind[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const cls of classes) {
+    out[cls] = (out[cls] ?? 0) + 1;
+  }
+  return out;
+}

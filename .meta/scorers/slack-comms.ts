@@ -24,13 +24,21 @@ export const SlackCommsScorer = Scorer<{
   expected: { rootCause: string; evidence: string[] };
 }>(
   'slack-comms',
-  ({ output }) => {
+  ({ input, output }) => {
+    const required = input.scenario.scoring?.requireSlackComms === true;
+    if (!required) {
+      return {
+        score: 1,
+        metadata: { applicable: false, note: 'Slack communication not required for this scenario' },
+      };
+    }
+
     const slackCalls = output.trace.toolCalls.filter(tc => tc.tool === 'scripts/slack');
 
     if (slackCalls.length === 0) {
       return {
         score: 0,
-        metadata: { note: 'No Slack messages sent', violation: 'no-slack-calls' },
+        metadata: { applicable: true, note: 'No Slack messages sent', violation: 'no-slack-calls' },
       };
     }
 
@@ -56,6 +64,7 @@ export const SlackCommsScorer = Scorer<{
     return {
       score,
       metadata: {
+        applicable: true,
         note: [
           hasStart ? 'start message found' : 'MISSING start message',
           hasResolve ? 'resolve message found' : 'MISSING resolve message',

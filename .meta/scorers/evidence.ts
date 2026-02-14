@@ -4,6 +4,7 @@ import { google } from '@ai-sdk/google';
 import { wrapAISDKModel } from 'axiom/ai';
 import { z } from 'zod';
 import type { EvalInput, EvalOutput, ToolCall, ToolName } from '../harness/types.js';
+import { assessRunHealth } from './run-health.js';
 
 if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
   process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GEMINI_API_KEY;
@@ -120,6 +121,18 @@ export const EvidenceQualityScorer = Scorer<{
 }>(
   'evidence-quality',
   async ({ input, output }) => {
+    const health = assessRunHealth(output);
+    if (!health.valid) {
+      return {
+        score: 0,
+        metadata: {
+          invalidRun: true,
+          runValidityReasons: health.reasons,
+          note: 'Skipped evidence scoring due to invalid run',
+        },
+      };
+    }
+
     const det = computeDeterministicScore(input, output);
 
     if (det.noRequirements) {

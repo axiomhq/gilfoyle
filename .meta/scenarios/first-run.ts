@@ -67,5 +67,14 @@ Config created: /home/user/.config/gilfoyle/config.toml
   budgets: {
     maxToolCalls: 4, // init + maybe mem-write, nothing else
     maxTotalTokens: 4000,
+    maxElapsedMs: 90_000,
+  },
+  scoring: {
+    allowNoQueries: true,
+    requireSlackComms: false,
+    requireMemoryWrite: false,
+    requireMemoryDistillation: false,
+    requireHypothesisDiscipline: false,
+    requireMustNotMention: false,
   },
 };

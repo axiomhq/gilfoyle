@@ -159,5 +159,6 @@ Slack:
   budgets: {
     maxToolCalls: 12,
     maxTotalTokens: 10000,
+    maxElapsedMs: 210_000,
   },
 };

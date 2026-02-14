@@ -60,6 +60,30 @@ function getModel(modelName: string): LanguageModel {
   throw new Error(`Unsupported model: ${modelName}`);
 }
 
+function extractToolError(output: unknown): string[] | undefined {
+  if (output == null) return undefined;
+  if (typeof output === 'string') {
+    const lines = output
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.toLowerCase().startsWith('error:'))
+      .map((line) => line.replace(/^error:\s*/i, '').trim())
+      .filter(Boolean);
+    return lines.length > 0 ? lines : undefined;
+  }
+  if (typeof output === 'object' && output && 'errors' in output && Array.isArray((output as { errors?: unknown }).errors)) {
+    const errors = ((output as { errors?: unknown[] }).errors ?? [])
+      .map((e) => (typeof e === 'string' ? e : JSON.stringify(e)))
+      .filter(Boolean);
+    return errors.length > 0 ? errors : undefined;
+  }
+  if (typeof output === 'object' && output && 'error' in output) {
+    const msg = String((output as { error?: unknown }).error ?? '').trim();
+    return msg ? [msg] : undefined;
+  }
+  return undefined;
+}
+
 export const directHarness: HarnessRunner = {
   name: 'direct',
 
@@ -121,10 +145,13 @@ export const directHarness: HarnessRunner = {
           execute: async (input: z.infer<typeof axiomParams>): Promise<string> => {
             const callStart = Date.now();
             const output = await mockTools.call('scripts/axiom-query', input);
+            const errors = extractToolError(output);
             toolCalls.push({
               tool: 'scripts/axiom-query',
               input,
               output,
+              queryValid: errors == null,
+              queryErrors: errors,
               durationMs: Date.now() - callStart,
             });
             return output as string;
@@ -136,10 +163,13 @@ export const directHarness: HarnessRunner = {
           execute: async (input: z.infer<typeof grafanaParams>): Promise<string> => {
             const callStart = Date.now();
             const output = await mockTools.call('scripts/grafana-query', input);
+            const errors = extractToolError(output);
             toolCalls.push({
               tool: 'scripts/grafana-query',
               input,
               output,
+              queryValid: errors == null,
+              queryErrors: errors,
               durationMs: Date.now() - callStart,
             });
             return output as string;

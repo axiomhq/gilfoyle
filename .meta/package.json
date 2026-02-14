@@ -11,6 +11,7 @@
     "eval:opencode:opus": "EVAL_HARNESS=opencode EVAL_MODEL=anthropic/claude-opus-4-6 axiom eval",
     "eval:claude": "EVAL_HARNESS=claude axiom eval",
     "eval:claude:opus": "EVAL_HARNESS=claude EVAL_MODEL=claude-opus-4-6 axiom eval",
+    "eval:diagnostics": "bun run scripts/eval-diagnostics.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
     "check": "tsc --noEmit && biome lint ."

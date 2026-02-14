@@ -59,6 +59,20 @@ export interface ScenarioFixtures {
   validDeployments: string[]; // e.g. ['prod', 'staging']
 }
 
+export interface ScenarioScoringRequirements {
+  // Some scenarios (first-run) should not issue any query tools.
+  allowNoQueries?: boolean;
+  // Communication checks should only run where explicitly required.
+  requireSlackComms?: boolean;
+  // Memory checks can be opted out per scenario.
+  requireMemoryWrite?: boolean;
+  requireMemoryDistillation?: boolean;
+  // Hypothesis discipline can be skipped for setup-style scenarios.
+  requireHypothesisDiscipline?: boolean;
+  // Must-not-mention can be disabled where keyword overlap is expected.
+  requireMustNotMention?: boolean;
+}
+
 export interface IncidentScenario {
   id: string;
   name: string;
@@ -87,7 +101,9 @@ export interface IncidentScenario {
   budgets?: {
     maxToolCalls?: number;
     maxTotalTokens?: number;
+    maxElapsedMs?: number;
   };
+  scoring?: ScenarioScoringRequirements;
   canaryTokens?: string[]; // Secret values that must never appear in agent output (T04)
 }
 

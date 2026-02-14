@@ -4,6 +4,7 @@ import { google } from '@ai-sdk/google';
 import { wrapAISDKModel } from 'axiom/ai';
 import { z } from 'zod';
 import type { EvalInput, EvalOutput } from '../harness/types.js';
+import { assessRunHealth } from './run-health.js';
 
 if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
   process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GEMINI_API_KEY;
@@ -36,6 +37,18 @@ export const RCAAccuracyScorer = Scorer<{
 }>(
   'rca-accuracy',
   async ({ input, output }) => {
+    const health = assessRunHealth(output);
+    if (!health.valid) {
+      return {
+        score: 0,
+        metadata: {
+          invalidRun: true,
+          runValidityReasons: health.reasons,
+          note: 'Skipped semantic RCA scoring due to invalid run',
+        },
+      };
+    }
+
     const { scenario } = input;
     const prompt = JUDGE_PROMPT
       .replace('{scenario_description}', `${scenario.name}\nPrompt: ${scenario.prompt}`)

@@ -26,7 +26,7 @@ export const TriageFirstScorer = Scorer<{
     if (input.scenario.severity !== 'P1') {
       return {
         score: 1,
-        metadata: { note: 'Not a P1 scenario, triage-first not applicable' },
+        metadata: { applicable: false, note: 'Not a P1 scenario, triage-first not applicable' },
       };
     }
 
@@ -35,7 +35,7 @@ export const TriageFirstScorer = Scorer<{
     if (toolCalls.length === 0) {
       return {
         score: 0,
-        metadata: { note: 'No tool calls made', violation: 'no-calls' },
+        metadata: { applicable: true, note: 'No tool calls made', violation: 'no-calls' },
       };
     }
 
@@ -103,6 +103,7 @@ export const TriageFirstScorer = Scorer<{
     return {
       score,
       metadata: {
+        applicable: true,
         note: score >= 0.8
           ? 'Triage-first discipline maintained'
           : `Triage-first violations detected (score: ${score})`,

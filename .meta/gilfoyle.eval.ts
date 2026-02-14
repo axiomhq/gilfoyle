@@ -2,7 +2,7 @@ import { Eval } from 'axiom/ai/evals';
 import { withSpan } from 'axiom/ai';
 import { loadScenarios } from './scenarios/index.js';
 import { getHarness, type EvalInput, type EvalOutput, type HarnessName, type ModelName } from './harness/index.js';
-import { RCAAccuracyScorer, EvidenceQualityScorer, EfficiencyScorer, QueryValidityScorer, InitFirstScorer, MustNotMentionScorer, MemoryWriteScorer, HypothesisDisciplineScorer, SecretHygieneScorer, TriageFirstScorer, SlackCommsScorer, MemoryDistillationScorer, FirstRunScorer } from './scorers/index.js';
+import { RCAAccuracyScorer, EvidenceQualityScorer, EfficiencyScorer, QueryValidityScorer, QueryYieldScorer, QueryRepairScorer, ExecutorCoverageScorer, InitFirstScorer, CounterfactualRejectionScorer, CausalGroundingScorer, MustNotMentionScorer, MemoryWriteScorer, HypothesisDisciplineScorer, SecretHygieneScorer, TriageFirstScorer, SlackCommsScorer, MemoryDistillationScorer, FirstRunScorer, RunValidityScorer, WallClockScorer, TokenBudgetScorer } from './scorers/index.js';
 
 const DEFAULT_HARNESS: HarnessName = 'amp';
 const DEFAULT_MODEL = 'xai/grok-4-1-fast';
@@ -15,7 +15,7 @@ function parseConfig(): { harness: HarnessName; model: ModelName | undefined } {
 
 function extractRootCause(text: string): string {
   const patterns = [
-    /root\s*cause[:\s]*([^\n]+(?:\n(?![A-Z#*-])[^\n]+)*)/i,
+    /\broot\s*cause\b\s*(?:[:-]\s*)([^\n]+(?:\n(?![A-Z#*-])[^\n]+)*)/i,
     /(?:the\s+)?(?:underlying\s+)?(?:issue|problem|cause|reason)\s+(?:is|was)[:\s]*([^\n]+(?:\n(?![A-Z#*-])[^\n]+)*)/i,
     /(?:caused\s+by|due\s+to|attributed\s+to)[:\s]*([^\n]+(?:\n(?![A-Z#*-])[^\n]+)*)/i,
     /(?:diagnosis|conclusion|finding|determination)[:\s]*([^\n]+(?:\n(?![A-Z#*-])[^\n]+)*)/i,
@@ -95,7 +95,29 @@ Eval<EvalInput, ExpectedOutput, EvalOutput>(evalName, {
     return result;
   },
 
-  scorers: [QueryValidityScorer, RCAAccuracyScorer, EvidenceQualityScorer, EfficiencyScorer, InitFirstScorer, MustNotMentionScorer, MemoryWriteScorer, HypothesisDisciplineScorer, SecretHygieneScorer, TriageFirstScorer, SlackCommsScorer, MemoryDistillationScorer, FirstRunScorer],
+  scorers: [
+    RunValidityScorer,
+    QueryValidityScorer,
+    QueryYieldScorer,
+    QueryRepairScorer,
+    ExecutorCoverageScorer,
+    RCAAccuracyScorer,
+    EvidenceQualityScorer,
+    CausalGroundingScorer,
+    EfficiencyScorer,
+    WallClockScorer,
+    TokenBudgetScorer,
+    InitFirstScorer,
+    CounterfactualRejectionScorer,
+    MustNotMentionScorer,
+    MemoryWriteScorer,
+    HypothesisDisciplineScorer,
+    SecretHygieneScorer,
+    TriageFirstScorer,
+    SlackCommsScorer,
+    MemoryDistillationScorer,
+    FirstRunScorer,
+  ],
   timeout: 300_000, // 5 minutes per scenario — LLM investigations take time
   metadata: { description: 'Evaluate Gilfoyle SRE skill incident investigation', version: '0.2.0', harness: harnessName, ...(modelName && { model: modelName }), commit: process.env.GIT_COMMIT ?? '', branch: process.env.GIT_BRANCH ?? '' },
 });

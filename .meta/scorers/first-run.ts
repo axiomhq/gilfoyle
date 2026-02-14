@@ -29,7 +29,7 @@ export const FirstRunScorer = Scorer<{
   ({ input, output }) => {
     // Only score this for the first-run scenario
     if (input.scenario.id !== 'first-run') {
-      return { score: 1, metadata: { note: 'Not a first-run scenario, skipped' } };
+      return { score: 1, metadata: { applicable: false, note: 'Not a first-run scenario, skipped' } };
     }
 
     const toolCalls = output.trace.toolCalls;
@@ -77,6 +77,7 @@ export const FirstRunScorer = Scorer<{
     return {
       score,
       metadata: {
+        applicable: true,
         note:
           score >= 0.7
             ? 'Handled first-run correctly'

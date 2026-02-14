@@ -46,6 +46,131 @@ function readStdin(): string {
   try { return readFileSync(0, 'utf-8').trim(); } catch { return ''; }
 }
 
+interface ParsedInvocation {
+  args: string[];
+  fallbackQuery?: string;
+  errors: string[];
+}
+
+function readQueryFile(path: string): { query?: string; error?: string } {
+  const trimmed = path.trim();
+  if (!trimmed) return { error: 'Missing query file path' };
+  try {
+    return { query: readFileSync(trimmed, 'utf-8').trim() };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return { error: `Failed to read query file '${trimmed}': ${msg}` };
+  }
+}
+
+function appendQuery(current: string | undefined, next: string): string {
+  const value = next.trim();
+  if (!value) return current ?? '';
+  return current ? `${current} ${value}` : value;
+}
+
+function parseAxiomInvocation(rawArgs: string[]): ParsedInvocation {
+  if (rawArgs.length === 0) return { args: rawArgs, errors: [] };
+
+  const args: string[] = [rawArgs[0]];
+  const errors: string[] = [];
+  let fallbackQuery: string | undefined;
+
+  for (let i = 1; i < rawArgs.length; i++) {
+    const arg = rawArgs[i];
+    if (arg === '--query') {
+      const value = rawArgs[i + 1];
+      if (!value || value.startsWith('--')) {
+        errors.push('Missing value for --query');
+      } else {
+        fallbackQuery = appendQuery(fallbackQuery, value);
+        i += 1;
+      }
+      continue;
+    }
+    if (arg.startsWith('--query=')) {
+      fallbackQuery = appendQuery(fallbackQuery, arg.slice('--query='.length));
+      continue;
+    }
+    if (arg === '--query-file') {
+      const path = rawArgs[i + 1];
+      if (!path || path.startsWith('--')) {
+        errors.push('Missing value for --query-file');
+      } else {
+        const loaded = readQueryFile(path);
+        if (loaded.error) errors.push(loaded.error);
+        else if (loaded.query) fallbackQuery = appendQuery(fallbackQuery, loaded.query);
+        i += 1;
+      }
+      continue;
+    }
+    if (arg.startsWith('--query-file=')) {
+      const loaded = readQueryFile(arg.slice('--query-file='.length));
+      if (loaded.error) errors.push(loaded.error);
+      else if (loaded.query) fallbackQuery = appendQuery(fallbackQuery, loaded.query);
+      continue;
+    }
+    if (arg.startsWith('--')) {
+      args.push(arg);
+      continue;
+    }
+    fallbackQuery = appendQuery(fallbackQuery, arg);
+  }
+
+  return { args, fallbackQuery, errors };
+}
+
+function parseGrafanaInvocation(rawArgs: string[]): ParsedInvocation {
+  if (rawArgs.length < 2) return { args: rawArgs, errors: [] };
+
+  const args: string[] = [rawArgs[0], rawArgs[1]];
+  const errors: string[] = [];
+  let fallbackQuery: string | undefined;
+
+  for (let i = 2; i < rawArgs.length; i++) {
+    const arg = rawArgs[i];
+    if (arg === '--query') {
+      const value = rawArgs[i + 1];
+      if (!value || value.startsWith('--')) {
+        errors.push('Missing value for --query');
+      } else {
+        fallbackQuery = appendQuery(fallbackQuery, value);
+        i += 1;
+      }
+      continue;
+    }
+    if (arg.startsWith('--query=')) {
+      fallbackQuery = appendQuery(fallbackQuery, arg.slice('--query='.length));
+      continue;
+    }
+    if (arg === '--query-file') {
+      const path = rawArgs[i + 1];
+      if (!path || path.startsWith('--')) {
+        errors.push('Missing value for --query-file');
+      } else {
+        const loaded = readQueryFile(path);
+        if (loaded.error) errors.push(loaded.error);
+        else if (loaded.query) fallbackQuery = appendQuery(fallbackQuery, loaded.query);
+        i += 1;
+      }
+      continue;
+    }
+    if (arg.startsWith('--query-file=')) {
+      const loaded = readQueryFile(arg.slice('--query-file='.length));
+      if (loaded.error) errors.push(loaded.error);
+      else if (loaded.query) fallbackQuery = appendQuery(fallbackQuery, loaded.query);
+      continue;
+    }
+    if (arg.startsWith('--')) {
+      args.push(arg);
+      continue;
+    }
+    fallbackQuery = appendQuery(fallbackQuery, arg);
+  }
+
+  return { args, fallbackQuery, errors };
+}
+
 // Legacy fallback (for scenarios not yet migrated)
 function matchMock(mocks: LegacyToolMock[] | undefined, queryText: string): unknown {
   if (!mocks || mocks.length === 0) return { error: 'No mock configured' };
@@ -70,8 +195,14 @@ try {
       const stdinQuery = readStdin();
 
       if (fixtures) {
+        const parsed = parseAxiomInvocation(toolArgs);
+        if (parsed.errors.length > 0) {
+          console.error(`error: ${parsed.errors.join('; ')}`);
+          process.exit(1);
+        }
+
         // Validate CLI contract
-        const cliCheck = validateAxiomCLI(toolArgs, stdinQuery, fixtures);
+        const cliCheck = validateAxiomCLI(parsed.args, stdinQuery, fixtures, { fallbackQuery: parsed.fallbackQuery });
         if (!cliCheck.valid) {
           console.error(`error: ${cliCheck.errors.join('; ')}`);
           process.exit(1);
@@ -96,8 +227,14 @@ try {
 
     case 'scripts-grafana-query': {
       if (fixtures) {
+        const parsed = parseGrafanaInvocation(toolArgs);
+        if (parsed.errors.length > 0) {
+          console.error(`error: ${parsed.errors.join('; ')}`);
+          process.exit(1);
+        }
+
         // Validate CLI contract
-        const cliCheck = validateGrafanaCLI(toolArgs, fixtures);
+        const cliCheck = validateGrafanaCLI(parsed.args, fixtures, { fallbackQuery: parsed.fallbackQuery });
         if (!cliCheck.valid) {
           console.error(`error: ${cliCheck.errors.join('; ')}`);
           process.exit(1);

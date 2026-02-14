@@ -20,14 +20,22 @@ export const MemoryDistillationScorer = Scorer<{
   expected: { rootCause: string; evidence: string[] };
 }>(
   'memory-distillation',
-  ({ output }) => {
+  ({ input, output }) => {
+    const required = input.scenario.scoring?.requireMemoryDistillation ?? input.scenario.id !== 'first-run';
+    if (!required) {
+      return {
+        score: 1,
+        metadata: { applicable: false, note: 'Memory distillation not required for this scenario' },
+      };
+    }
+
     const toolCalls = output.trace.toolCalls;
     const memWriteCalls = toolCalls.filter((tc: ToolCall) => tc.tool === 'scripts/mem-write');
 
     if (memWriteCalls.length === 0) {
       return {
         score: 0,
-        metadata: { note: 'No mem-write calls made', totalCalls: toolCalls.length },
+        metadata: { applicable: true, note: 'No mem-write calls made', totalCalls: toolCalls.length },
       };
     }
 
@@ -82,6 +90,7 @@ export const MemoryDistillationScorer = Scorer<{
     return {
       score: Math.min(1, score),
       metadata: {
+        applicable: true,
         categoriesFound: [...categoriesFound],
         queryWrites: queryWrites.length,
         queryMatchFound,

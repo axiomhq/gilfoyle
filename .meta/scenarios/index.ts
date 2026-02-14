@@ -45,8 +45,36 @@ function loadGeneratedScenarios(): IncidentScenario[] {
   return scenarios;
 }
 
+function ensureUniqueScenarioIds(scenarios: IncidentScenario[]): IncidentScenario[] {
+  const used = new Set<string>();
+  const out: IncidentScenario[] = [];
+
+  for (const scenario of scenarios) {
+    if (!used.has(scenario.id)) {
+      used.add(scenario.id);
+      out.push(scenario);
+      continue;
+    }
+
+    // Generated variants may collide with hand-crafted IDs (e.g. redis-oom).
+    // Keep all scenarios, but make IDs stable and unique for scoring/reporting.
+    let i = 0;
+    let candidate = `${scenario.id}-v${i}`;
+    while (used.has(candidate)) {
+      i += 1;
+      candidate = `${scenario.id}-v${i}`;
+    }
+    used.add(candidate);
+    out.push({ ...scenario, id: candidate });
+  }
+
+  return out;
+}
+
 export function loadScenarios(): IncidentScenario[] {
   const synthOnly = process.env.EVAL_SYNTH_ONLY === '1';
-  if (synthOnly) return loadGeneratedScenarios();
-  return [...handCrafted, ...loadGeneratedScenarios()];
+  const combined = synthOnly
+    ? loadGeneratedScenarios()
+    : [...handCrafted, ...loadGeneratedScenarios()];
+  return ensureUniqueScenarioIds(combined);
 }

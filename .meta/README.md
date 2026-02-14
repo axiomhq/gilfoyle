@@ -19,8 +19,9 @@ Most agent evals are a retrieval game in disguise. This one isn't. The agent get
                    │    scenarios/*.ts      │  │  rca-accuracy    │
                    │                        │  │  evidence-quality│
                    │  Synthesized           │  │  efficiency      │
-                   │    synthesizer/        │  │                  │
-                   │    generated/*.json    │  └──────────────────┘
+                   │    synthesizer/        │  │  wall-clock      │
+                   │    generated/*.json    │  │  token-budget    │
+                   │                        │  └──────────────────┘
                    └────────────┬──────────┘
                                 │
                    ┌────────────▼──────────┐
@@ -65,7 +66,7 @@ Most agent evals are a retrieval game in disguise. This one isn't. The agent get
 
 4. **Fixture Engine** (`toolbox/fixture-engine.ts`) — The query execution layer. Parses APL (dataset bracket syntax, pipe stages), validates PromQL (metric names, label matchers, balanced syntax), enforces CLI contracts, and formats output to match real `scripts/axiom-query-fmt` and `scripts/grafana-query` output.
 
-5. **Scorers** — Four scoring dimensions evaluated after each run. Details below.
+5. **Scorers** — Multiple scoring dimensions evaluated after each run. Details below.
 
 ## Quick Start
 
@@ -109,6 +110,22 @@ EVAL_HARNESS=amp npx axiom eval --debug
 # Verbose harness logging
 DEBUG_OPENCODE_HARNESS=1 EVAL_HARNESS=opencode npx axiom eval --debug
 DEBUG_AMP_HARNESS=1 EVAL_HARNESS=amp npx axiom eval --debug
+
+# Score diagnostics:
+# - config snapshot across all latest runs
+# - per-config case + failure-signature reports for all latest runs
+bun run eval:diagnostics
+
+# Optional targeting knobs:
+# - EVAL_DEPLOYMENT (default: play)
+# - EVAL_DATASET_NAME (falls back to AXIOM_DATASET, then gilfoyle-evals)
+# - EVAL_TARGET_EVAL (optional: limit to one eval config)
+# - EVAL_VERSION (optional: limit to a specific version)
+# - EVAL_MIN_CASE_COVERAGE_RATIO (default 0.8; ignore partial runs in config snapshots)
+EVAL_DEPLOYMENT=play \
+EVAL_DATASET_NAME=gilfoyle-evals \
+EVAL_TARGET_EVAL=gilfoyle-sre-opencode-ollama-cloud-minimax-m2-5 \
+bun run eval:diagnostics
 
 # Typecheck
 npx tsc --noEmit
@@ -275,6 +292,23 @@ Checks that the agent's final answer cites specific data points from tool output
 - **Failed queries** (30%): What fraction of queries failed with syntax/contract errors? Each failure is wasted compute.
 - **Redundant queries** (30%): Near-duplicate queries detected via normalization (lowercase, whitespace collapse, quote removal). Running the same query twice is a sign the agent lost track of what it already knows.
 
+### wall-clock
+
+**Explicit end-to-end runtime score (elapsed wall time).**
+
+- Uses `trace.elapsedMs` from the harness run.
+- Honors scenario `budgets.maxElapsedMs` where provided.
+- Otherwise derives a budget from scenario shape (`maxToolCalls`, setup-only vs query-heavy scenarios).
+- Adds a cadence component (`ms/tool-call`) to penalize slow loops.
+
+### token-budget
+
+**Token spend score against per-scenario `maxTotalTokens`.**
+
+- Uses harness-reported `inputTokens + outputTokens`.
+- Score is 1 within budget; linear decay to 0 at 2x budget.
+- Marked non-applicable if a scenario has no token budget or provider does not report usage.
+
 ## Fixture Engine
 
 The fixture engine (`toolbox/fixture-engine.ts`) is what separates this from a retrieval game. Instead of keyword-matching mock responses, it actually parses and executes queries against fixture data.
@@ -303,19 +337,19 @@ The fixture engine (`toolbox/fixture-engine.ts`) is what separates this from a r
 
 **axiom-query:**
 ```
-axiom-query <deployment> [--raw|--ndjson|--full|--trace] <<< "APL query"
+axiom-query <deployment> [--raw|--ndjson|--full|--trace] [--query "<APL>"|--query-file /path/to/query.apl]
 ```
-- Deployment must exist in `fixtures.validDeployments`
-- Query must be provided via stdin
+- Deployment accepts aliases (for example `prod` in single-deployment fixtures)
+- Query accepted via stdin, `--query`, or `--query-file`
 - Unknown flags rejected
 
 **grafana-query:**
 ```
-grafana-query <deployment> <datasource_uid> <promql_query> [options]
+grafana-query <deployment> <datasource_uid> [<promql_query>] [--query "<PromQL>"|--query-file /path/to/query.promql]
 ```
-- Deployment must exist in `fixtures.validDeployments`
-- Datasource UID (or name) must exist in `fixtures.datasources`
-- Accepts both UID and name-based references
+- Deployment accepts aliases (for example `prod` in single-deployment fixtures)
+- Datasource accepts UID, name, and `name (uid)` forms
+- Query accepted as positional arg, `--query`, or `--query-file`
 
 ### Output Formatting
 

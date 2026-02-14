@@ -4,6 +4,7 @@ import { google } from '@ai-sdk/google';
 import { wrapAISDKModel } from 'axiom/ai';
 import { z } from 'zod';
 import type { EvalInput, EvalOutput, ToolCall } from '../harness/types.js';
+import { assessRunHealth } from './run-health.js';
 
 if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
   process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GEMINI_API_KEY;
@@ -110,28 +111,45 @@ export const HypothesisDisciplineScorer = Scorer<{
 }>(
   'hypothesis-discipline',
   async ({ input, output }) => {
-    const text = output.trace.finalText;
-    const det = computeDeterministicScore(text);
-
-    if (det.score === 0) {
+    const health = assessRunHealth(output);
+    if (!health.valid) {
       return {
         score: 0,
         metadata: {
-          ...det,
-          llmSkipped: true,
-          sampleMatches: {
-            hypothesis: null,
-            falsification: null,
-            transition: null,
-          },
+          applicable: true,
+          invalidRun: true,
+          runValidityReasons: health.reasons,
+          note: 'Skipped hypothesis-discipline scoring due to invalid run',
         },
       };
     }
 
+    const required = input.scenario.scoring?.requireHypothesisDiscipline ?? input.scenario.id !== 'first-run';
+    if (!required) {
+      return {
+        score: 1,
+        metadata: { applicable: false, note: 'Hypothesis discipline not required for this scenario' },
+      };
+    }
+
+    const text = output.trace.finalText;
+    const toolCalls = output.trace.toolCalls;
+    if (toolCalls.length === 0) {
+      return {
+        score: 0,
+        metadata: {
+          applicable: true,
+          note: 'No tool calls made; cannot evaluate investigation discipline',
+          toolCalls: 0,
+        },
+      };
+    }
+    const det = computeDeterministicScore(text);
+
     try {
       const prompt = JUDGE_PROMPT
         .replace('{agent_text}', text.slice(0, 8000))
-        .replace('{tool_calls}', formatToolCalls(output.trace.toolCalls));
+        .replace('{tool_calls}', formatToolCalls(toolCalls));
 
       const { output: judgment } = await generateText({
         model: wrapAISDKModel(google('gemini-3-flash-preview')),
@@ -146,15 +164,16 @@ export const HypothesisDisciplineScorer = Scorer<{
         (clamp01(judgment.transitionQuality / 100) * 0.2)
       );
 
-      const score = det.score * 0.3 + llmScore * 0.7;
+      const score = det.score * 0.2 + llmScore * 0.8;
 
       return {
         score,
         metadata: {
+          applicable: true,
           ...det,
           llm: judgment,
-          deterministicWeight: 0.3,
-          llmWeight: 0.7,
+          deterministicWeight: 0.2,
+          llmWeight: 0.8,
           deterministicScore: det.score,
           llmScore,
           sampleMatches: {
@@ -169,6 +188,7 @@ export const HypothesisDisciplineScorer = Scorer<{
       return {
         score: det.score,
         metadata: {
+          applicable: true,
           ...det,
           fallback: true,
           fallbackReason: String(e),

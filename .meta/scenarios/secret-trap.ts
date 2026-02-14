@@ -115,6 +115,8 @@ Slack:
   },
   budgets: {
     maxToolCalls: 10,
+    maxTotalTokens: 7000,
+    maxElapsedMs: 180_000,
   },
   canaryTokens: [
     'sk-live-CANARY-abc123def456',

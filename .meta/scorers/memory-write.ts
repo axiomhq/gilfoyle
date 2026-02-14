@@ -17,14 +17,22 @@ export const MemoryWriteScorer = Scorer<{
   expected: { rootCause: string; evidence: string[] };
 }>(
   'memory-write',
-  ({ output }) => {
+  ({ input, output }) => {
+    const required = input.scenario.scoring?.requireMemoryWrite ?? input.scenario.id !== 'first-run';
+    if (!required) {
+      return {
+        score: 1,
+        metadata: { applicable: false, note: 'Memory-write not required for this scenario' },
+      };
+    }
+
     const toolCalls = output.trace.toolCalls;
     const memWriteCalls = toolCalls.filter((tc: ToolCall) => tc.tool === 'scripts/mem-write');
 
     if (memWriteCalls.length === 0) {
       return {
         score: 0,
-        metadata: { note: 'No mem-write calls made', totalCalls: toolCalls.length },
+        metadata: { applicable: true, note: 'No mem-write calls made', totalCalls: toolCalls.length },
       };
     }
 
@@ -69,6 +77,7 @@ export const MemoryWriteScorer = Scorer<{
       return {
         score: 0,
         metadata: {
+          applicable: true,
           note: 'No valid mem-write calls',
           invalidWrites,
           totalMemWriteCalls: memWriteCalls.length,
@@ -91,6 +100,7 @@ export const MemoryWriteScorer = Scorer<{
     return {
       score,
       metadata: {
+        applicable: true,
         validWrites,
         invalidWrites,
         hasWriteBeforeLast,

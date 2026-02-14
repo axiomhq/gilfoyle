@@ -26,8 +26,9 @@ const MOCK_TOOL_PATH = join(__dirname, '../toolbox/mock-tool.ts');
 
 const DEFAULT_PROVIDER = 'xai';
 const DEFAULT_MODEL = 'grok-4-1-fast';
-const DEFAULT_TIMEOUT_MS = 280_000;
-const HARNESS_TIMEOUT_MS = parseInt(process.env.EVAL_TIMEOUT_MS ?? '', 10) || DEFAULT_TIMEOUT_MS;
+const DEFAULT_TIMEOUT_MS = 295_000;
+const MIN_TIMEOUT_MS = 60_000;
+const MAX_TIMEOUT_MS = 295_000;
 const STATUS_POLL_INTERVAL_MS = 2_000;
 
 function parseModel(config: RunConfig): { provider: string; model: string; format: 'colon' | 'slash' } {
@@ -69,6 +70,27 @@ function isToolPart(part: Part): part is ToolPart {
   return part.type === 'tool';
 }
 
+function clampTimeoutMs(ms: number): number {
+  return Math.min(MAX_TIMEOUT_MS, Math.max(MIN_TIMEOUT_MS, Math.round(ms)));
+}
+
+function resolveHarnessTimeoutMs(scenario: IncidentScenario): number {
+  const envOverride = parseInt(process.env.EVAL_TIMEOUT_MS ?? '', 10);
+  if (Number.isFinite(envOverride) && envOverride > 0) {
+    return clampTimeoutMs(envOverride);
+  }
+
+  const budgetMs = scenario.budgets?.maxElapsedMs;
+  if (Number.isFinite(budgetMs) && (budgetMs ?? 0) > 0) {
+    // Never shrink below default headroom; only stretch when budgets exceed it.
+    return clampTimeoutMs(
+      Math.max(DEFAULT_TIMEOUT_MS, (budgetMs ?? DEFAULT_TIMEOUT_MS) + 10_000),
+    );
+  }
+
+  return DEFAULT_TIMEOUT_MS;
+}
+
 export const opencodeHarness: HarnessRunner = {
   name: 'opencode',
 
@@ -98,10 +120,11 @@ export const opencodeHarness: HarnessRunner = {
 
     const elapsed = () => `${((Date.now() - start) / 1000).toFixed(0)}s`;
     const log = (msg: string) => console.error(`[opencode] ${scenario.id} (${elapsed()}): ${msg}`);
+    const harnessTimeoutMs = resolveHarnessTimeoutMs(scenario);
 
     const port = await getFreePort();
     const { provider, model, format } = parseModel(config);
-    log(`port=${port} provider=${provider} model=${model} format=${format}`);
+    log(`port=${port} provider=${provider} model=${model} format=${format} timeout=${harnessTimeoutMs}ms`);
 
     let opencode: Awaited<ReturnType<typeof createOpencode>> | undefined;
     let eventAbort: AbortController | undefined;
@@ -248,7 +271,7 @@ IMPORTANT: All scripts are in ${scriptsDir}. Run them with the full path. Exampl
 
       // Poll session status until idle or timeout
       // OpenCode sessions go busy → idle, or busy → disappear from map
-      const deadline = Date.now() + HARNESS_TIMEOUT_MS;
+      const deadline = Date.now() + harnessTimeoutMs;
       let settled = false;
       let pollCount = 0;
       let sawBusy = false;
@@ -292,7 +315,7 @@ IMPORTANT: All scripts are in ${scriptsDir}. Run them with the full path. Exampl
         if (lastError) {
           finalText += `\nHARNESS TIMEOUT (last error: ${lastError})\n`;
         } else {
-          finalText += `\nHARNESS TIMEOUT after ${HARNESS_TIMEOUT_MS}ms\n`;
+          finalText += `\nHARNESS TIMEOUT after ${harnessTimeoutMs}ms\n`;
         }
       }
 
