@@ -45,6 +45,63 @@ axiom-query staging -f /tmp/q.apl
 ['dataset'] | extend value = tostring(['attributes']['nested.key'])
 ```
 
+### Map Type Discovery (CRITICAL for OTel Traces)
+
+Fields typed as `map[string]` in `getschema` (e.g., `attributes`, `attributes.custom`, `resource`, `resource.attributes`) are opaque containers — `getschema` only shows the column name and type `map[string]`, NOT the keys inside. You must discover map contents explicitly.
+
+**Step 1: Identify map columns** — Run `getschema` and look for `map` types:
+```apl
+['traces-dataset'] | getschema
+// Look for: attributes        map[string]...
+//           attributes.custom  map[string]...
+//           resource           map[string]...
+```
+
+**Step 2: Sample raw events** — The fastest way to see actual map keys:
+```apl
+// See full event structure including all map keys
+['traces-dataset'] | where _time > ago(15m) | take 1
+
+// Project just the map column to reduce noise
+['traces-dataset'] | where _time > ago(15m) | project ['attributes.custom'] | take 5
+['traces-dataset'] | where _time > ago(15m) | project attributes | take 5
+```
+
+**Step 3: Enumerate distinct keys** — For high-cardinality maps, find what keys exist:
+```apl
+// List keys and their frequency
+['traces-dataset'] | where _time > ago(15m)
+| extend keys = ['attributes.custom']
+| mv-expand keys
+| summarize count() by tostring(keys)
+| top 30 by count_
+```
+
+**Step 4: Access map values in queries** — Use bracket notation:
+```apl
+// Access a specific key inside a map column
+['traces-dataset'] | where _time > ago(15m)
+| extend http_status = toint(['attributes.custom']['http.response.status_code'])
+
+// Filter on map values
+['traces-dataset'] | where _time > ago(15m)
+| where tostring(['attributes.custom']['db.system']) == "redis"
+
+// Multiple map fields
+['traces-dataset'] | where _time > ago(15m)
+| extend method = tostring(['attributes']['http.method']),
+         route = tostring(['attributes']['http.route']),
+         status = toint(['attributes']['http.response.status_code'])
+```
+
+**Common OTel map columns and what they contain:**
+- `attributes` — Span attributes (HTTP method, status, DB queries, custom tags)
+- `attributes.custom` — Non-standard/user-defined span attributes
+- `resource` — Resource attributes (service.name, host, k8s metadata)
+- `resource.attributes` — Additional resource metadata
+
+**WARNING:** Do NOT assume key names inside maps. The same semantic attribute may appear under different keys depending on instrumentation library, OTel SDK version, or custom configuration. Always sample first.
+
 **Common escaped fields in k8s-logs-prod:**
 - `kubernetes.node_labels.karpenter\\.sh/nodepool`
 - `kubernetes.node_labels.nodepool\\.axiom\\.co/name`
