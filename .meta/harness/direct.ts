@@ -7,6 +7,7 @@
 
 import type { HarnessRunner, IncidentScenario, RunConfig, RunTrace, ToolCall, } from './types.js';
 import { createMockRouter } from '../toolbox/mock-router.js';
+import { initAllValidators } from '../toolbox/apl-validator.js';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -104,6 +105,7 @@ export const directHarness: HarnessRunner = {
 
   async run(scenario: IncidentScenario, config: RunConfig): Promise<RunTrace> {
     const start = Date.now();
+    await initAllValidators();
     const skill = await loadSkill(config.skillPath);
     const mockTools = createMockRouter(scenario);
     const toolCalls: ToolCall[] = [];

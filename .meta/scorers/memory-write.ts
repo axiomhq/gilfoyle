@@ -44,9 +44,7 @@ export const MemoryWriteScorer = Scorer<{
 
     for (const tc of memWriteCalls) {
       const inputStr = typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input);
-
-      // Parse arguments
-      const args = parseMemWriteArgs(inputStr);
+      const args = parseMemWriteInput(tc.input);
       if (!args) {
         invalidWrites.push({ input: inputStr.slice(0, 100), reason: 'Could not parse arguments' });
         continue;
@@ -110,7 +108,39 @@ export const MemoryWriteScorer = Scorer<{
   }
 );
 
-function parseMemWriteArgs(input: string): { category: string; key: string; content: string } | null {
+function parseMemWriteInput(input: unknown): { category: string; key: string; content: string } | null {
+  if (input && typeof input === 'object') {
+    const obj = input as Record<string, unknown>;
+    const category = asString(obj.category);
+    const key = asString(obj.key);
+    const content = asString(obj.value ?? obj.content);
+    if (category && key && content) {
+      return { category, key, content };
+    }
+  }
+
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+        const category = asString(parsed.category);
+        const key = asString(parsed.key);
+        const content = asString(parsed.value ?? parsed.content);
+        if (category && key && content) {
+          return { category, key, content };
+        }
+      } catch {
+        // Fall back to CLI parser below.
+      }
+    }
+    return parseMemWriteCliArgs(trimmed);
+  }
+
+  return null;
+}
+
+function parseMemWriteCliArgs(input: string): { category: string; key: string; content: string } | null {
   // Remove any leading script path (handles ./scripts/, bash scripts/, etc.)
   let cleaned = input.replace(/^(?:bash\s+)?(?:\.\/)?scripts\/mem-write\s*/, '').trim();
 
@@ -146,4 +176,8 @@ function parseMemWriteArgs(input: string): { category: string; key: string; cont
     key: parts[2].replace(/^["']|["']$/g, ''),
     content: parts[3],
   };
+}
+
+function asString(v: unknown): string {
+  return typeof v === 'string' ? v.trim() : '';
 }

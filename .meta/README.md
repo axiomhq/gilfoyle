@@ -61,7 +61,7 @@ Most agent evals are a retrieval game in disguise. This one isn't. The agent get
 2. **Harnesses** — Run an LLM agent against mock scripts in a temp directory.
    - `amp.ts` — Uses `@sourcegraph/amp-sdk` `execute()`. Intercepts tool_use/tool_result messages.
    - `opencode.ts` — Uses `@opencode-ai/sdk` `createOpencode()`. Allocates a random free port per session for parallel runs. Parses tool parts from message stream.
-   - `codex.ts` — Uses direct OpenAI API calls via Vercel AI SDK (`@ai-sdk/openai`) for Codex/GPT model runs.
+   - `codex.ts` — Uses the OpenAI Codex agent SDK (`@openai/codex-sdk`) to run real Codex `exec` turns and stream command events.
 
 3. **Mock Tool v2** (`toolbox/mock-tool-v2.ts`) — Replaces simple keyword mocks. Backed by the fixture engine. Validates CLI contracts, parses APL/PromQL, executes queries against fixture data, returns computed results. Falls back to legacy keyword matching if no fixtures present.
 
