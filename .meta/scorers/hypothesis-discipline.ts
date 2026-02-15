@@ -10,44 +10,6 @@ if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
   process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GEMINI_API_KEY;
 }
 
-const HYPOTHESIS_PATTERNS = [
-  /hypothesis[:\s]/i,
-  /\bi\s+(?:suspect|believe|think)\s+(?:the\s+)?(?:root\s+)?cause/i,
-  /\bmy\s+(?:initial\s+)?(?:theory|hypothesis)/i,
-  /\blikely\s+(?:root\s+)?cause/i,
-  /\btesting\s+(?:the\s+)?hypothesis/i,
-  /\binitial\s+hypothesis/i,
-];
-
-const FALSIFICATION_PATTERNS = [
-  /\brule[ds]?\s+out\b/i,
-  /\bdisprove[ds]?\b/i,
-  /\bfalsif(?:y|ied|ies|ication)\b/i,
-  /\bnot\s+the\s+(?:root\s+)?cause\b/i,
-  /\bexclude[ds]?\b/i,
-  /\bcontradicts?\b/i,
-  /\binconsistent\s+with\b/i,
-  /\bdoesn'?t\s+explain\b/i,
-  /\balternative\s+(?:hypothesis|explanation)/i,
-  /\bcompare[ds]?\s+(?:with|to|against)\b/i,
-  /\bcohort\s+comparison\b/i,
-  /\bcontrol\s+group\b/i,
-  /\bif\s+(?:this|it)\s+were\s+(?:the\s+)?cause/i,
-  /\bwould\s+(?:also\s+)?expect\s+to\s+see\b/i,
-];
-
-const TRANSITION_PATTERNS = [
-  /\bdisproved\b/i,
-  /\bruled\s+out\b/i,
-  /\bnot\s+the\s+cause\b/i,
-  /\bmoving\s+on\s+to\b/i,
-  /\bnew\s+hypothesis\b/i,
-  /\brevising\s+(?:my\s+)?hypothesis\b/i,
-  /\bactually[,\s]+(?:the|it)\b/i,
-  /\binstead[,\s]+(?:the|it)\b/i,
-  /\bhowever[,\s]+(?:the\s+)?(?:data|logs?|evidence)\b/i,
-];
-
 const JUDGE_PROMPT = `You are evaluating whether an SRE agent followed proper hypothesis-driven investigation methodology.
 
 ## Agent's Investigation Text
@@ -59,9 +21,9 @@ const JUDGE_PROMPT = `You are evaluating whether an SRE agent followed proper hy
 ## Task
 Evaluate three dimensions of hypothesis discipline:
 
-1. **Hypothesis Quality** (0-100): Did the agent form a testable, specific hypothesis? Not just using the word "hypothesis" but stating a concrete, falsifiable claim about the root cause. A good hypothesis names a specific component, failure mode, or mechanism.
+1. **Hypothesis Quality** (0-100): Did the agent form a testable, specific hypothesis? Not just using the word "hypothesis" but stating a concrete, falsifiable claim about the root cause. A good hypothesis names a specific component, failure mode, or mechanism. Agents often state hypotheses implicitly as causal claims (e.g., "the 500s are from X failing to connect to Y", "goroutines growing while connections stay flat = goroutine leak") — these count.
 
-2. **Falsification Quality** (0-100): Did the agent's queries intentionally target disproof of the initial hypothesis? Look at the tool call inputs — were queries designed to find evidence that would contradict the hypothesis, or did the agent only seek confirming evidence? Deliberately querying alternative causes, checking control groups, or looking for contradicting metrics scores high.
+2. **Falsification Quality** (0-100): Did the agent's queries intentionally target disproof of the initial hypothesis? Look at the tool call inputs — were queries designed to find evidence that would contradict the hypothesis, or did the agent only seek confirming evidence? Deliberately querying alternative causes, checking control groups, comparing pre/post baselines, ruling out other error classes ("no DB errors, no network errors"), or using the Oracle for independent validation all count as falsification.
 
 3. **Transition Quality** (0-100): When the agent changed hypotheses, was the transition evidence-driven? Did they explicitly state what evidence disproved the prior hypothesis before moving on, or did they silently shift? Score 0 if there was only one hypothesis and no need for transitions.`;
 
@@ -72,29 +34,6 @@ const judgmentSchema = z.object({
   explanation: z.string().describe('One sentence explaining the judgment'),
 });
 
-function computeDeterministicScore(text: string) {
-  const hasHypothesis = HYPOTHESIS_PATTERNS.some(p => p.test(text));
-  const hypothesisScore = hasHypothesis ? 1 : 0;
-
-  const falsificationMatches = FALSIFICATION_PATTERNS.filter(p => p.test(text));
-  const falsificationScore = Math.min(1, falsificationMatches.length / 2);
-
-  const hasTransition = TRANSITION_PATTERNS.some(p => p.test(text));
-  const transitionScore = hasTransition ? 1 : 0;
-
-  const score = hypothesisScore * 0.4 + falsificationScore * 0.4 + transitionScore * 0.2;
-
-  return {
-    score,
-    hasHypothesis,
-    falsificationMatches: falsificationMatches.length,
-    hasTransition,
-    hypothesisScore,
-    falsificationScore,
-    transitionScore,
-  };
-}
-
 function formatToolCalls(toolCalls: ToolCall[]): string {
   return toolCalls
     .map((tc, i) => {
@@ -102,6 +41,46 @@ function formatToolCalls(toolCalls: ToolCall[]): string {
       return `${i + 1}. ${tc.tool}: ${input.slice(0, 500)}`;
     })
     .join('\n');
+}
+
+async function callJudge(
+  prompt: string,
+  scenarioId: string,
+): Promise<z.infer<typeof judgmentSchema>> {
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await generateText({
+        model: wrapAISDKModel(google('gemini-3-flash-preview')),
+        prompt,
+        output: Output.object({ schema: judgmentSchema }),
+        maxOutputTokens: 1000,
+      });
+
+      // AI SDK throws AI_NoOutputGeneratedError when finishReason !== "stop"
+      // (known bug with Gemini: vercel/ai#11348, #11466).
+      // Try .output first, fall back to parsing .text manually.
+      try {
+        return result.output;
+      } catch {
+        if (result.text) {
+          const parsed = judgmentSchema.safeParse(JSON.parse(result.text));
+          if (parsed.success) return parsed.data;
+        }
+        throw new Error('Gemini returned text but failed schema validation');
+      }
+    } catch (err) {
+      if (attempt < MAX_ATTEMPTS - 1) {
+        console.error(
+          `[hypothesis-discipline] Gemini attempt ${attempt + 1} failed for ${scenarioId}, retrying: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw new Error('Unreachable');
 }
 
 export const HypothesisDisciplineScorer = Scorer<{
@@ -124,15 +103,23 @@ export const HypothesisDisciplineScorer = Scorer<{
       };
     }
 
-    const required = input.scenario.scoring?.requireHypothesisDiscipline ?? input.scenario.id !== 'first-run';
+    const required =
+      input.scenario.scoring?.requireHypothesisDiscipline ?? input.scenario.id !== 'first-run';
     if (!required) {
       return {
         score: 1,
-        metadata: { applicable: false, note: 'Hypothesis discipline not required for this scenario' },
+        metadata: {
+          applicable: false,
+          note: 'Hypothesis discipline not required for this scenario',
+        },
       };
     }
 
-    const text = output.trace.finalText;
+    // Strip HARNESS ERROR/TIMEOUT noise before scoring.
+    const text = output.trace.finalText
+      .replace(/\s*HARNESS ERROR:.*$/s, '')
+      .replace(/\s*HARNESS TIMEOUT.*$/s, '')
+      .trim();
     const toolCalls = output.trace.toolCalls;
     if (toolCalls.length === 0) {
       return {
@@ -144,77 +131,34 @@ export const HypothesisDisciplineScorer = Scorer<{
         },
       };
     }
-    const det = computeDeterministicScore(text);
 
-    try {
-      const prompt = JUDGE_PROMPT
-        .replace('{agent_text}', text.slice(0, 8000))
-        .replace('{tool_calls}', formatToolCalls(toolCalls));
+    // Pass last 8000 chars to keep the final conclusion (always at the end).
+    const agentText =
+      text.length > 8000
+        ? `[...earlier investigation truncated...]\n\n${text.slice(-8000)}`
+        : text;
+    const prompt = JUDGE_PROMPT.replace('{agent_text}', agentText).replace(
+      '{tool_calls}',
+      formatToolCalls(toolCalls),
+    );
 
-      const { output: judgment } = await generateText({
-        model: wrapAISDKModel(google('gemini-3-flash-preview')),
-        prompt,
-        output: Output.object({ schema: judgmentSchema }),
-        maxOutputTokens: 1000,
-      });
+    const judgment = await callJudge(prompt, input.scenario.id);
 
-      const llmScore = (
-        (clamp01(judgment.hypothesisQuality / 100) * 0.4) +
-        (clamp01(judgment.falsificationQuality / 100) * 0.4) +
-        (clamp01(judgment.transitionQuality / 100) * 0.2)
-      );
+    const score =
+      clamp01(judgment.hypothesisQuality / 100) * 0.4 +
+      clamp01(judgment.falsificationQuality / 100) * 0.4 +
+      clamp01(judgment.transitionQuality / 100) * 0.2;
 
-      const score = det.score * 0.2 + llmScore * 0.8;
-
-      return {
-        score,
-        metadata: {
-          applicable: true,
-          ...det,
-          llm: judgment,
-          deterministicWeight: 0.2,
-          llmWeight: 0.8,
-          deterministicScore: det.score,
-          llmScore,
-          sampleMatches: {
-            hypothesis: det.hasHypothesis ? findFirstMatch(text, HYPOTHESIS_PATTERNS) : null,
-            falsification: det.falsificationMatches > 0 ? findFirstMatch(text, FALSIFICATION_PATTERNS) : null,
-            transition: det.hasTransition ? findFirstMatch(text, TRANSITION_PATTERNS) : null,
-          },
-        },
-      };
-    } catch (e) {
-      console.error(`[hypothesis-discipline] Gemini judge unavailable for ${input.scenario.id}, using regex fallback: ${e instanceof Error ? e.message : String(e)}`);
-      return {
-        score: det.score,
-        metadata: {
-          applicable: true,
-          ...det,
-          fallback: true,
-          fallbackReason: String(e),
-          sampleMatches: {
-            hypothesis: det.hasHypothesis ? findFirstMatch(text, HYPOTHESIS_PATTERNS) : null,
-            falsification: det.falsificationMatches > 0 ? findFirstMatch(text, FALSIFICATION_PATTERNS) : null,
-            transition: det.hasTransition ? findFirstMatch(text, TRANSITION_PATTERNS) : null,
-          },
-        },
-      };
-    }
-  }
+    return {
+      score,
+      metadata: {
+        applicable: true,
+        llm: judgment,
+      },
+    };
+  },
 );
 
 function clamp01(v: number): number {
   return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
-}
-
-function findFirstMatch(text: string, patterns: RegExp[]): string | null {
-  for (const p of patterns) {
-    const match = text.match(p);
-    if (match) {
-      const start = Math.max(0, match.index! - 30);
-      const end = Math.min(text.length, match.index! + match[0].length + 30);
-      return `...${text.slice(start, end)}...`;
-    }
-  }
-  return null;
 }

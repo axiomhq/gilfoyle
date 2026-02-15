@@ -80,12 +80,29 @@ export const RCAAccuracyScorer = Scorer<{
     });
 
     try {
-      const { output: judgment } = await generateText({
+      const result = await generateText({
         model: wrapAISDKModel(google('gemini-3-flash-preview')),
         prompt,
         output: Output.object({ schema: judgmentSchema }),
         maxOutputTokens: 1000,
       });
+      // AI SDK throws AI_NoOutputGeneratedError when finishReason !== "stop"
+      // (known Gemini bug: vercel/ai#11348). Fall back to parsing .text.
+      let judgment: z.infer<typeof judgmentSchema>;
+      try {
+        judgment = result.output;
+      } catch {
+        if (result.text) {
+          const parsed = judgmentSchema.safeParse(JSON.parse(result.text));
+          if (parsed.success) {
+            judgment = parsed.data;
+          } else {
+            throw new Error('Gemini returned text but failed schema validation');
+          }
+        } else {
+          throw new Error('Gemini returned no output and no text');
+        }
+      }
       const rawScore = judgment.score;
       const score = Number.isFinite(rawScore) ? Math.max(0, Math.min(1, rawScore / 100)) : 0;
       return {
