@@ -371,6 +371,9 @@ Every finding must link to its source — dashboards, queries, error reports, PR
 2. **Postmortems**—All queries that identified root cause
 3. **Shared findings**—Any query the user might want to explore
 4. **Documented patterns**—In `kb/queries.md` and `kb/patterns.md`
+5. **Data responses**—Any answer citing tool-derived numbers (burn rates, error counts, usage stats). Questions don't require investigation, but if you cite numbers from a query, include the source link.
+
+**Rule: If you ran a query and cite its results, generate a permalink.** Run `scripts/axiom-link` for every Axiom query whose results appear in your response.
 
 **Axiom permalinks:**
 ```bash
