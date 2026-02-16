@@ -392,15 +392,16 @@ Every finding must link to its source — dashboards, queries, error reports, PR
 **Rule: If you ran a query and cite its results, generate a permalink.** Run the appropriate link tool for every query whose results appear in your response.
 
 **Axiom chart-friendly links:** When your query aggregates over time (`summarize ... by bin(_time, ...)` or `bin_auto(_time)`), pass a simplified version to `scripts/axiom-link` that keeps the `summarize` as the last operator — strip any trailing `extend`, `order by`, or `project-reorder`. This lets Axiom render the result as a time-series chart instead of a flat table. If the query has no time binning, pass it as-is.
-- **Axiom:** `scripts/axiom-link`
+- **Axiom:** `scripts/axiom-link` (works for both APL and MPL queries)
 - **Grafana:** `scripts/grafana-link`
 - **Pyroscope:** `scripts/pyroscope-link`
 - **Sentry:** `scripts/sentry-link`
 
 **Permalinks:**
 ```bash
-# Axiom
+# Axiom (APL or MPL — same script handles both)
 scripts/axiom-link <env> "['logs'] | where status >= 500 | take 100" "1h"
+scripts/axiom-link <env> "dataset:metric.name | align to 5m using avg" "1h"
 # Grafana (metrics)
 scripts/grafana-link <env> <datasource-uid> "rate(http_requests_total[5m])" "1h"
 # Pyroscope (profiling)
