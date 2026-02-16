@@ -63,8 +63,10 @@ get_catalog() {
 
     if [[ -n "$data" ]]; then
         mkdir -p "$CACHE_DIR/$dep"
-        printf '%s' "$data" > "$cache_file"
-        chmod 600 "$cache_file"
+        local tmp_file="$cache_file.tmp.$$"
+        printf '%s' "$data" > "$tmp_file"
+        chmod 600 "$tmp_file"
+        mv "$tmp_file" "$cache_file"
     fi
 
     printf '%s' "$data"
@@ -103,7 +105,7 @@ discover_dep() {
 
             # Fetch dataset catalog to identify MetricsDB datasets
             catalog=$(get_catalog "$dep")
-            metrics_set=$(echo "$catalog" | jq -r '.[] | select(.kind == "otel-metrics-v1") | .name' 2>/dev/null || echo "")
+            metrics_set=$(echo "$catalog" | jq -r '.[] | select(.kind == "otel:metrics:v1") | .name' 2>/dev/null || echo "")
 
             END_CATALOG=$(current_time_ms)
             DURATION_CATALOG=$(( END_CATALOG - END_QUERY ))
@@ -150,7 +152,7 @@ discover_dep() {
                 echo -e "  ${GREEN}$count datasets found${NC} (query: ${DURATION_QUERY}ms, fallback: ${DURATION_FALLBACK}ms)"
 
                 # Identify MetricsDB datasets (otel-metrics-v1)
-                metrics_datasets=$(echo "$response" | jq -r '.[] | select(.kind == "otel-metrics-v1") | .name' 2>/dev/null || echo "")
+                metrics_datasets=$(echo "$response" | jq -r '.[] | select(.kind == "otel:metrics:v1") | .name' 2>/dev/null || echo "")
 
                 # Tag MetricsDB datasets inline, consistent with Strategy 1
                 echo "$response" | jq -r '.[] | .name' | sort | while IFS= read -r ds; do

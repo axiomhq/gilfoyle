@@ -5,21 +5,22 @@
 # range_to_rfc3339 converts a human range (e.g. 1h, 24h, 7d) to an RFC3339 timestamp that many seconds ago
 range_to_rfc3339() {
   local range="$1"
-  local value="${range%[hdm]}"
+  local value="${range%[smhd]}"
   local suffix="${range: -1}"
 
   if ! [[ "$value" =~ ^[0-9]+$ ]]; then
-    echo "Error: Invalid range value '$range'. Expected number + suffix (h/d/m)." >&2
+    echo "Error: Invalid range value '$range'. Expected number + suffix (s/m/h/d)." >&2
     return 1
   fi
 
   local label
   case "$suffix" in
+    s) label="second" ;;
     h) label="hour" ;;
     d) label="day" ;;
     m) label="minute" ;;
     *)
-      echo "Error: Invalid range suffix '$suffix'. Use h (hours), d (days), or m (minutes)." >&2
+      echo "Error: Invalid range suffix '$suffix'. Use s (seconds), m (minutes), h (hours), or d (days)." >&2
       return 1
       ;;
   esac
@@ -37,6 +38,7 @@ range_to_rfc3339() {
     # macOS date: -v flag with uppercase suffix
     local date_flag
     case "$suffix" in
+      s) date_flag="-v-${value}S" ;;
       h) date_flag="-v-${value}H" ;;
       d) date_flag="-v-${value}d" ;;
       m) date_flag="-v-${value}M" ;;

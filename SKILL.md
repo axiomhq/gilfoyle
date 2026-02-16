@@ -402,10 +402,23 @@ Every finding must link to its source — dashboards, queries, error reports, PR
 3. **Shared findings**—Any query the user might want to explore
 4. **Documented patterns**—In `kb/queries.md` and `kb/patterns.md`
 
-**Axiom permalinks:**
+**Rule: If you ran a query and cite its results, generate a permalink.** Run the appropriate link tool for every query whose results appear in your response:
+- **Axiom:** `scripts/axiom-link` (works for both APL and MPL queries)
+- **Grafana:** `scripts/grafana-link`
+- **Pyroscope:** `scripts/pyroscope-link`
+- **Sentry:** `scripts/sentry-link`
+
+**Permalinks:**
 ```bash
+# Axiom (APL or MPL — same script handles both)
 scripts/axiom-link <env> "['logs'] | where status >= 500 | take 100" "1h"
-scripts/axiom-link <env> "['logs'] | summarize count() by service" "24h"
+scripts/axiom-link <env> "dataset:metric.name | align to 5m using avg" "1h"
+# Grafana (metrics)
+scripts/grafana-link <env> <datasource-uid> "rate(http_requests_total[5m])" "1h"
+# Pyroscope (profiling)
+scripts/pyroscope-link <env> 'process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="my-service"}' "1h"
+# Sentry
+scripts/sentry-link <env> "/issues/?query=is:unresolved+service:api-gateway"
 ```
 
 **Format:**
