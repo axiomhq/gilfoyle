@@ -12,6 +12,7 @@ import { missingAccessScenario } from './missing-access.js';
 import { p1RollbackScenario } from './p1-rollback.js';
 import { firstRunScenario } from './first-run.js';
 import { schemaDiscoveryScenario } from './schema-discovery.js';
+import { dataQuestionScenario } from './data-question.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GENERATED_DIR = join(__dirname, '../synthesizer/generated');
@@ -27,6 +28,7 @@ const handCrafted: IncidentScenario[] = [
   p1RollbackScenario,
   firstRunScenario,
   schemaDiscoveryScenario,
+  dataQuestionScenario,
 ];
 
 function loadGeneratedScenarios(): IncidentScenario[] {

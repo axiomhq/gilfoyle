@@ -8,7 +8,7 @@
 #
 # Returns environment variables based on tool:
 #   axiom:    AXIOM_URL, AXIOM_TOKEN, AXIOM_ORG_ID
-#   grafana:  GRAFANA_URL, GRAFANA_TOKEN, GRAFANA_ACCESS_CMD, GRAFANA_USERNAME, GRAFANA_PASSWORD,
+#   grafana:  GRAFANA_URL, GRAFANA_TOKEN, GRAFANA_ORG_ID, GRAFANA_ACCESS_CMD, GRAFANA_USERNAME, GRAFANA_PASSWORD,
 #             GRAFANA_CF_ACCESS_CLIENT_ID, GRAFANA_CF_ACCESS_CLIENT_SECRET
 #   pyroscope: PYROSCOPE_URL, PYROSCOPE_TOKEN, PYROSCOPE_ACCESS_CMD, PYROSCOPE_USERNAME, PYROSCOPE_PASSWORD,
 #             PYROSCOPE_CF_ACCESS_CLIENT_ID, PYROSCOPE_CF_ACCESS_CLIENT_SECRET
@@ -161,6 +161,7 @@ case "$TOOL" in
         ;;
     
     grafana)
+        ORG_ID=$(extract_value "$SECTION" "org_id")
         if [[ -z "$URL" ]]; then
             echo "Error: Deployment '$DEPLOYMENT' not found in [grafana.deployments.$DEPLOYMENT]" >&2
             echo "" >&2
@@ -172,6 +173,7 @@ case "$TOOL" in
         fi
         echo "GRAFANA_URL=\"$URL\""
         [[ -n "$TOKEN" ]] && echo "GRAFANA_TOKEN=\"$TOKEN\"" || true
+        [[ -n "$ORG_ID" ]] && echo "GRAFANA_ORG_ID=\"$ORG_ID\"" || true
         [[ -n "$ACCESS_CMD" ]] && echo "GRAFANA_ACCESS_CMD=\"$ACCESS_CMD\"" || true
         [[ -n "$CF_ACCESS_CLIENT_ID" ]] && echo "GRAFANA_CF_ACCESS_CLIENT_ID=\"$CF_ACCESS_CLIENT_ID\"" || true
         [[ -n "$CF_ACCESS_CLIENT_SECRET" ]] && echo "GRAFANA_CF_ACCESS_CLIENT_SECRET=\"$CF_ACCESS_CLIENT_SECRET\"" || true

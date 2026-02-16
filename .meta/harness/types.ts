@@ -1,6 +1,6 @@
 export type HarnessName = 'amp' | 'opencode' | 'direct' | 'claude' | 'codex';
 export type ModelName = string;
-export type ToolName = 'scripts/init' | 'scripts/axiom-query' | 'scripts/grafana-query' | 'scripts/slack' | 'scripts/mem-write' | 'scripts/rollback' | 'scripts/flag-revert' | 'scripts/axiom-link';
+export type ToolName = 'scripts/init' | 'scripts/axiom-query' | 'scripts/grafana-query' | 'scripts/slack' | 'scripts/mem-write' | 'scripts/rollback' | 'scripts/flag-revert' | 'scripts/axiom-link' | 'scripts/grafana-link' | 'scripts/pyroscope-link' | 'scripts/sentry-link';
 
 export interface ToolCall {
   tool: ToolName;
@@ -71,6 +71,8 @@ export interface ScenarioScoringRequirements {
   requireHypothesisDiscipline?: boolean;
   // Must-not-mention can be disabled where keyword overlap is expected.
   requireMustNotMention?: boolean;
+  // Source links must accompany any data-derived claims in the response.
+  requireSourceLinks?: boolean;
 }
 
 export interface IncidentScenario {

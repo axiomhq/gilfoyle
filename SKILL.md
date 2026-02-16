@@ -399,12 +399,22 @@ Every finding must link to its source — dashboards, queries, error reports, PR
 4. **Documented patterns**—In `kb/queries.md` and `kb/patterns.md`
 5. **Data responses**—Any answer citing tool-derived numbers (e.g. burn rates, error counts, usage stats, etc). Questions don't require investigation, but if you cite numbers from a query, include the source link.
 
-**Rule: If you ran a query and cite its results, generate a permalink.** Run `scripts/axiom-link` for every Axiom query whose results appear in your response.
+**Rule: If you ran a query and cite its results, generate a permalink.** Run the appropriate link tool for every query whose results appear in your response:
+- **Axiom:** `scripts/axiom-link`
+- **Grafana:** `scripts/grafana-link`
+- **Pyroscope:** `scripts/pyroscope-link`
+- **Sentry:** `scripts/sentry-link`
 
-**Axiom permalinks:**
+**Permalinks:**
 ```bash
+# Axiom
 scripts/axiom-link <env> "['logs'] | where status >= 500 | take 100" "1h"
-scripts/axiom-link <env> "['logs'] | summarize count() by service" "24h"
+# Grafana (metrics)
+scripts/grafana-link <env> <datasource-uid> "rate(http_requests_total[5m])" "1h"
+# Pyroscope (profiling)
+scripts/pyroscope-link <env> 'process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="my-service"}' "1h"
+# Sentry
+scripts/sentry-link <env> "/issues/?query=is:unresolved+service:api-gateway"
 ```
 
 **Format:**
@@ -412,6 +422,12 @@ scripts/axiom-link <env> "['logs'] | summarize count() by service" "24h"
 **Finding:** Error rate spiked at 14:32 UTC
 - Query: `['logs'] | where status >= 500 | summarize count() by bin(_time, 1m)`
 - [View in Axiom](https://app.axiom.co/...)
+- Query: `rate(http_requests_total{status=~"5.."}[5m])`
+- [View in Grafana](https://grafana.acme.co/explore?...)
+- Profile: `process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="api"}`
+- [View in Pyroscope](https://pyroscope.acme.co/?query=...)
+- Issue: PROJ-1234
+- [View in Sentry](https://sentry.io/issues/...)
 ```
 
 ---
