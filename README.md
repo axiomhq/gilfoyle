@@ -90,6 +90,14 @@ scripts/slack default chat.postMessage channel=incidents text="Fixed. You're wel
 | **Slack** | `slack` |
 | **Memory** | `mem-write`, `mem-doctor`, `mem-sync` |
 | **Setup** | `init`, `config` |
+| **Tests** | `test-curl-auth`, `test-config-toml` |
+
+## Testing
+
+```bash
+scripts/test-curl-auth      # Auth integration and secret handling
+scripts/test-config-toml    # TOML parsing with indented sections
+```
 
 ## Principles
 
