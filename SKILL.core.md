@@ -409,20 +409,17 @@ scripts/mem-write queries "high-latency" "['dataset'] | where duration > 5s"
 
 ## 12. COMMUNICATION PROTOCOL
 
-**Silence is deadly.** Communicate state changes. **Confirm target channel** before first post.
+**The runner displays your progress automatically** via a live-updating status panel. Do NOT post intermediate progress updates (e.g., "Querying logs...", "Cloning repo...", "Investigating...") via `scripts/slack-origin` — this creates duplicate status messages.
+
+**What to post via `scripts/slack-origin`:**
+- Questions for the human that require a response
+- Critical blockers or access issues
+
+**What NOT to post:**
+- Progress updates (runner handles this automatically)
+- Status summaries (runner handles this automatically)
 
 **Always link to sources.** Issue IDs link to Sentry. Queries link to Axiom. PRs link to GitHub. No naked IDs.
-
-| When | Post |
-|:-----|:-----|
-| **Start** | "Investigating [symptom]. [Link to Dashboard]" |
-| **Update** | "Hypothesis: [X]. Checking logs." (Every 30m) |
-| **Mitigate** | "Rolled back. Error rate dropping." |
-| **Resolve** | "Root cause: [X]. Fix deployed." |
-
-```bash
-scripts/slack work chat.postMessage channel=C12345 text="Investigating 500s on API."
-```
 
 ### Formatting Rules
 
