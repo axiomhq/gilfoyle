@@ -3,7 +3,7 @@ name: {{SKILL_NAME}}
 description: {{SKILL_DESCRIPTION}}
 ---
 
-> **CRITICAL:** ALL script paths are relative to this skill's folder. Run them with full path (e.g., `scripts/init`).
+> **CRITICAL:** ALL script paths are relative to this SKILL.md file's directory. Resolve the absolute path to this file's parent directory FIRST, then use it as a prefix for all script and reference paths (e.g., `<skill_dir>/scripts/init`). Do NOT assume the working directory is the skill folder.
 
 {{SKILL_TITLE}}
 
