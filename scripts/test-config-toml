@@ -100,6 +100,22 @@ token =    "xaat-prod-token"
 org_id = "org-prod-123"
 EOF
 
+# Inline comments
+cat > "$TEST_DIR/comments.toml" << 'EOF'
+[axiom.deployments.prod]
+url = "https://api.axiom.co" # production API
+token = "xaat-prod-token" # keep secret
+org_id = "org-prod-123"
+EOF
+
+# Hash inside quoted value
+cat > "$TEST_DIR/hash_in_value.toml" << 'EOF'
+[axiom.deployments.prod]
+url = "https://example.com/path#fragment"
+token = "xaat-prod-token"
+org_id = "org-prod-123"
+EOF
+
 # ========== Tests via config script ==========
 # Use GILFOYLE_CONFIG env var to point config at our fixtures.
 
@@ -155,6 +171,22 @@ result=$(eval "$("$SCRIPT_DIR/config" axiom prod)" && echo "$AXIOM_URL")
 assert_eq "axiom url with spacing" "https://api.axiom.co" "$result"
 result=$(eval "$("$SCRIPT_DIR/config" axiom prod)" && echo "$AXIOM_TOKEN")
 assert_eq "axiom token with spacing" "xaat-prod-token" "$result"
+
+echo ""
+echo "=== extract_value: inline comments ==="
+export GILFOYLE_CONFIG="$TEST_DIR/comments.toml"
+result=$(eval "$("$SCRIPT_DIR/config" axiom prod)" && echo "$AXIOM_URL")
+assert_eq "axiom url with comment" "https://api.axiom.co" "$result"
+result=$(eval "$("$SCRIPT_DIR/config" axiom prod)" && echo "$AXIOM_TOKEN")
+assert_eq "axiom token with comment" "xaat-prod-token" "$result"
+
+echo ""
+echo "=== extract_value: hash inside quoted value ==="
+export GILFOYLE_CONFIG="$TEST_DIR/hash_in_value.toml"
+result=$(eval "$("$SCRIPT_DIR/config" axiom prod)" && echo "$AXIOM_URL")
+assert_eq "axiom url with hash fragment" "https://example.com/path#fragment" "$result"
+result=$(eval "$("$SCRIPT_DIR/config" axiom prod)" && echo "$AXIOM_TOKEN")
+assert_eq "axiom token after hash url" "xaat-prod-token" "$result"
 
 echo ""
 echo "=== extract_value: no cross-section leaking ==="

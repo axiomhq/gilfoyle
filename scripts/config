@@ -81,7 +81,7 @@ extract_value() {
     local key="$2"
     
     awk -v section="$section" -v key="$key" '
-        /\[/ {
+        /^[[:space:]]*\[/ {
             line = $0
             gsub(/^[[:space:]]+/, "", line)
             in_section = (line == "[" section "]")
@@ -90,7 +90,11 @@ extract_value() {
             gsub(/^[[:space:]]+/, "")
             if ($1 == key) {
                 sub(/^[^=]*=[[:space:]]*/, "")
-                gsub(/^"|"$/, "")
+                if (match($0, /^"[^"]*"/)) {
+                    $0 = substr($0, RSTART+1, RLENGTH-2)
+                } else {
+                    sub(/[[:space:]]*#.*$/, "")
+                }
                 print
                 exit
             }
