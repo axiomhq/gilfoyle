@@ -35,7 +35,7 @@ jobs:
 
   eval:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -64,7 +64,7 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       EVAL_HARNESS: ${{ matrix.harness }}
       EVAL_MODEL: ${{ matrix.model }}
-      EVAL_TIMEOUT_MS: 600000
+      EVAL_TIMEOUT_MS: 900000
       GIT_COMMIT: ${{ github.sha }}
       GIT_BRANCH: ${{ github.ref_name }}
     steps:

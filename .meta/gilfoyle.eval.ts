@@ -144,6 +144,6 @@ Eval<EvalInput, ExpectedOutput, EvalOutput>(evalName, {
     FirstRunScorer,
     SourceLinkScorer,
   ],
-  timeout: 300_000, // 5 minutes per scenario — LLM investigations take time
+  timeout: 900_000, // 15 minutes per scenario — LLM investigations take time, especially with slower models
   metadata: { description: 'Evaluate Gilfoyle SRE skill incident investigation', version: '0.2.0', harness: harnessName, ...(modelName && { model: modelName }), commit: process.env.GIT_COMMIT ?? '', branch: process.env.GIT_BRANCH ?? '' },
 });
