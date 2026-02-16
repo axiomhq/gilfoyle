@@ -15,7 +15,7 @@ import type { IncidentScenario, RunConfig, EvalOutput, HarnessName, ModelName } 
 import type { FailedScenario, PromptFix, OptimizeResult } from './types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SKILL_PATH = join(__dirname, '../../SKILL.md');
+const SKILL_PATH = join(__dirname, '../../skill/SKILL.md');
 
 function extractRootCause(text: string): string {
   const rcMatch = text.match(/root\s*cause[:\s]*([^\n]+(?:\n(?![A-Z])[^\n]+)*)/i);

@@ -15,7 +15,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_DIR="$(dirname "$SCRIPT_DIR")"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+SKILL_DIR="$REPO_DIR/skill"
 TARGET="${1:-$HOME/code/skills/skills/sre}"
 
 if [[ ! -d "$TARGET" ]]; then
@@ -32,27 +33,15 @@ echo "Building SKILL.md (axiom-sre)..."
 "$SCRIPT_DIR/build-skill" axiom-sre > "$TARGET/SKILL.md"
 echo "  ✓ SKILL.md"
 
-# 2. Copy scripts (skip meta scripts, remove stale)
-SKIP_SCRIPTS="build-skill sync-to-skills test-build"
+# 2. Copy scripts (remove stale, sync all from skill/scripts/)
 echo "Syncing scripts..."
 
-# Remove scripts in target that don't exist in source or are meta-only
+# Remove scripts in target that don't exist in source
 for target_script in "$TARGET/scripts/"*; do
     name=$(basename "$target_script")
     [[ -d "$target_script" ]] && continue
 
-    should_remove=false
     if [[ ! -f "$SKILL_DIR/scripts/$name" ]]; then
-        should_remove=true
-    fi
-    for s in $SKIP_SCRIPTS; do
-        if [[ "$name" == "$s" ]]; then
-            should_remove=true
-            break
-        fi
-    done
-
-    if $should_remove; then
         rm "$target_script"
         echo "  ✗ scripts/$name (removed)"
     fi
@@ -60,16 +49,6 @@ done
 
 for script in "$SKILL_DIR/scripts/"*; do
     name=$(basename "$script")
-
-    # Skip meta scripts
-    skip=false
-    for s in $SKIP_SCRIPTS; do
-        if [[ "$name" == "$s" ]]; then
-            skip=true
-            break
-        fi
-    done
-    $skip && continue
 
     # Skip directories
     [[ -d "$script" ]] && continue
@@ -122,7 +101,7 @@ echo "  ✓ replacements applied"
 
 # Summary
 echo ""
-GILFOYLE_SCRIPTS=$(ls "$SKILL_DIR/scripts/" | grep -v -E "build-skill|sync-to-skills" | wc -l | tr -d ' ')
+GILFOYLE_SCRIPTS=$(ls "$SKILL_DIR/scripts/" | wc -l | tr -d ' ')
 TARGET_SCRIPTS=$(ls "$TARGET/scripts/" | wc -l | tr -d ' ')
 GILFOYLE_REFS=$(ls "$SKILL_DIR/reference/" | wc -l | tr -d ' ')
 TARGET_REFS=$(ls "$TARGET/reference/" | wc -l | tr -d ' ')

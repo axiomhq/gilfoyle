@@ -4,11 +4,8 @@ on:
   pull_request:
     paths:
       - 'SKILL.core.md'
-      - 'SKILL.md'
-      - 'personas/**'
+      - 'skill/**'
       - 'scripts/**'
-      - 'reference/**'
-      - 'templates/**'
 
 jobs:
   test:
@@ -16,8 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify build-skill reproduces SKILL.md
-        run: diff <(scripts/build-skill gilfoyle) SKILL.md
+      - name: Verify build-skill reproduces skill/SKILL.md
+        run: diff <(scripts/build-skill gilfoyle) skill/SKILL.md
 
       - name: Run test suite
         run: scripts/test-build

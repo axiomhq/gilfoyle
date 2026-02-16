@@ -9,11 +9,9 @@ on:
   push:
     branches: [main]
     paths:
-      - 'SKILL.md'
       - 'SKILL.core.md'
-      - 'personas/**'
+      - 'skill/**'
       - 'scripts/**'
-      - 'reference/**'
       - '.meta/**'
       - '.github/workflows/**'
 

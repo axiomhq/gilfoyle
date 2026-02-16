@@ -7,14 +7,14 @@
 #   scripts/build-skill              # Defaults to gilfoyle
 #
 # Output: writes SKILL.md to stdout (redirect to file as needed)
-#   scripts/build-skill gilfoyle > SKILL.md
+#   scripts/build-skill gilfoyle > skill/SKILL.md
 #   scripts/build-skill axiom-sre > /path/to/skills/sre/SKILL.md
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_DIR="$(dirname "$SCRIPT_DIR")"
-CORE="$SKILL_DIR/SKILL.core.md"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+CORE="$REPO_DIR/SKILL.core.md"
 
 PERSONA="${1:-gilfoyle}"
 
@@ -35,7 +35,7 @@ case "$PERSONA" in
         MEMORY_DIR='~/.config/gilfoyle/memory'
         CONFIG_PATH='~/.config/gilfoyle/config.toml'
         INIT_TIMEOUT_VAR="GILFOYLE_INIT_TIMEOUT"
-        PERSONA_FILE="$SKILL_DIR/personas/gilfoyle.md"
+        PERSONA_FILE="$REPO_DIR/skill/personas/gilfoyle.md"
         if [[ ! -f "$PERSONA_FILE" ]]; then
             echo "Error: Persona file not found: $PERSONA_FILE" >&2
             exit 1

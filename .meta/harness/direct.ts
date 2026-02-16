@@ -20,7 +20,7 @@ import { z } from 'zod';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 async function loadSkill(skillPath?: string): Promise<string> {
-  const path = skillPath ?? join(__dirname, '../../SKILL.md');
+  const path = skillPath ?? join(__dirname, '../../skill/SKILL.md');
   return readFile(path, 'utf-8');
 }
 

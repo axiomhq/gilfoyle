@@ -18,7 +18,7 @@ You're welcome.
 ## Installation
 
 ```bash
-npx skills add axiomhq/gilfoyle
+npx skills add axiomhq/gilfoyle/skill
 ```
 
 ### Requirements

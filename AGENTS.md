@@ -10,7 +10,7 @@ You're working on Gilfoyle. Act accordingly.
 
 ```bash
 # Build SKILL.md from SKILL.core.md + persona
-scripts/build-skill gilfoyle > SKILL.md
+scripts/build-skill gilfoyle > skill/SKILL.md
 
 # Test the build pipeline
 scripts/test-build
@@ -67,7 +67,7 @@ After changing SKILL.core.md, reference files, or scripts:
 
 ```bash
 # 1. Build SKILL.md from source
-scripts/build-skill gilfoyle > SKILL.md
+scripts/build-skill gilfoyle > skill/SKILL.md
 
 # 2. Run build tests (checks line count, placeholders, sections, idempotency)
 scripts/test-build
@@ -90,12 +90,14 @@ Steps 1-2 must pass. Step 3 produces a comparison against baseline — review th
 
 ```
 gilfoyle/
-├── SKILL.md              # Main skill definition (<500 lines)
-├── SKILL.core.md         # Core skill without persona (build input)
-├── personas/             # Persona overlays for build-skill
-├── scripts/              # All executable tools
-├── reference/            # Deep-dive documentation
-├── templates/            # Memory system templates
+├── skill/                # Installable skill (amp skill add axiomhq/gilfoyle/skill)
+│   ├── SKILL.md          # Built skill definition (<500 lines)
+│   ├── scripts/          # All executable tools
+│   ├── reference/        # Deep-dive documentation
+│   ├── templates/        # Memory system templates
+│   └── personas/         # Persona overlays
+├── SKILL.core.md         # Core skill template (build input)
+├── scripts/              # Build/sync tooling (build-skill, sync-to-skills, test-build)
 ├── .meta/                # Eval framework (bun project)
 └── .github/workflows/    # CI (eval runs on push to main)
 ```

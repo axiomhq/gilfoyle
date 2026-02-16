@@ -21,7 +21,7 @@ const OPENCODE_CACHE_PACKAGE_JSON = JSON.stringify({
 });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SKILL_PATH = join(__dirname, '../../SKILL.md');
+const SKILL_PATH = join(__dirname, '../../skill/SKILL.md');
 const MOCK_TOOL_PATH = join(__dirname, '../toolbox/mock-tool.ts');
 
 const DEFAULT_PROVIDER = 'xai';
