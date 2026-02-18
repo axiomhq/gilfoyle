@@ -1,6 +1,6 @@
 export type HarnessName = 'amp' | 'opencode' | 'direct' | 'claude' | 'codex';
 export type ModelName = string;
-export type ToolName = 'scripts/init' | 'scripts/axiom-query' | 'scripts/grafana-query' | 'scripts/slack' | 'scripts/mem-write' | 'scripts/rollback' | 'scripts/flag-revert' | 'scripts/axiom-link' | 'scripts/grafana-link' | 'scripts/pyroscope-link' | 'scripts/sentry-link';
+export type ToolName = 'scripts/init' | 'scripts/axiom-query' | 'scripts/grafana-query' | 'scripts/slack' | 'scripts/mem-write' | 'scripts/rollback' | 'scripts/flag-revert' | 'scripts/axiom-link' | 'scripts/grafana-link' | 'scripts/pyroscope-link' | 'scripts/sentry-link' | 'git_log' | 'git_blame' | 'gh_pr_view' | 'gh_pr_diff' | 'gh_repo_clone';
 
 export interface ToolCall {
   tool: ToolName;
@@ -52,11 +52,44 @@ export interface DataSourceInfo {
   type: string; // 'prometheus' | 'loki' | etc
 }
 
+export interface GitLogEntry {
+  sha: string;
+  author: string;
+  date: string;
+  message: string;
+  files?: string[];
+}
+
+export interface GitBlameEntry {
+  sha: string;
+  author: string;
+  date: string;
+  lineStart: number;
+  lineEnd: number;
+  content: string;
+}
+
+export interface GitHubPR {
+  number: number;
+  title: string;
+  body: string;
+  author: string;
+  mergedAt: string;
+  files: string[];
+  diff: string;
+}
+
 export interface ScenarioFixtures {
   datasets: Record<string, LogRow[]>; // dataset name → log rows
   metrics: Record<string, MetricSeries[]>; // metric name → series
   datasources: DataSourceInfo[];
   validDeployments: string[]; // e.g. ['prod', 'staging']
+  /** Git history for mocked repos — keyed by file path */
+  gitLog?: Record<string, GitLogEntry[]>;
+  /** Git blame output — keyed by file path */
+  gitBlame?: Record<string, GitBlameEntry[]>;
+  /** GitHub PRs — keyed by PR number */
+  pullRequests?: Record<string, GitHubPR>;
 }
 
 export interface ScenarioScoringRequirements {
@@ -73,6 +106,8 @@ export interface ScenarioScoringRequirements {
   requireMustNotMention?: boolean;
   // Source links must accompany any data-derived claims in the response.
   requireSourceLinks?: boolean;
+  // Bug fix diligence: agent must investigate history before fixing.
+  requireBugfixDiligence?: boolean;
 }
 
 export interface IncidentScenario {

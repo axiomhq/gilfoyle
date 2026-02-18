@@ -222,6 +222,67 @@ export const directHarness: HarnessRunner = {
             return output as string;
           },
         }),
+        gh_repo_clone: tool({
+          description: 'Clone a GitHub repository',
+          inputSchema: z.object({
+            repo: z.string().describe('Repository in owner/name format'),
+          }),
+          execute: async (input): Promise<string> => {
+            const callStart = Date.now();
+            const output = await mockTools.call('gh_repo_clone', input);
+            toolCalls.push({ tool: 'gh_repo_clone', input, output, durationMs: Date.now() - callStart });
+            return output as string;
+          },
+        }),
+        git_log: tool({
+          description: 'View git log for a file. Pass file path and optional args (e.g., "-L :FunctionName:file")',
+          inputSchema: z.object({
+            file: z.string().optional().describe('File path'),
+            args: z.string().optional().describe('Additional git log arguments'),
+          }),
+          execute: async (input): Promise<string> => {
+            const callStart = Date.now();
+            const output = await mockTools.call('git_log', input);
+            toolCalls.push({ tool: 'git_log', input, output, durationMs: Date.now() - callStart });
+            return output as string;
+          },
+        }),
+        git_blame: tool({
+          description: 'View git blame for a file',
+          inputSchema: z.object({
+            file: z.string().describe('File path'),
+          }),
+          execute: async (input): Promise<string> => {
+            const callStart = Date.now();
+            const output = await mockTools.call('git_blame', input);
+            toolCalls.push({ tool: 'git_blame', input, output, durationMs: Date.now() - callStart });
+            return output as string;
+          },
+        }),
+        gh_pr_view: tool({
+          description: 'View a GitHub pull request',
+          inputSchema: z.object({
+            number: z.string().describe('PR number'),
+          }),
+          execute: async (input): Promise<string> => {
+            const callStart = Date.now();
+            const output = await mockTools.call('gh_pr_view', input);
+            toolCalls.push({ tool: 'gh_pr_view', input, output, durationMs: Date.now() - callStart });
+            return output as string;
+          },
+        }),
+        gh_pr_diff: tool({
+          description: 'View the diff of a GitHub pull request',
+          inputSchema: z.object({
+            number: z.string().describe('PR number'),
+          }),
+          execute: async (input): Promise<string> => {
+            const callStart = Date.now();
+            const output = await mockTools.call('gh_pr_diff', input);
+            toolCalls.push({ tool: 'gh_pr_diff', input, output, durationMs: Date.now() - callStart });
+            return output as string;
+          },
+        }),
       },
     });
 

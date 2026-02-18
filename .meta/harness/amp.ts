@@ -20,6 +20,14 @@ const MOCK_TOOL_PATH = join(__dirname, '../toolbox/mock-tool.ts');
 function extractScriptFromBashCmd(cmd: string): ToolName | null {
   const match = cmd.match(/scripts\/(init|axiom-query|grafana-query|slack|mem-write|rollback|flag-revert|axiom-link|grafana-link|pyroscope-link|sentry-link)/);
   if (match) return `scripts/${match[1]}` as ToolName;
+
+  // Match git/gh commands for bug fix protocol
+  if (/\bgit\s+log\b/.test(cmd)) return 'git_log';
+  if (/\bgit\s+blame\b/.test(cmd)) return 'git_blame';
+  if (/\bgh\s+pr\s+view\b/.test(cmd)) return 'gh_pr_view';
+  if (/\bgh\s+pr\s+diff\b/.test(cmd)) return 'gh_pr_diff';
+  if (/\bgh\s+repo\s+clone\b/.test(cmd)) return 'gh_repo_clone';
+
   return null;
 }
 
@@ -38,7 +46,9 @@ export const ampHarness: HarnessRunner = {
 
     const tmpDir = join(tmpdir(), `gilfoyle-eval-${Date.now()}`);
     const scriptsDir = join(tmpDir, 'scripts');
+    const binDir = join(tmpDir, 'bin');
     mkdirSync(scriptsDir, { recursive: true });
+    mkdirSync(binDir, { recursive: true });
 
     const scenarioFile = join(tmpDir, 'scenario.json');
     writeFileSync(scenarioFile, JSON.stringify(scenario));
@@ -51,12 +61,43 @@ export const ampHarness: HarnessRunner = {
       chmodSync(scriptPath, 0o755);
     }
 
+    // Create mock git/gh binaries for bug fix protocol scenarios
+    if (scenario.fixtures?.gitLog || scenario.fixtures?.gitBlame || scenario.fixtures?.pullRequests) {
+      // Mock git: routes subcommands to mock-tool.ts
+      const gitScript = `#!/bin/bash
+export GILFOYLE_SCENARIO_FILE="${scenarioFile}"
+case "$1" in
+  log)   shift; exec bun "${MOCK_TOOL_PATH}" mock-git-log "$@" ;;
+  blame) shift; exec bun "${MOCK_TOOL_PATH}" mock-git-blame "$@" ;;
+  *)     echo "mock-git: unsupported subcommand: $1" >&2; exit 1 ;;
+esac
+`;
+      writeFileSync(join(binDir, 'git'), gitScript);
+      chmodSync(join(binDir, 'git'), 0o755);
+
+      // Mock gh: routes subcommands to mock-tool.ts
+      const ghScript = `#!/bin/bash
+export GILFOYLE_SCENARIO_FILE="${scenarioFile}"
+case "$1:$2" in
+  pr:view)  shift 2; exec bun "${MOCK_TOOL_PATH}" mock-gh-pr-view "$@" ;;
+  pr:diff)  shift 2; exec bun "${MOCK_TOOL_PATH}" mock-gh-pr-diff "$@" ;;
+  repo:clone) shift 2; exec bun "${MOCK_TOOL_PATH}" mock-gh-repo-clone "$@" ;;
+  *)        echo "mock-gh: unsupported subcommand: $1 $2" >&2; exit 1 ;;
+esac
+`;
+      writeFileSync(join(binDir, 'gh'), ghScript);
+      chmodSync(join(binDir, 'gh'), 0o755);
+    }
+
     const elapsed = () => `${((Date.now() - start) / 1000).toFixed(0)}s`;
     const log = (msg: string) => console.error(`[amp] ${scenario.id} (${elapsed()}): ${msg}`);
     const pendingTools = new Map<string, { tool: ToolName; input: unknown }>();
 
     try {
-      const prompt = `You are Gilfoyle. Investigate this incident:\n\n${scenario.prompt}\n\nRun scripts/init first to discover available environments, then use scripts/axiom-query and scripts/grafana-query to investigate. State your ROOT CAUSE clearly with evidence.`;
+      const bugfixHint = scenario.scoring?.requireBugfixDiligence
+        ? `\n\nIf the root cause is a code bug, follow the Bug Fix Protocol: use git log, git blame, and gh pr view to trace the introducing change, understand intent, and report the full chain (PR → code change → failure mechanism).`
+        : '';
+      const prompt = `You are Gilfoyle. Investigate this incident:\n\n${scenario.prompt}\n\nRun scripts/init first to discover available environments, then use scripts/axiom-query and scripts/grafana-query to investigate. State your ROOT CAUSE clearly with evidence.${bugfixHint}`;
 
       log('starting');
       for await (const message of execute({
@@ -64,7 +105,7 @@ export const ampHarness: HarnessRunner = {
         options: {
           cwd: tmpDir,
           skills: tmpDir,
-          env: { GILFOYLE_SCENARIO_FILE: scenarioFile },
+          env: { GILFOYLE_SCENARIO_FILE: scenarioFile, PATH: `${binDir}:${process.env.PATH}` },
           dangerouslyAllowAll: true,
         },
       })) {

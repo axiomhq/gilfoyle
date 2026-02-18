@@ -319,6 +319,84 @@ try {
       break;
     }
 
+    case 'mock-git-log': {
+      // Parse file path from git log args (last non-flag arg, or after --)
+      const gitLogFiles = toolArgs.filter(a => !a.startsWith('-') && a !== '--');
+      const file = gitLogFiles[gitLogFiles.length - 1];
+      if (fixtures?.gitLog && file) {
+        const entries = fixtures.gitLog[file];
+        if (entries) {
+          console.log(entries.map(e =>
+            `${e.sha.slice(0, 7)} ${e.date} ${e.author} ${e.message}`
+          ).join('\n'));
+        } else {
+          console.error(`fatal: no such file: ${file}`);
+          process.exit(1);
+        }
+      } else {
+        console.log('No git history available in fixtures');
+      }
+      break;
+    }
+
+    case 'mock-git-blame': {
+      const blameFiles = toolArgs.filter(a => !a.startsWith('-') && a !== '--');
+      const blameFile = blameFiles[blameFiles.length - 1];
+      if (fixtures?.gitBlame && blameFile) {
+        const entries = fixtures.gitBlame[blameFile];
+        if (entries) {
+          console.log(entries.map(e =>
+            `${e.sha.slice(0, 7)} (${e.author} ${e.date}) ${e.lineStart}-${e.lineEnd}: ${e.content}`
+          ).join('\n'));
+        } else {
+          console.error(`fatal: no such file: ${blameFile}`);
+          process.exit(1);
+        }
+      } else {
+        console.log('No blame data available in fixtures');
+      }
+      break;
+    }
+
+    case 'mock-gh-pr-view': {
+      // Parse PR number from args (first numeric arg)
+      const prNum = toolArgs.find(a => /^\d+$/.test(a));
+      if (fixtures?.pullRequests && prNum) {
+        const pr = fixtures.pullRequests[prNum];
+        if (pr) {
+          console.log(`#${pr.number} ${pr.title}\n\nAuthor: ${pr.author}\nMerged: ${pr.mergedAt}\nFiles: ${pr.files.join(', ')}\n\n${pr.body}`);
+        } else {
+          console.error(`Could not resolve to a PullRequest with the number of ${prNum}`);
+          process.exit(1);
+        }
+      } else {
+        console.log('No PR data available in fixtures');
+      }
+      break;
+    }
+
+    case 'mock-gh-pr-diff': {
+      const diffPrNum = toolArgs.find(a => /^\d+$/.test(a));
+      if (fixtures?.pullRequests && diffPrNum) {
+        const pr = fixtures.pullRequests[diffPrNum];
+        if (pr) {
+          console.log(pr.diff);
+        } else {
+          console.error(`Could not resolve to a PullRequest with the number of ${diffPrNum}`);
+          process.exit(1);
+        }
+      } else {
+        console.log('No PR diff data available in fixtures');
+      }
+      break;
+    }
+
+    case 'mock-gh-repo-clone': {
+      const repo = toolArgs[0] ?? 'unknown';
+      console.log(`Cloned ${repo} to /tmp/${repo.split('/').pop()}`);
+      break;
+    }
+
     default:
       console.error(`error: Unknown tool: ${scriptName}`);
       process.exit(1);

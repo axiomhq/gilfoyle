@@ -174,7 +174,23 @@ Follow this loop strictly.
 
 ---
 
-## 5. CONCLUSION VALIDATION (MANDATORY)
+## 5. BUG FIX PROTOCOL
+
+Applies when the task outcome is a code change that fixes a bug — not just investigating a production incident.
+
+1. **Reproduce and define expected behavior** — state expected vs actual in one sentence. Write a minimal repro (test, script, or assertion) that demonstrates the bug. If you can't reproduce, say why and create the closest deterministic check you can
+2. **Trace the code path** — read the relevant code end-to-end (caller → callee → side effects). Identify the violated invariant and the exact failure mechanism, not just symptoms
+3. **Find what introduced it** — use `git blame`, `git log -L :FunctionName:path/to/file`, `git log --follow -p -- path/to/file`, or `gh pr list --state merged --search "path:file"` to identify the commit/PR that introduced the bug. Use `git bisect` for non-obvious regressions
+4. **Understand intent** — `gh pr view <number> --comments` and `gh pr diff <number>` to read *why* those changes were made. The bug may be an unintended side effect of an intentional change. Summarize the PR's intent in one line — you'll need this for your final message
+5. **Prove the test fails first** — write a test that catches the bug, run it, watch it fail. Only then apply the fix. If the test doesn't fail against the buggy code, it's not testing the bug. For race conditions: `go test -race -count=10`
+6. **Implement the minimal fix** — smallest change that restores the correct behavior. Don't mix refactors with bug fixes. Preserve the intent of the introducing PR unless the intent itself is wrong
+7. **Validate** — run the failing test again (now green), then the full test suite. For Go: include `-race`. For repos with linters: run them
+
+Your final message MUST include: what broke (repro signal), root cause mechanism, introduced-by (PR/commit link or "unknown" + what you checked), fix summary, and tests run
+
+---
+
+## 6. CONCLUSION VALIDATION (MANDATORY)
 
 Before declaring **any** stop condition (RESOLVED, MONITORING, ESCALATED, STALLED), run both checks.
 This applies to **pure RCA** too. No fix ≠ no validation.
@@ -236,7 +252,7 @@ If the Oracle finds gaps, keep investigating and report the gaps.
 
 ---
 
-## 6. FINAL MEMORY DISTILLATION (MANDATORY)
+## 7. FINAL MEMORY DISTILLATION (MANDATORY)
 
 Before declaring RESOLVED/MONITORING/ESCALATED/STALLED, distill what matters:
 
@@ -249,7 +265,7 @@ Use `scripts/mem-write` for each item. If memory bloat is flagged by `scripts/in
 
 ---
 
-## 7. COGNITIVE TRAPS
+## 8. COGNITIVE TRAPS
 
 | Trap | Antidote |
 |:-----|:---------|
@@ -266,7 +282,7 @@ Use `scripts/mem-write` for each item. If memory bloat is flagged by `scripts/in
 
 ---
 
-## 8. SRE METHODOLOGY
+## 9. SRE METHODOLOGY
 
 ### A. FOUR GOLDEN SIGNALS
 
@@ -346,7 +362,7 @@ For jq parsing and interpretation of spotlight output, see `reference/apl.md` �
 
 ---
 
-## 9. APL ESSENTIALS
+## 10. APL ESSENTIALS
 
 See `reference/apl.md` for full operator, function, and pattern reference.
 
@@ -362,7 +378,7 @@ See `reference/apl.md` for full operator, function, and pattern reference.
 
 ---
 
-## 10. EVIDENCE LINKS
+## 11. EVIDENCE LINKS
 
 Every finding must link to its source — dashboards, queries, error reports, PRs. No naked IDs. Make evidence reproducible and clickable.
 
@@ -406,7 +422,7 @@ scripts/sentry-link <env> "/issues/?query=is:unresolved+service:api-gateway"
 
 ---
 
-## 11. MEMORY SYSTEM
+## 12. MEMORY SYSTEM
 
 See `reference/memory-system.md` for full documentation.
 
@@ -426,7 +442,7 @@ scripts/mem-write queries "high-latency" "['dataset'] | where duration > 5s"
 
 ---
 
-## 12. COMMUNICATION PROTOCOL
+## 13. COMMUNICATION PROTOCOL
 
 **Silence is deadly.** Communicate state changes. **Confirm target channel** before first post.
 
@@ -450,7 +466,7 @@ scripts/slack work chat.postMessage channel=C12345 text="Investigating 500s on A
 
 ---
 
-## 13. POST-INCIDENT
+## 14. POST-INCIDENT
 
 **Before sharing any findings:**
 - [ ] Every claim verified with query evidence
@@ -467,7 +483,7 @@ See `reference/postmortem-template.md` for retrospective format.
 
 ---
 
-## 14. SLEEP PROTOCOL (CONSOLIDATION)
+## 15. SLEEP PROTOCOL (CONSOLIDATION)
 
 **If `scripts/init` warns of BLOAT:**
 1. **Finish task:** Solve the current incident first
@@ -478,7 +494,7 @@ See `reference/postmortem-template.md` for retrospective format.
 
 ---
 
-## 15. TOOL REFERENCE
+## 16. TOOL REFERENCE
 
 ### Axiom (Logs & Events)
 ```bash

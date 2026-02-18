@@ -185,6 +185,76 @@ export function createMockRouter(scenario: IncidentScenario): MockToolRouter {
           break;
         }
 
+        case 'gh_repo_clone': {
+          const { repo } = input as { repo?: string };
+          output = `Cloned ${repo ?? 'unknown'} to /tmp/${(repo ?? 'repo').split('/').pop()}`;
+          break;
+        }
+
+        case 'git_log': {
+          const { file } = input as { file?: string; args?: string };
+          if (scenario.fixtures?.gitLog && file) {
+            const entries = scenario.fixtures.gitLog[file];
+            if (entries) {
+              output = entries.map(e =>
+                `${e.sha.slice(0, 7)} ${e.date} ${e.author} ${e.message}`
+              ).join('\n');
+            } else {
+              output = `fatal: no such file: ${file}`;
+            }
+          } else {
+            output = 'No git history available in fixtures';
+          }
+          break;
+        }
+
+        case 'git_blame': {
+          const { file } = input as { file?: string };
+          if (scenario.fixtures?.gitBlame && file) {
+            const entries = scenario.fixtures.gitBlame[file];
+            if (entries) {
+              output = entries.map(e =>
+                `${e.sha.slice(0, 7)} (${e.author} ${e.date}) ${e.lineStart}-${e.lineEnd}: ${e.content}`
+              ).join('\n');
+            } else {
+              output = `fatal: no such file: ${file}`;
+            }
+          } else {
+            output = 'No blame data available in fixtures';
+          }
+          break;
+        }
+
+        case 'gh_pr_view': {
+          const { number: prNumber } = input as { number?: string };
+          if (scenario.fixtures?.pullRequests && prNumber) {
+            const pr = scenario.fixtures.pullRequests[prNumber];
+            if (pr) {
+              output = `#${pr.number} ${pr.title}\n\nAuthor: ${pr.author}\nMerged: ${pr.mergedAt}\nFiles: ${pr.files.join(', ')}\n\n${pr.body}`;
+            } else {
+              output = `Could not resolve to a PullRequest with the number of ${prNumber}`;
+            }
+          } else {
+            output = 'No PR data available in fixtures';
+          }
+          break;
+        }
+
+        case 'gh_pr_diff': {
+          const { number: diffPrNumber } = input as { number?: string };
+          if (scenario.fixtures?.pullRequests && diffPrNumber) {
+            const pr = scenario.fixtures.pullRequests[diffPrNumber];
+            if (pr) {
+              output = pr.diff;
+            } else {
+              output = `Could not resolve to a PullRequest with the number of ${diffPrNumber}`;
+            }
+          } else {
+            output = 'No PR diff data available in fixtures';
+          }
+          break;
+        }
+
         default:
           error = `Unknown tool: ${tool}`;
           output = { error };

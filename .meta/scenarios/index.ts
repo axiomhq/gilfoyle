@@ -13,6 +13,7 @@ import { p1RollbackScenario } from './p1-rollback.js';
 import { firstRunScenario } from './first-run.js';
 import { schemaDiscoveryScenario } from './schema-discovery.js';
 import { dataQuestionScenario } from './data-question.js';
+import { bugfixConnLeakScenario } from './bugfix-conn-leak.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GENERATED_DIR = join(__dirname, '../synthesizer/generated');
@@ -29,6 +30,7 @@ const handCrafted: IncidentScenario[] = [
   firstRunScenario,
   schemaDiscoveryScenario,
   dataQuestionScenario,
+  bugfixConnLeakScenario,
 ];
 
 function loadGeneratedScenarios(): IncidentScenario[] {
