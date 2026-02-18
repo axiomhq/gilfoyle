@@ -111,8 +111,10 @@ uriencode() {
 }
 
 DATASET_ENC=$(uriencode "$DATASET")
+START_ENC=$(uriencode "$START_TIME")
+END_ENC=$(uriencode "$END_TIME")
 BASE="/v1/query/metrics/info/datasets/${DATASET_ENC}"
-QS="start=${START_TIME}&end=${END_TIME}"
+QS="start=${START_ENC}&end=${END_ENC}"
 
 case "$COMMAND" in
   metrics)
