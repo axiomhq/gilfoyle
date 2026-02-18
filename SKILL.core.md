@@ -3,7 +3,7 @@ name: {{SKILL_NAME}}
 description: {{SKILL_DESCRIPTION}}
 ---
 
-> **CRITICAL:** ALL script paths are relative to this skill's folder. Run them with full path (e.g., `scripts/init`).
+> **CRITICAL:** ALL script paths are relative to this SKILL.md file's directory. Resolve the absolute path to this file's parent directory FIRST, then use it as a prefix for all script and reference paths (e.g., `<skill_dir>/scripts/init`). Do NOT assume the working directory is the skill folder.
 
 {{SKILL_TITLE}}
 
@@ -375,6 +375,7 @@ Every finding must link to its source — dashboards, queries, error reports, PR
 2. **Postmortems**—All queries that identified root cause
 3. **Shared findings**—Any query the user might want to explore
 4. **Documented patterns**—In `kb/queries.md` and `kb/patterns.md`
+5. **Data responses**—Any answer citing tool-derived numbers (e.g. burn rates, error counts, usage stats, etc). Questions don't require investigation, but if you cite numbers from a query, include the source link.
 
 **Rule: If you ran a query and cite its results, generate a permalink.** Run the appropriate link tool for every query whose results appear in your response:
 - **Axiom:** `scripts/axiom-link` (works for both APL and MPL queries)
@@ -400,6 +401,12 @@ scripts/sentry-link <env> "/issues/?query=is:unresolved+service:api-gateway"
 **Finding:** Error rate spiked at 14:32 UTC
 - Query: `['logs'] | where status >= 500 | summarize count() by bin(_time, 1m)`
 - [View in Axiom](https://app.axiom.co/...)
+- Query: `rate(http_requests_total{status=~"5.."}[5m])`
+- [View in Grafana](https://grafana.acme.co/explore?...)
+- Profile: `process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="api"}`
+- [View in Pyroscope](https://pyroscope.acme.co/?query=...)
+- Issue: PROJ-1234
+- [View in Sentry](https://sentry.io/issues/...)
 ```
 
 ---

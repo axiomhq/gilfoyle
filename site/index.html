@@ -588,7 +588,7 @@
 
       <div class="cta-container">
         <button class="btn btn-copy" onclick="copy()">
-          <span class="cmd-text">npx skills add axiomhq/gilfoyle</span>
+          <span class="cmd-text">npx skills add axiomhq/gilfoyle/skill</span>
           <span class="check">✓</span>
         </button>
         <a href="https://github.com/axiomhq/gilfoyle" target="_blank" rel="noopener" class="btn btn-github" title="View on GitHub">
@@ -886,7 +886,7 @@
     });
 
     function copy() {
-      navigator.clipboard.writeText('npx skills add axiomhq/gilfoyle');
+      navigator.clipboard.writeText('npx skills add axiomhq/gilfoyle/skill');
       const b = document.querySelector('.btn-copy');
       b.classList.add('copied');
       setTimeout(() => b.classList.remove('copied'), 2000);

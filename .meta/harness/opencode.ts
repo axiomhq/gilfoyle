@@ -21,7 +21,7 @@ const OPENCODE_CACHE_PACKAGE_JSON = JSON.stringify({
 });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SKILL_PATH = join(__dirname, '../../SKILL.md');
+const SKILL_PATH = join(__dirname, '../../skill/SKILL.md');
 const MOCK_TOOL_PATH = join(__dirname, '../toolbox/mock-tool.ts');
 
 const DEFAULT_PROVIDER = 'xai';
@@ -61,7 +61,7 @@ function createMockScript(name: string, scenarioFile: string): string {
 }
 
 function extractScriptFromCmd(cmd: string): ToolName | null {
-  const match = cmd.match(/scripts\/(init|axiom-query|grafana-query|slack|mem-write|rollback|flag-revert|axiom-link)/);
+  const match = cmd.match(/scripts\/(init|axiom-query|grafana-query|slack|mem-write|rollback|flag-revert|axiom-link|grafana-link|pyroscope-link|sentry-link)/);
   if (match) return `scripts/${match[1]}` as ToolName;
   return null;
 }
@@ -108,7 +108,7 @@ export const opencodeHarness: HarnessRunner = {
     writeFileSync(scenarioFile, JSON.stringify(scenario));
     copyFileSync(SKILL_PATH, join(tmpDir, 'SKILL.md'));
 
-    const mockScripts = ['init', 'axiom-query', 'grafana-query', 'slack', 'mem-write', 'rollback', 'flag-revert', 'axiom-link'];
+    const mockScripts = ['init', 'axiom-query', 'grafana-query', 'slack', 'mem-write', 'rollback', 'flag-revert', 'axiom-link', 'grafana-link', 'pyroscope-link', 'sentry-link'];
     for (const name of mockScripts) {
       const scriptPath = join(scriptsDir, name);
       writeFileSync(scriptPath, createMockScript(name, scenarioFile));

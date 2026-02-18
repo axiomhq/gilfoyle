@@ -287,9 +287,35 @@ try {
     }
 
     case 'scripts-axiom-link': {
-      const query = toolArgs[0] ?? '';
-      const range = toolArgs[1] ?? '1h';
+      // toolArgs[0] is env (consumed by CLI routing, not used in URL)
+      const query = toolArgs[1] ?? '';
+      const range = toolArgs[2] ?? '1h';
       console.log(`https://app.axiom.co/acme/query?q=${encodeURIComponent(query)}&t=${range}`);
+      break;
+    }
+
+    case 'scripts-grafana-link': {
+      // toolArgs[0] is env (consumed by CLI routing, not used in URL)
+      const datasource = toolArgs[1] ?? 'prometheus';
+      const query = toolArgs[2] ?? '';
+      const range = toolArgs[3] ?? '1h';
+      const panes = JSON.stringify({ a: { datasource, queries: [{ refId: 'A', expr: query, datasource: { uid: datasource } }], range: { from: `now-${range}`, to: 'now' } } });
+      console.log(`https://grafana.acme.co/explore?schemaVersion=1&panes=${encodeURIComponent(panes)}&orgId=1`);
+      break;
+    }
+
+    case 'scripts-pyroscope-link': {
+      // toolArgs[0] is env, toolArgs[1] is query, toolArgs[2] is range
+      const pQuery = toolArgs[1] ?? '';
+      const pRange = toolArgs[2] ?? '1h';
+      console.log(`https://pyroscope.acme.co/?query=${encodeURIComponent(pQuery)}&from=now-${pRange}&until=now`);
+      break;
+    }
+
+    case 'scripts-sentry-link': {
+      // toolArgs[0] is env, toolArgs[1] is path
+      const sPath = (toolArgs[1] ?? '').replace(/^\//, '');
+      console.log(`https://sentry.acme.co/${sPath}`);
       break;
     }
 

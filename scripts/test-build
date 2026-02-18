@@ -6,7 +6,8 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_DIR="$(dirname "$SCRIPT_DIR")"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+SKILL_DIR="$REPO_DIR/skill"
 SKILLS_SRE="${1:-}"
 PASS=0
 FAIL=0
@@ -16,11 +17,11 @@ fail() { echo "  ✗ $1"; ((FAIL++)); }
 
 echo "=== build-skill tests ==="
 
-# Test 1: gilfoyle build matches current SKILL.md
+# Test 1: gilfoyle build matches current skill/SKILL.md
 if diff <("$SCRIPT_DIR/build-skill" gilfoyle) "$SKILL_DIR/SKILL.md" >/dev/null 2>&1; then
-    pass "gilfoyle build matches SKILL.md"
+    pass "gilfoyle build matches skill/SKILL.md"
 else
-    fail "gilfoyle build differs from SKILL.md"
+    fail "gilfoyle build differs from skill/SKILL.md"
     diff <("$SCRIPT_DIR/build-skill" gilfoyle) "$SKILL_DIR/SKILL.md" | head -20
 fi
 
@@ -150,11 +151,10 @@ if [[ -n "$SKILLS_SRE" && -d "$SKILLS_SRE" ]]; then
         fail "synced SKILL.md differs from build-skill output"
     fi
 
-    # Test: all gilfoyle scripts present (except meta scripts)
+    # Test: all skill scripts present in target
     MISSING=""
     for script in "$SKILL_DIR/scripts/"*; do
         name=$(basename "$script")
-        [[ "$name" == "build-skill" || "$name" == "sync-to-skills" || "$name" == "test-build" ]] && continue
         [[ -d "$script" ]] && continue
         if [[ ! -f "$SKILLS_SRE/scripts/$name" ]]; then
             MISSING="$MISSING $name"

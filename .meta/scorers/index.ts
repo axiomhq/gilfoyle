@@ -20,3 +20,4 @@ export { FirstRunScorer } from './first-run.js';
 export { RunValidityScorer } from './run-validity.js';
 export { WallClockScorer } from './wall-clock.js';
 export { TokenBudgetScorer } from './token-budget.js';
+export { SourceLinkScorer } from './source-links.js';

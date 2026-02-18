@@ -8,7 +8,7 @@
 #
 # Returns environment variables based on tool:
 #   axiom:    AXIOM_URL, AXIOM_TOKEN, AXIOM_ORG_ID
-#   grafana:  GRAFANA_URL, GRAFANA_TOKEN, GRAFANA_ACCESS_CMD, GRAFANA_USERNAME, GRAFANA_PASSWORD,
+#   grafana:  GRAFANA_URL, GRAFANA_TOKEN, GRAFANA_ORG_ID, GRAFANA_ACCESS_CMD, GRAFANA_USERNAME, GRAFANA_PASSWORD,
 #             GRAFANA_CF_ACCESS_CLIENT_ID, GRAFANA_CF_ACCESS_CLIENT_SECRET
 #   pyroscope: PYROSCOPE_URL, PYROSCOPE_TOKEN, PYROSCOPE_ACCESS_CMD, PYROSCOPE_USERNAME, PYROSCOPE_PASSWORD,
 #             PYROSCOPE_CF_ACCESS_CLIENT_ID, PYROSCOPE_CF_ACCESS_CLIENT_SECRET
@@ -50,7 +50,7 @@ list_tools() {
         echo "Config file not found: $CONFIG_FILE" >&2
         exit 1
     fi
-    grep -E '^\[' "$CONFIG_FILE" | sed 's/\[//' | sed 's/\..*//' | sort -u
+    grep -E '^\s*\[' "$CONFIG_FILE" | sed 's/^[[:space:]]*//' | sed 's/\[//' | sed 's/\..*//' | sort -u
 }
 
 # List deployments for a tool
@@ -63,12 +63,13 @@ list_deployments() {
     
     local section_pattern
     if [[ "$tool" == "slack" ]]; then
-        section_pattern="^\[slack\.workspaces\."
+        section_pattern="^\s*\[slack\.workspaces\."
     else
-        section_pattern="^\[${tool}\.deployments\."
+        section_pattern="^\s*\[${tool}\.deployments\."
     fi
-    
+
     grep -E "$section_pattern" "$CONFIG_FILE" 2>/dev/null | \
+        sed 's/^[[:space:]]*//' | \
         sed "s/^\[${tool}\.deployments\.//" | \
         sed "s/^\[${tool}\.workspaces\.//" | \
         sed 's/\]$//' || echo "(none configured)"
@@ -80,15 +81,23 @@ extract_value() {
     local key="$2"
     
     awk -v section="$section" -v key="$key" '
-        /^\[/ { 
-            in_section = ($0 == "[" section "]")
+        /^[[:space:]]*\[/ {
+            line = $0
+            gsub(/^[[:space:]]+/, "", line)
+            in_section = (line == "[" section "]")
         }
-        in_section && $1 == key { 
-            # Handle key = "value" or key = value
-            sub(/^[^=]*=[[:space:]]*/, "")
-            gsub(/^"|"$/, "")
-            print
-            exit 
+        in_section {
+            gsub(/^[[:space:]]+/, "")
+            if ($1 == key) {
+                sub(/^[^=]*=[[:space:]]*/, "")
+                if (match($0, /^"[^"]*"/)) {
+                    $0 = substr($0, RSTART+1, RLENGTH-2)
+                } else {
+                    sub(/[[:space:]]*#.*$/, "")
+                }
+                print
+                exit
+            }
         }
     ' "$CONFIG_FILE"
 }
@@ -161,6 +170,7 @@ case "$TOOL" in
         ;;
     
     grafana)
+        ORG_ID=$(extract_value "$SECTION" "org_id")
         if [[ -z "$URL" ]]; then
             echo "Error: Deployment '$DEPLOYMENT' not found in [grafana.deployments.$DEPLOYMENT]" >&2
             echo "" >&2
@@ -172,6 +182,7 @@ case "$TOOL" in
         fi
         echo "GRAFANA_URL=\"$URL\""
         [[ -n "$TOKEN" ]] && echo "GRAFANA_TOKEN=\"$TOKEN\"" || true
+        [[ -n "$ORG_ID" ]] && echo "GRAFANA_ORG_ID=\"$ORG_ID\"" || true
         [[ -n "$ACCESS_CMD" ]] && echo "GRAFANA_ACCESS_CMD=\"$ACCESS_CMD\"" || true
         [[ -n "$CF_ACCESS_CLIENT_ID" ]] && echo "GRAFANA_CF_ACCESS_CLIENT_ID=\"$CF_ACCESS_CLIENT_ID\"" || true
         [[ -n "$CF_ACCESS_CLIENT_SECRET" ]] && echo "GRAFANA_CF_ACCESS_CLIENT_SECRET=\"$CF_ACCESS_CLIENT_SECRET\"" || true

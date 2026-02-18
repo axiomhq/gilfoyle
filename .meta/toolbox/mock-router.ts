@@ -163,6 +163,28 @@ export function createMockRouter(scenario: IncidentScenario): MockToolRouter {
           break;
         }
 
+        case 'scripts/grafana-link': {
+          const { datasource, query, range } = input as { env?: string; datasource?: string; query?: string; range?: string };
+          const ds = datasource ?? 'prometheus';
+          const panes = JSON.stringify({ a: { datasource: ds, queries: [{ refId: 'A', expr: query ?? '', datasource: { uid: ds } }], range: { from: `now-${range ?? '1h'}`, to: 'now' } } });
+          output = `https://grafana.acme.co/explore?schemaVersion=1&panes=${encodeURIComponent(panes)}&orgId=1`;
+          break;
+        }
+
+        case 'scripts/pyroscope-link': {
+          const { query: pQuery, range: pRange } = input as { query?: string; range?: string };
+          const encodedPQuery = encodeURIComponent(pQuery ?? '');
+          output = `https://pyroscope.acme.co/?query=${encodedPQuery}&from=now-${pRange ?? '1h'}&until=now`;
+          break;
+        }
+
+        case 'scripts/sentry-link': {
+          const { path: sPath } = input as { path?: string };
+          const cleanPath = (sPath ?? '').replace(/^\//, '');
+          output = `https://sentry.acme.co/${cleanPath}`;
+          break;
+        }
+
         default:
           error = `Unknown tool: ${tool}`;
           output = { error };
