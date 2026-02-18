@@ -135,7 +135,7 @@ discover_dep() {
                 if [[ -n "$unlisted" ]]; then
                     unlisted_count=$(echo "$unlisted" | grep -c .)
                     echo -e "  ${GREEN}MetricsDB datasets ($metrics_total total, $unlisted_count not in top):${NC}"
-                    echo "$unlisted" | sort | head -n 10 | sed 's/^/  - [MPL] /'
+                    echo "$unlisted" | sort | head -n 10 | sed 's/^/  - [MPL] /' || true
                 else
                     echo -e "  ${GREEN}MetricsDB datasets ($metrics_total total, all in top list)${NC}"
                 fi
