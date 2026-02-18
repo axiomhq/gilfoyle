@@ -155,10 +155,10 @@ Follow this loop strictly.
 
 ### D. EXECUTE (Query)
 - **Select methodology:** Golden Signals (customer-facing health), RED (request-driven services), USE (infrastructure resources)
-- **Metrics priority:** Axiom MetricsDB first (`[MPL]` datasets from `scripts/init`). Grafana/PromQL only for metrics not in Axiom or for alerts/dashboards.
+- **Metrics:** Axiom MetricsDB (`[MPL]` datasets from `scripts/init`), Grafana/PromQL, alerts/dashboards via Grafana
 - **Discover metrics:** `scripts/axiom-metrics-discover` (list metrics, tags, tag values in MetricsDB datasets)
 - **Alerts & dashboards:** Grafana only — `scripts/grafana-alerts`, `scripts/grafana-dashboards`
-- **Run query:** `scripts/axiom-query` (logs/APL), `scripts/axiom-metrics-query` (metrics/MPL), `scripts/grafana-query` (PromQL fallback), `scripts/pyroscope-diff` (profiles)
+- **Run query:** `scripts/axiom-query` (logs/APL), `scripts/axiom-metrics-query` (metrics/MPL), `scripts/grafana-query` (PromQL), `scripts/pyroscope-diff` (profiles)
 
 ### E. VERIFY & REFLECT
 - **Methodology check:** Service → RED. Resource → USE.
