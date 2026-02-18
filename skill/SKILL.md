@@ -536,6 +536,21 @@ scripts/slack-download <env> <url_private> [output_path]
 scripts/slack-upload <env> <channel> ./file.png --comment "Description" --thread_ts 1234567890.123456
 ```
 
+### Charts (Visualization)
+```bash
+# Render Chart.js config JSON as PNG
+echo '{"type":"line","data":{"labels":["a","b"],"datasets":[{"data":[1,2]}]}}' \
+  | scripts/render-chart /tmp/chart.png
+
+# One-step: APL query → chart → Slack upload
+scripts/axiom-chart <env> "['dataset'] | where _time > ago(6h) | summarize count() by bin(_time, 10m)" \
+  --type line --title "Request Volume" --channel C1234 --thread_ts 1234567890.123456
+
+# Save chart locally without uploading
+scripts/axiom-chart <env> "['dataset'] | summarize count() by status | top 10 by count_" \
+  --type bar --title "Top Status Codes" --output /tmp/chart.png
+```
+
 **Native CLI tools** (psql, kubectl, gh, aws) can be used directly for resources listed by `scripts/init`. If it's not in discovery output, ask before assuming access.
 
 ---

@@ -1,0 +1,284 @@
+#!/usr/bin/env bash
+# Render an Axiom APL query result as a chart and upload to Slack
+#
+# Usage: axiom-chart <deployment> <query> [options]
+#
+# Runs an APL query, maps the result columns to a Chart.js config, renders a PNG,
+# and uploads it to a Slack channel.
+#
+# Options:
+#   --type <type>       Chart type: line, bar, area, scatter, pie, doughnut, radar, polarArea
+#                       (default: auto-detect based on data shape)
+#   --title <text>      Chart title
+#   --channel <id>      Slack channel ID (required)
+#   --thread_ts <ts>    Slack thread timestamp
+#   --workspace <name>  Slack workspace name (default: "default")
+#   --width <px>        Chart width (default: 800)
+#   --height <px>       Chart height (default: 400)
+#   --output <path>     Save PNG to path instead of uploading
+#   --light             Use light theme
+#   --stacked           Stack datasets (for bar/area)
+#
+# Examples:
+#   axiom-chart prod \
+#     "['logs'] | where _time > ago(6h) | summarize count() by bin(_time, 10m)" \
+#     --type line --title "Request Volume (6h)" \
+#     --channel C1234 --thread_ts 1234567890.123456
+#
+#   axiom-chart prod \
+#     "['logs'] | where _time > ago(1h) | summarize count() by status | top 10 by count_" \
+#     --type bar --title "Top Status Codes" \
+#     --channel C1234
+#
+#   axiom-chart prod \
+#     "['logs'] | where _time > ago(1h) | summarize count() by bin(_time, 5m), level" \
+#     --type area --stacked --title "Log Volume by Level" \
+#     --output /tmp/chart.png
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+DEPLOYMENT=""
+QUERY=""
+CHART_TYPE=""
+TITLE=""
+CHANNEL=""
+THREAD_TS=""
+WORKSPACE="default"
+WIDTH=800
+HEIGHT=400
+OUTPUT=""
+THEME="dark"
+STACKED=false
+
+# Parse positional args first
+if [[ $# -ge 2 ]]; then
+  DEPLOYMENT="$1"
+  QUERY="$2"
+  shift 2
+else
+  echo "Usage: axiom-chart <deployment> <query> [options]" >&2
+  exit 1
+fi
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --type)     CHART_TYPE="$2"; shift 2 ;;
+    --title)    TITLE="$2"; shift 2 ;;
+    --channel)  CHANNEL="$2"; shift 2 ;;
+    --thread_ts) THREAD_TS="$2"; shift 2 ;;
+    --workspace) WORKSPACE="$2"; shift 2 ;;
+    --width)    WIDTH="$2"; shift 2 ;;
+    --height)   HEIGHT="$2"; shift 2 ;;
+    --output)   OUTPUT="$2"; shift 2 ;;
+    --light)    THEME="light"; shift ;;
+    --stacked)  STACKED=true; shift ;;
+    *)
+      echo "Error: Unknown option '$1'" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Run the query
+NDJSON=$("$SCRIPT_DIR/axiom-query" "$DEPLOYMENT" --ndjson <<< "$QUERY")
+
+if [[ -z "$NDJSON" ]]; then
+  echo "Error: Query returned no results" >&2
+  exit 1
+fi
+
+# Map query results to Chart.js config using jq
+CHART_CONFIG=$(echo "$NDJSON" | jq -s --arg type "$CHART_TYPE" --arg title "$TITLE" --argjson stacked "$STACKED" '
+# Collect all field names from the first row
+(.[0] | keys) as $fields |
+
+# Detect time field (usually _time)
+($fields | map(select(. == "_time" or test("^time$|^timestamp$"; "i"))) | first // null) as $time_field |
+
+# Detect numeric fields (value columns)
+([.[] | to_entries[] | select(.value | type == "number") | .key] | unique) as $all_numeric |
+
+# Detect label field (non-time, non-numeric string column used for grouping)
+($fields | map(select(
+  . != $time_field and
+  (. as $f | $all_numeric | index($f) | not) and
+  . != "_sysTime" and . != "_rowId"
+)) | first // null) as $group_field |
+
+# Numeric fields minus group field
+($all_numeric | map(select(. != $group_field))) as $numeric_fields |
+
+# Auto-detect chart type
+(if $type != "" then $type
+ elif $time_field != null then "line"
+ elif ($group_field != null and ($numeric_fields | length) == 1) then "bar"
+ else "bar"
+ end) as $chart_type |
+
+# Determine if area chart (stacked line with fill)
+(if $chart_type == "area" then true else false end) as $is_area |
+(if $is_area then "line" else $chart_type end) as $actual_type |
+
+# Build chart data based on data shape
+if $time_field != null and $group_field != null then
+  # Time series with grouping: pivot group values into separate datasets
+  # Group by time, then by group field
+  group_by(.[$time_field]) |
+  sort_by(.[0][$time_field]) |
+  (map(.[0][$time_field]) | map(
+    split("T") |
+    if length > 1 then .[1] | split(".")[0] | .[0:5]
+    else .[0]
+    end
+  )) as $labels |
+  ([.[][] | .[$group_field]] | unique | sort) as $groups |
+  ($numeric_fields[0] // "count_") as $value_field |
+  {
+    type: $actual_type,
+    data: {
+      labels: $labels,
+      datasets: [$groups[] as $g | {
+        label: ($g | tostring),
+        data: [. as $rows | $labels | to_entries[] | .key as $i |
+          ($rows[$i] | map(select(.[$group_field] == $g)) | first // null) as $match |
+          if $match then $match[$value_field] // 0 else 0 end
+        ],
+        fill: $is_area
+      }]
+    },
+    options: {
+      plugins: {
+        title: (if $title != "" then {display: true, text: $title} else {display: false} end)
+      },
+      scales: {
+        x: {},
+        y: ({beginAtZero: true} + if $stacked then {stacked: true} else {} end)
+      }
+    } + (if $stacked then {scales: {x: {stacked: true}, y: {stacked: true, beginAtZero: true}}} else {} end)
+  }
+elif $time_field != null then
+  # Simple time series: time on x-axis, numeric fields as datasets
+  sort_by(.[$time_field]) |
+  (map(.[$time_field]) | map(
+    split("T") |
+    if length > 1 then .[1] | split(".")[0] | .[0:5]
+    else .[0]
+    end
+  )) as $labels |
+  {
+    type: $actual_type,
+    data: {
+      labels: $labels,
+      datasets: [$numeric_fields[] as $f | {
+        label: $f,
+        data: [.[] | .[$f] // 0],
+        fill: $is_area
+      }]
+    },
+    options: {
+      plugins: {
+        title: (if $title != "" then {display: true, text: $title} else {display: false} end)
+      },
+      scales: {x: {}, y: {beginAtZero: true}}
+    }
+  }
+elif $group_field != null then
+  # Categorical: group field as labels, numeric field as values
+  ($numeric_fields[0] // "count_") as $value_field |
+  if ($actual_type == "pie" or $actual_type == "doughnut" or $actual_type == "polarArea" or $actual_type == "radar") then
+    {
+      type: $actual_type,
+      data: {
+        labels: [.[] | .[$group_field] | tostring],
+        datasets: [{
+          data: [.[] | .[$value_field] // 0]
+        }]
+      },
+      options: {
+        plugins: {
+          title: (if $title != "" then {display: true, text: $title} else {display: false} end)
+        }
+      }
+    }
+  else
+    {
+      type: $actual_type,
+      data: {
+        labels: [.[] | .[$group_field] | tostring],
+        datasets: [{
+          label: $value_field,
+          data: [.[] | .[$value_field] // 0]
+        }]
+      },
+      options: {
+        plugins: {
+          title: (if $title != "" then {display: true, text: $title} else {display: false} end)
+        },
+        scales: {x: {}, y: {beginAtZero: true}}
+      }
+    }
+  end
+else
+  # Fallback: first field as labels, rest as datasets
+  ($fields[0]) as $label_field |
+  {
+    type: $actual_type,
+    data: {
+      labels: [.[] | .[$label_field] | tostring],
+      datasets: [$numeric_fields[] as $f | {
+        label: $f,
+        data: [.[] | .[$f] // 0]
+      }]
+    },
+    options: {
+      plugins: {
+        title: (if $title != "" then {display: true, text: $title} else {display: false} end)
+      },
+      scales: {x: {}, y: {beginAtZero: true}}
+    }
+  }
+end
+')
+
+# Determine output path
+if [[ -z "$OUTPUT" ]]; then
+  TMPFILE=$(mktemp /tmp/axiom-chart-XXXXXX.png)
+  OUTPUT_PATH="$TMPFILE"
+else
+  OUTPUT_PATH="$OUTPUT"
+fi
+
+# Render the chart
+RENDER_ARGS=("$OUTPUT_PATH" --width "$WIDTH" --height "$HEIGHT")
+if [[ "$THEME" == "light" ]]; then
+  RENDER_ARGS+=(--light)
+fi
+
+echo "$CHART_CONFIG" | "$SCRIPT_DIR/render-chart" "${RENDER_ARGS[@]}"
+
+echo "Chart rendered: $OUTPUT_PATH" >&2
+
+# Upload to Slack if channel specified and no explicit output path
+if [[ -n "$CHANNEL" && -z "$OUTPUT" ]]; then
+  UPLOAD_ARGS=("$WORKSPACE" "$CHANNEL" "$OUTPUT_PATH")
+  if [[ -n "$TITLE" ]]; then
+    UPLOAD_ARGS+=(--comment "$TITLE")
+  fi
+  if [[ -n "$THREAD_TS" ]]; then
+    UPLOAD_ARGS+=(--thread_ts "$THREAD_TS")
+  fi
+  "$SCRIPT_DIR/slack-upload" "${UPLOAD_ARGS[@]}"
+  rm -f "$OUTPUT_PATH"
+elif [[ -n "$CHANNEL" && -n "$OUTPUT" ]]; then
+  # Explicit output AND channel: upload but keep the file
+  UPLOAD_ARGS=("$WORKSPACE" "$CHANNEL" "$OUTPUT_PATH")
+  if [[ -n "$TITLE" ]]; then
+    UPLOAD_ARGS+=(--comment "$TITLE")
+  fi
+  if [[ -n "$THREAD_TS" ]]; then
+    UPLOAD_ARGS+=(--thread_ts "$THREAD_TS")
+  fi
+  "$SCRIPT_DIR/slack-upload" "${UPLOAD_ARGS[@]}"
+fi
