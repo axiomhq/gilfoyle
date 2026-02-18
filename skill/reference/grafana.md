@@ -67,14 +67,14 @@ Summary view shows: Samples, Range, **Min/Max with timestamps**, Avg
 
 ## Integration with Axiom
 
-Grafana is the **fallback** for metrics not in Axiom. Axiom MetricsDB (`[MPL]` datasets) is the primary source for ALL OTel metrics — application and infrastructure. Grafana covers Prometheus-native metrics not shipped to Axiom and provides alerts/dashboards that Axiom does not.
+Grafana covers Prometheus-native metrics not shipped to Axiom and provides alerts/dashboards. For OTel metrics (application and infrastructure), Axiom MetricsDB (`[MPL]` datasets) is available.
 
-### Typical Workflow
+### Available Data Sources
 
-1. **Axiom MetricsDB**: Check OTel metrics first — app and infra (MPL)
-2. **Axiom EventDB**: Search logs/traces for errors and anomalies (APL)
-3. **Grafana**: Query Prometheus-native metrics not in Axiom, check alerts/dashboards
-4. **Pyroscope**: If CPU/memory issue, get flame graphs
+- **Axiom MetricsDB**: OTel metrics — application and infrastructure (MPL)
+- **Axiom EventDB**: Logs, traces, error events (APL)
+- **Grafana**: Prometheus-native metrics, alerts, dashboards
+- **Pyroscope**: CPU and memory flame graphs
 
 ### Example: Investigating High Latency
 
