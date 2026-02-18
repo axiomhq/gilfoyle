@@ -161,7 +161,7 @@ discover_dep() {
                     else
                         echo "  - $ds"
                     fi
-                done | head -n 10
+                done | head -n 10 || true
                 if [[ "$count" -gt 10 ]]; then
                     echo "  - ... (and $((count - 10)) more)"
                     echo -e "  ${BOLD}To search:${NC} scripts/axiom-api $dep GET \"/v1/datasets\" | jq -r '.[].name' | grep \"pattern\""
