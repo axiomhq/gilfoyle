@@ -88,6 +88,7 @@ find "$TARGET/scripts" "$TARGET/reference" "$TARGET/templates" -type f | while r
     # Skip binary files
     if file "$file" | grep -q "text"; then
         sedi \
+            -e 's|GILFOYLE_NO_CACHE|SRE_NO_CACHE|g' \
             -e 's|GILFOYLE_INIT_TIMEOUT|SRE_INIT_TIMEOUT|g' \
             -e 's|GILFOYLE_CONFIG_DIR|SRE_CONFIG_DIR|g' \
             -e 's|GILFOYLE_CONFIG|SRE_CONFIG|g' \

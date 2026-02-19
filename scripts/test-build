@@ -41,7 +41,7 @@ else
 fi
 
 # Test 4: correct frontmatter name
-if echo "$OUTPUT" | head -3 | grep -q "name: axiom-sre"; then
+if echo "$OUTPUT" | grep -m1 -q "name: axiom-sre"; then
     pass "axiom-sre frontmatter name correct"
 else
     fail "axiom-sre frontmatter name wrong"

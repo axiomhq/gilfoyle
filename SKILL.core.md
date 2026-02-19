@@ -155,8 +155,10 @@ Follow this loop strictly.
 
 ### D. EXECUTE (Query)
 - **Select methodology:** Golden Signals (customer-facing health), RED (request-driven services), USE (infrastructure resources)
-- **Select telemetry:** Use whatever's available—metrics, logs, traces, profiles
-- **Run query:** `scripts/axiom-query` (logs), `scripts/grafana-query` (metrics), `scripts/pyroscope-diff` (profiles)
+- **Metrics:** Axiom MetricsDB (`[MPL]` datasets from `scripts/init`), Grafana/PromQL, alerts/dashboards via Grafana
+- **Discover metrics:** `scripts/axiom-metrics-discover` (list metrics, tags, tag values in MetricsDB datasets)
+- **Alerts & dashboards:** Grafana only — `scripts/grafana-alerts`, `scripts/grafana-dashboards`
+- **Run query:** `scripts/axiom-query` (logs/APL), `scripts/axiom-metrics-query` (metrics/MPL), `scripts/grafana-query` (PromQL), `scripts/pyroscope-diff` (profiles)
 
 ### E. VERIFY & REFLECT
 - **Methodology check:** Service → RED. Resource → USE.
@@ -325,7 +327,7 @@ For request-driven services. Measures the *work* the service does.
 | **Errors** | Error rate (5xx / total) |
 | **Duration** | Latency percentiles (p50, p95, p99) |
 
-Measure via logs (APL — see `reference/apl.md`) or metrics (PromQL — see `reference/grafana.md`).
+Measure via logs (APL — see `reference/apl.md`), OTel metrics (MPL — see `reference/metrics.md`), or PromQL fallback (see `reference/grafana.md`).
 
 ### C. USE METHOD (Resources)
 
@@ -337,7 +339,7 @@ For infrastructure resources (CPU, memory, disk, network). Measures the *capacit
 | **Saturation** | Queue depth, load average, waiting threads |
 | **Errors** | Hardware/network errors |
 
-Typically measured via metrics. See `reference/grafana.md` for PromQL patterns.
+Check Axiom MetricsDB first (OTel resource metrics). Fall back to Grafana/PromQL if not available. See `reference/grafana.md` for PromQL patterns.
 
 ### D. DIFFERENTIAL ANALYSIS
 
@@ -374,6 +376,8 @@ See `reference/apl.md` for full operator, function, and pattern reference.
 - **Avoid `search`**—scans ALL fields. Last resort only.
 - **Field escaping**—dots need `\\.`: `['kubernetes.node_labels.nodepool\\.axiom\\.co/name']`
 
+**MetricsDB/MPL:** For OTel metrics (`[MPL]` datasets), discover with `scripts/axiom-metrics-discover`, query with `scripts/axiom-metrics-query`. See `reference/metrics.md`.
+
 **Need more?** Open `reference/apl.md` for operators/functions, `reference/query-patterns.md` for ready-to-use investigation queries.
 
 ---
@@ -390,15 +394,16 @@ Every finding must link to its source — dashboards, queries, error reports, PR
 5. **Data responses**—Any answer citing tool-derived numbers (e.g. burn rates, error counts, usage stats, etc). Questions don't require investigation, but if you cite numbers from a query, include the source link.
 
 **Rule: If you ran a query and cite its results, generate a permalink.** Run the appropriate link tool for every query whose results appear in your response:
-- **Axiom:** `scripts/axiom-link`
+- **Axiom:** `scripts/axiom-link` (works for both APL and MPL queries)
 - **Grafana:** `scripts/grafana-link`
 - **Pyroscope:** `scripts/pyroscope-link`
 - **Sentry:** `scripts/sentry-link`
 
 **Permalinks:**
 ```bash
-# Axiom
+# Axiom (APL or MPL — same script handles both)
 scripts/axiom-link <env> "['logs'] | where status >= 500 | take 100" "1h"
+scripts/axiom-link <env> "dataset:metric.name | align to 5m using avg" "1h"
 # Grafana (metrics)
 scripts/grafana-link <env> <datasource-uid> "rate(http_requests_total[5m])" "1h"
 # Pyroscope (profiling)
@@ -496,20 +501,21 @@ See `reference/postmortem-template.md` for retrospective format.
 
 ## 16. TOOL REFERENCE
 
-### Axiom (Logs & Events)
+### Axiom (Logs & Events — APL)
 ```bash
 scripts/axiom-query <env> <<< "['dataset'] | getschema"
 scripts/axiom-query <env> <<< "['dataset'] | where _time > ago(1h) | project _time, message, level | take 5"
-scripts/axiom-query <env> --ndjson <<< "['dataset'] | where _time > ago(1h) | project _time, message | take 1"
 ```
 
-### Grafana (Metrics)
+### Axiom (MetricsDB — MPL)
+```bash
+scripts/axiom-metrics-discover <env> <dataset> metrics|tags|tag-values|search
+scripts/axiom-metrics-query <env> --range 1h <<< "dataset:metric.name | align to 5m using avg"
+```
+
+### Grafana (PromQL fallback) / Pyroscope / Slack
 ```bash
 scripts/grafana-query <env> prometheus 'rate(http_requests_total[5m])'
-```
-
-### Pyroscope (Profiling)
-```bash
 scripts/pyroscope-diff <env> <app_name> -2h -1h -1h now
 ```
 
@@ -534,6 +540,7 @@ scripts/slack-upload <env> <channel> ./file.png --comment "Description" --thread
 
 - `reference/apl.md`—APL operators, functions, and spotlight analysis
 - `reference/axiom.md`—Axiom API endpoints (70+)
+- `reference/metrics.md`—MetricsDB MPL querying, discovery, and patterns
 - `reference/blocks.md`—Slack Block Kit formatting
 - `reference/failure-modes.md`—Common failure patterns
 - `reference/grafana.md`—Grafana queries and PromQL patterns
