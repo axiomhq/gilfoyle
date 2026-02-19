@@ -35,11 +35,15 @@ description: {{SKILL_DESCRIPTION}}
 
    **The only legitimate use of secrets** is passing them to `scripts/curl-auth` or similar tooling that handles them internally without exposure. If you find yourself needing to see, copy, or transmit a secret directly, you're doing it wrong.
 
+9. **DISCOVER BEFORE QUERYING.** Every query tool has a corresponding discovery script. NEVER query a tool before running its discovery script. `scripts/init` only tells you which tools are configured — it does NOT list datasets, datasources, applications, or UIDs. The discover scripts do. Querying without discovering first IS guessing, which violates Rule #1. The pairs: `discover-axiom` → `axiom-query`, `discover-grafana` → `grafana-query`, `discover-pyroscope` → `pyroscope-diff`, `discover-k8s` → `kubectl`, `discover-slack` → `slack`.
+
+10. **SELF-HEAL ON QUERY ERRORS.** If any query tool returns a 404, "not found", "unknown dataset/datasource/application", or similar error → run the corresponding `scripts/discover-*` script, pick the correct name from discovery output, and retry with corrected names. This applies to ALL tools, not just Axiom and Grafana. **Never give up on the first error. Discover, correct, retry.**
+
 ---
 
 ## 1. MANDATORY INITIALIZATION
 
-**RULE:** Run `scripts/init` immediately upon activation. This syncs memory and discovers available environments.
+**RULE:** Run `scripts/init` immediately upon activation. This loads config and syncs memory (fast, no network calls).
 
 ```bash
 scripts/init
@@ -47,25 +51,18 @@ scripts/init
 
 **First run:** If no config exists, `scripts/init` creates `{{CONFIG_PATH}}` and memory directories automatically. If no deployments are configured, it prints setup guidance and exits early (no point discovering nothing). Walk the user through adding at least one tool (Axiom, Grafana, Pyroscope, Sentry, or Slack) to the config, then re-run `scripts/init`.
 
-**Why?**
-- Lists your ACTUAL datasets, datasources, and environments.
-- **DO NOT GUESS** dataset names like `['logs']`.
-- **DO NOT GUESS** Grafana datasource UIDs.
-- Use ONLY the names from `scripts/init` output.
+**Progressive discovery (MANDATORY):** `scripts/init` only confirms which tools are configured (e.g., "axiom: prod ✓"). It does NOT reveal datasets, datasources, or UIDs. You MUST run the tool's discovery script before your first query to that tool:
+- `scripts/discover-axiom` — datasets (REQUIRED before `scripts/axiom-query`)
+- `scripts/discover-grafana` — datasources and UIDs (REQUIRED before `scripts/grafana-query`)
+- `scripts/discover-pyroscope` — applications (REQUIRED before `scripts/pyroscope-diff`)
+- `scripts/discover-k8s` — contexts and namespaces
+- `scripts/discover-slack` — workspaces and channels
 
-**Requirement:** `timeout` (GNU coreutils). On macOS, install with `brew install coreutils` (provides `gtimeout`). Setup checks for missing dependencies automatically.
+**Only discover tools you actually need for the investigation.**
 
-**If init times out:**
-- Some discovery sections may be partial or missing. Do NOT guess.
-- Retry the specific discovery script that timed out:
-  - `scripts/discover-axiom`
-  - `scripts/discover-grafana`
-  - `scripts/discover-pyroscope`
-  - `scripts/discover-k8s`
-  - `scripts/discover-alerts`
-  - `scripts/discover-slack`
-- If it still fails, request access or have the user run the command and paste back output.
-- You can raise the timeout with `{{INIT_TIMEOUT_VAR}}=20 scripts/init`.
+- **DO NOT GUESS** dataset names like `['logs']`. You don't know them until you run `scripts/discover-axiom`.
+- **DO NOT GUESS** Grafana datasource UIDs. You don't know them until you run `scripts/discover-grafana`.
+- Use ONLY the names from discovery output. Querying without discovery is a Golden Rule violation (Rule #9).
 
 ---
 
@@ -92,12 +89,9 @@ scripts/init
 - "Based on the code, orders-api talks to Redis for caching. Correct?"
 - "The logs suggest failure started at 14:30. Does that match what you're seeing?"
 
-**For systems NOT in `scripts/init` output:**
+**For systems NOT in discovery output:**
 - Ask for access, OR
 - Give user the exact command to run and paste back
-
-**For systems that timed out in `scripts/init`:**
-- Treat them as unavailable until you re-run the specific discovery or the user confirms access.
 
 ---
 
@@ -109,7 +103,9 @@ Follow this loop strictly.
 
 **Before writing ANY query against a dataset, you MUST discover its schema.** This is not optional. Skipping schema discovery is the #1 cause of lazy, wrong queries.
 
-**Step 1: Identify datasets** — Review `scripts/init` output. Use ONLY dataset names from discovery. If you see `['k8s-logs-prod']`, use that—not `['logs']`.
+**Step 0: STOP. Run discovery.** Have you run `scripts/discover-<tool>` for the tool you're about to query? If NO → run it NOW. Do NOT proceed to Step 1 without discovery output. `scripts/init` does NOT give you dataset names or datasource UIDs. Only discovery scripts do. This is Golden Rule #9.
+
+**Step 1: Identify datasets** — Review discovery output from `scripts/discover-axiom`. Use ONLY dataset names from discovery. If you see `['k8s-logs-prod']`, use that—not `['logs']`.
 
 **Step 2: Get schema** — Run `getschema` on every dataset you plan to query:
 ```apl
@@ -165,7 +161,7 @@ Follow this loop strictly.
 - **Course correct:**
   - **Supported:** Narrow scope to root cause
   - **Disproved:** Abandon hypothesis immediately. State a new one.
-  - **Stuck:** 3 queries with no leads? STOP. Re-read `scripts/init`. Wrong dataset?
+  - **Stuck:** 3 queries with no leads? STOP. Re-read discovery output. Wrong dataset?
 
 ### F. RECORD FINDINGS
 - **Do not wait for resolution.** Save verified facts, patterns, queries immediately.
@@ -498,6 +494,9 @@ See `reference/postmortem-template.md` for retrospective format.
 
 ### Axiom (Logs & Events)
 ```bash
+# Discover available datasets first
+scripts/discover-axiom
+
 scripts/axiom-query <env> <<< "['dataset'] | getschema"
 scripts/axiom-query <env> <<< "['dataset'] | where _time > ago(1h) | project _time, message, level | take 5"
 scripts/axiom-query <env> --ndjson <<< "['dataset'] | where _time > ago(1h) | project _time, message | take 1"
@@ -505,11 +504,17 @@ scripts/axiom-query <env> --ndjson <<< "['dataset'] | where _time > ago(1h) | pr
 
 ### Grafana (Metrics)
 ```bash
+# Discover available datasources and UIDs first
+scripts/discover-grafana
+
 scripts/grafana-query <env> prometheus 'rate(http_requests_total[5m])'
 ```
 
 ### Pyroscope (Profiling)
 ```bash
+# Discover available applications first
+scripts/discover-pyroscope
+
 scripts/pyroscope-diff <env> <app_name> -2h -1h -1h now
 ```
 
@@ -526,7 +531,7 @@ scripts/slack-download <env> <url_private> [output_path]
 scripts/slack-upload <env> <channel> ./file.png --comment "Description" --thread_ts 1234567890.123456
 ```
 
-**Native CLI tools** (psql, kubectl, gh, aws) can be used directly for resources listed by `scripts/init`. If it's not in discovery output, ask before assuming access.
+**Native CLI tools** (psql, kubectl, gh, aws) can be used directly for resources listed in discovery output. If it's not in discovery output, ask before assuming access.
 
 ---
 

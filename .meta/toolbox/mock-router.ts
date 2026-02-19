@@ -31,6 +31,7 @@ export interface MockToolRouter {
 
 export function createMockRouter(scenario: IncidentScenario): MockToolRouter {
   const trace: ToolCall[] = [];
+  const discoveredTools = new Set<string>();
 
   function matchMock(mocks: ToolMock[] | undefined, queryText: string): unknown {
     if (!mocks || mocks.length === 0) {
@@ -70,7 +71,34 @@ export function createMockRouter(scenario: IncidentScenario): MockToolRouter {
           output = scenario.initOutput;
           break;
 
+        case 'scripts/discover-axiom':
+          discoveredTools.add('axiom');
+          output = scenario.discoveryOutputs?.axiom ?? 'No Axiom deployments configured.';
+          break;
+
+        case 'scripts/discover-grafana':
+          discoveredTools.add('grafana');
+          output = scenario.discoveryOutputs?.grafana ?? 'No Grafana deployments configured.';
+          break;
+
+        case 'scripts/discover-pyroscope':
+          output = scenario.discoveryOutputs?.pyroscope ?? 'No Pyroscope deployments configured.';
+          break;
+
+        case 'scripts/discover-k8s':
+          output = scenario.discoveryOutputs?.k8s ?? 'No Kubernetes contexts found.';
+          break;
+
+        case 'scripts/discover-slack':
+          output = scenario.discoveryOutputs?.slack ?? 'No Slack workspaces configured.';
+          break;
+
         case 'scripts/axiom-query': {
+          if (!discoveredTools.has('axiom')) {
+            error = 'scripts/axiom-query called before scripts/discover-axiom. Run scripts/discover-axiom first to learn available datasets. Querying without discovery violates Golden Rule #9.';
+            output = { error };
+            break;
+          }
           const { env, query } = input as { env?: string; query: string };
 
           if (scenario.fixtures) {
@@ -95,6 +123,11 @@ export function createMockRouter(scenario: IncidentScenario): MockToolRouter {
         }
 
         case 'scripts/grafana-query': {
+          if (!discoveredTools.has('grafana')) {
+            error = 'scripts/grafana-query called before scripts/discover-grafana. Run scripts/discover-grafana first to learn available datasources and UIDs. Querying without discovery violates Golden Rule #9.';
+            output = { error };
+            break;
+          }
           const { env, datasource, promql } = input as {
             env?: string;
             datasource?: string;

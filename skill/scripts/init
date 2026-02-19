@@ -12,7 +12,7 @@
 #
 # Every run:
 #   - Syncs shared memory
-#   - Discovers Axiom datasets, Grafana datasources, Pyroscope apps, K8s contexts
+#   - Reports which tools are configured (config-only, no network calls)
 #   - Checks for memory bloat
 #
 # Migrates from (--migrate):
@@ -287,84 +287,19 @@ echo "=============================="
 "$SCRIPT_DIR/mem-sync"
 echo ""
 
-# Temp files for parallel output
-TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
-
-echo "Scanning environments in parallel..."
-
-TIMEOUT_SECONDS="${GILFOYLE_INIT_TIMEOUT:-12}"
-
-if command -v timeout >/dev/null 2>&1; then
-    TIMEOUT_CMD="timeout"
-elif command -v gtimeout >/dev/null 2>&1; then
-    TIMEOUT_CMD="gtimeout"
-else
-    echo "timeout command not found. Install coreutils (gtimeout) or provide timeout in PATH." >&2
-    exit 1
-fi
-
-JOBS=()
-
-start_job() {
-    local name="$1"
-    local out="$2"
-    shift 2
-
-    (
-        "$TIMEOUT_CMD" -k 2s "${TIMEOUT_SECONDS}s" "$@" > "$out" 2>&1
-        status=$?
-        if [[ $status -eq 124 || $status -eq 137 ]]; then
-            echo "timeout" > "$TMP_DIR/${name}.timeout"
-        fi
-        exit $status
-    ) &
-    local pid=$!
-
-    JOBS+=("${name}:${pid}")
-}
-
-wait_jobs() {
-    local job name pid
-    for job in "${JOBS[@]}"; do
-        IFS=: read -r name pid <<< "$job"
-        wait "$pid" || true
-    done
-}
-
-render_output() {
-    local name="$1"
-    local file="$2"
-    local timeout_file="$TMP_DIR/${name}.timeout"
-    if [[ -f "$timeout_file" ]]; then
-        echo -e "${YELLOW}⚠️  ${name} timed out after ${TIMEOUT_SECONDS}s${NC}" >> "$file"
+echo "Configured tools:"
+for tool in axiom grafana pyroscope sentry slack; do
+    deployments=$("$SCRIPT_DIR/config" --list "$tool" 2>/dev/null || true)
+    if [[ -z "$deployments" || "$deployments" == "(none configured)" ]]; then
+        echo "  ${tool}: (not configured)"
+    else
+        names=$(echo "$deployments" | paste -sd',' - | sed 's/,/, /g')
+        echo "  ${tool}: ${names} ✓"
     fi
-    cat "$file"
-}
+done
 
-# Run discovery in parallel
-start_job "axiom" "$TMP_DIR/axiom" "$SCRIPT_DIR/discover-axiom"
-start_job "grafana" "$TMP_DIR/grafana" "$SCRIPT_DIR/discover-grafana"
-start_job "pyroscope" "$TMP_DIR/pyroscope" "$SCRIPT_DIR/discover-pyroscope"
-start_job "k8s" "$TMP_DIR/k8s" "$SCRIPT_DIR/discover-k8s"
-start_job "alerts" "$TMP_DIR/alerts" "$SCRIPT_DIR/discover-alerts"
-start_job "slack" "$TMP_DIR/slack" "$SCRIPT_DIR/discover-slack"
-
-# Wait for all background jobs
-wait_jobs
-
-# Display results
-render_output "alerts" "$TMP_DIR/alerts"
 echo ""
-render_output "slack" "$TMP_DIR/slack"
-echo ""
-render_output "axiom" "$TMP_DIR/axiom"
-echo ""
-render_output "grafana" "$TMP_DIR/grafana"
-echo ""
-render_output "pyroscope" "$TMP_DIR/pyroscope"
-echo ""
-render_output "k8s" "$TMP_DIR/k8s"
+echo "Run scripts/discover-<tool> to see available assets before querying."
 
 # Check for Memory Bloat
 MEMORY_KB="$CONFIG_DIR/memory/kb"

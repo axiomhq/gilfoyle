@@ -2,7 +2,7 @@ import { Eval } from 'axiom/ai/evals';
 import { withSpan } from 'axiom/ai';
 import { loadScenarios } from './scenarios/index.js';
 import { getHarness, type EvalInput, type EvalOutput, type HarnessName, type ModelName } from './harness/index.js';
-import { RCAAccuracyScorer, EvidenceQualityScorer, EfficiencyScorer, QueryValidityScorer, QueryYieldScorer, QueryRepairScorer, ExecutorCoverageScorer, InitFirstScorer, SchemaFirstScorer, CounterfactualRejectionScorer, CausalGroundingScorer, MustNotMentionScorer, MemoryWriteScorer, HypothesisDisciplineScorer, SecretHygieneScorer, TriageFirstScorer, SlackCommsScorer, MemoryDistillationScorer, FirstRunScorer, RunValidityScorer, WallClockScorer, TokenBudgetScorer, SourceLinkScorer, BugfixDiligenceScorer } from './scorers/index.js';
+import { RCAAccuracyScorer, EvidenceQualityScorer, EfficiencyScorer, QueryValidityScorer, QueryYieldScorer, QueryRepairScorer, ExecutorCoverageScorer, InitFirstScorer, SchemaFirstScorer, DiscoverFirstScorer, CounterfactualRejectionScorer, CausalGroundingScorer, MustNotMentionScorer, MemoryWriteScorer, HypothesisDisciplineScorer, SecretHygieneScorer, TriageFirstScorer, SlackCommsScorer, MemoryDistillationScorer, FirstRunScorer, RunValidityScorer, WallClockScorer, TokenBudgetScorer, SourceLinkScorer, BugfixDiligenceScorer } from './scorers/index.js';
 
 const DEFAULT_HARNESS: HarnessName = 'amp';
 const DEFAULT_MODEL = 'xai/grok-4-1-fast';
@@ -15,8 +15,6 @@ function defaultModelForHarness(harness: HarnessName): ModelName | undefined {
       return DEFAULT_MODEL;
     case 'claude':
       return 'claude-opus-4-6';
-    case 'direct':
-      return 'claude-sonnet-4';
     case 'codex':
       return 'gpt-5.2-codex';
     default:
@@ -133,6 +131,7 @@ Eval<EvalInput, ExpectedOutput, EvalOutput>(evalName, {
     TokenBudgetScorer,
     InitFirstScorer,
     SchemaFirstScorer,
+    DiscoverFirstScorer,
     CounterfactualRejectionScorer,
     MustNotMentionScorer,
     MemoryWriteScorer,

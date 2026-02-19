@@ -49,6 +49,7 @@ Config created: /home/user/.config/gilfoyle/config.toml
 
    Then re-run: scripts/init
 `,
+  discoveryOutputs: {},
   toolMocks: {},
   fixtures: {
     validDeployments: [],

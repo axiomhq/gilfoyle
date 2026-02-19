@@ -29,18 +29,27 @@ Investigate and find the root cause.`,
   initOutput: `Gilfoyle Environment Discovery
 ==============================
 
-Axiom Environments:
-  prod:
-    datasets: [kafka-logs, app-logs]
+Configured tools:
+  axiom: prod ✓
+  grafana: prod ✓
+  slack: acme ✓
 
-Grafana Environments:
-  prod:
-    ⚠ Connection timed out after 10s (prometheus-prod unreachable)
-    datasources: [] (discovery failed)
-
-Slack:
-  Available (workspace: acme)
+Run scripts/discover-<tool> to see available assets before querying.
 `,
+  discoveryOutputs: {
+    axiom: `=== Axiom Deployments ===
+deployment: prod
+  Top datasets found (2)
+  - kafka-logs
+  - app-logs`,
+    grafana: `=== Grafana Deployments ===
+deployment: prod
+  ⚠️  Connection timed out after 10s (prometheus-prod unreachable)
+  0 datasources found (discovery failed)`,
+    slack: `=== Slack Workspaces ===
+workspace: acme
+  Connected ✓`,
+  },
   toolMocks: {},
   fixtures: {
     validDeployments: ['prod'],
@@ -104,7 +113,7 @@ Slack:
     ],
   },
   budgets: {
-    maxToolCalls: 12,
+    maxToolCalls: 13,
     maxTotalTokens: 8000,
     maxElapsedMs: 210_000,
   },

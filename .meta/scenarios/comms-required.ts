@@ -23,17 +23,28 @@ Investigate, find root cause, and communicate status via Slack.`,
   initOutput: `Gilfoyle Environment Discovery
 ==============================
 
-Axiom Environments:
-  prod:
-    datasets: [log-aggregator-logs, ingest-pipeline-logs, k8s-events]
+Configured tools:
+  axiom: prod ✓
+  grafana: prod ✓
+  slack: acme ✓
 
-Grafana Environments:
-  prod:
-    datasources: [prometheus-prod (uid: prom-prod)]
-
-Slack:
-  Available (workspace: acme)
+Run scripts/discover-<tool> to see available assets before querying.
 `,
+  discoveryOutputs: {
+    axiom: `=== Axiom Deployments ===
+deployment: prod
+  Top datasets found (3)
+  - log-aggregator-logs
+  - ingest-pipeline-logs
+  - k8s-events`,
+    grafana: `=== Grafana Deployments ===
+deployment: prod
+  1 datasources found
+  - prometheus-prod (prometheus) [uid: prom-prod]`,
+    slack: `=== Slack Workspaces ===
+workspace: acme
+  Connected ✓`,
+  },
   toolMocks: {},
   fixtures: {
     validDeployments: ['prod'],
@@ -148,7 +159,7 @@ Slack:
     ],
   },
   budgets: {
-    maxToolCalls: 14,
+    maxToolCalls: 16,
     maxTotalTokens: 9000,
     maxElapsedMs: 225_000,
   },

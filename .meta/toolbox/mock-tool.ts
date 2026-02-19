@@ -9,7 +9,8 @@
  * Falls back to legacy keyword matching if no fixtures present.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync as writeFileSyncFs } from 'node:fs';
+import { dirname } from 'node:path';
 import type { ScenarioFixtures } from '../harness/types.js';
 import {
   validateAPL, executeAPL, formatAxiomOutput,
@@ -34,6 +35,13 @@ interface LegacyToolMock {
 
 interface Scenario {
   initOutput: string;
+  discoveryOutputs?: {
+    axiom?: string;
+    grafana?: string;
+    pyroscope?: string;
+    k8s?: string;
+    slack?: string;
+  };
   toolMocks?: {
     axiom?: LegacyToolMock[];
     grafana?: LegacyToolMock[];
@@ -181,6 +189,21 @@ function matchMock(mocks: LegacyToolMock[] | undefined, queryText: string): unkn
   return { error: 'No mock matched query', query: queryText.slice(0, 200) };
 }
 
+function discoveryMarkerPath(tool: 'axiom' | 'grafana'): string {
+  return `${dirname(scenarioFile!)}.gilfoyle-discovered-${tool}`;
+}
+
+function markDiscovered(tool: 'axiom' | 'grafana'): void {
+  writeFileSyncFs(discoveryMarkerPath(tool), '1');
+}
+
+function requireDiscovery(tool: 'axiom' | 'grafana', queryTool: string): void {
+  if (!existsSync(discoveryMarkerPath(tool))) {
+    console.error(`error: ${queryTool} called before scripts/discover-${tool}. Run scripts/discover-${tool} first to learn available ${tool === 'axiom' ? 'datasets' : 'datasources and UIDs'}. Querying without discovery violates Golden Rule #9.`);
+    process.exit(1);
+  }
+}
+
 try {
   await initAllValidators();
   const scenario: Scenario = JSON.parse(readFileSync(scenarioFile, 'utf-8'));
@@ -191,7 +214,30 @@ try {
       console.log(scenario.initOutput);
       break;
 
+    case 'scripts-discover-axiom':
+      markDiscovered('axiom');
+      console.log(scenario.discoveryOutputs?.axiom ?? 'No Axiom deployments configured.');
+      break;
+
+    case 'scripts-discover-grafana':
+      markDiscovered('grafana');
+      console.log(scenario.discoveryOutputs?.grafana ?? 'No Grafana deployments configured.');
+      break;
+
+    case 'scripts-discover-pyroscope':
+      console.log(scenario.discoveryOutputs?.pyroscope ?? 'No Pyroscope deployments configured.');
+      break;
+
+    case 'scripts-discover-k8s':
+      console.log(scenario.discoveryOutputs?.k8s ?? 'No Kubernetes contexts found.');
+      break;
+
+    case 'scripts-discover-slack':
+      console.log(scenario.discoveryOutputs?.slack ?? 'No Slack workspaces configured.');
+      break;
+
     case 'scripts-axiom-query': {
+      requireDiscovery('axiom', 'scripts/axiom-query');
       const stdinQuery = readStdin();
 
       if (fixtures) {
@@ -226,6 +272,7 @@ try {
     }
 
     case 'scripts-grafana-query': {
+      requireDiscovery('grafana', 'scripts/grafana-query');
       if (fixtures) {
         const parsed = parseGrafanaInvocation(toolArgs);
         if (parsed.errors.length > 0) {

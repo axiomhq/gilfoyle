@@ -33,17 +33,27 @@ The traces are in our OTel pipeline. Investigate and find the root cause.`,
   initOutput: `Gilfoyle Environment Discovery
 ==============================
 
-Axiom Environments:
-  prod:
-    datasets: [otel-traces-prod, k8s-logs-prod]
+Configured tools:
+  axiom: prod ✓
+  grafana: prod ✓
+  slack: acme ✓
 
-Grafana Environments:
-  prod:
-    datasources: [prometheus-prod (uid: prom-prod)]
-
-Slack:
-  Available (workspace: acme)
+Run scripts/discover-<tool> to see available assets before querying.
 `,
+  discoveryOutputs: {
+    axiom: `=== Axiom Deployments ===
+deployment: prod
+  Top datasets found (2)
+  - otel-traces-prod
+  - k8s-logs-prod`,
+    grafana: `=== Grafana Deployments ===
+deployment: prod
+  1 datasources found
+  - prometheus-prod (prometheus) [uid: prom-prod]`,
+    slack: `=== Slack Workspaces ===
+workspace: acme
+  Connected ✓`,
+  },
   toolMocks: {},
   fixtures: {
     validDeployments: ['prod'],
@@ -200,7 +210,7 @@ Slack:
     ],
   },
   budgets: {
-    maxToolCalls: 18,
+    maxToolCalls: 20,
     maxTotalTokens: 15000,
     maxElapsedMs: 285_000,
   },

@@ -1,6 +1,6 @@
-export type HarnessName = 'amp' | 'opencode' | 'direct' | 'claude' | 'codex';
+export type HarnessName = 'amp' | 'opencode' | 'claude' | 'codex';
 export type ModelName = string;
-export type ToolName = 'scripts/init' | 'scripts/axiom-query' | 'scripts/grafana-query' | 'scripts/slack' | 'scripts/mem-write' | 'scripts/rollback' | 'scripts/flag-revert' | 'scripts/axiom-link' | 'scripts/grafana-link' | 'scripts/pyroscope-link' | 'scripts/sentry-link' | 'git_log' | 'git_blame' | 'gh_pr_view' | 'gh_pr_diff' | 'gh_repo_clone';
+export type ToolName = 'scripts/init' | 'scripts/axiom-query' | 'scripts/grafana-query' | 'scripts/slack' | 'scripts/mem-write' | 'scripts/rollback' | 'scripts/flag-revert' | 'scripts/axiom-link' | 'scripts/grafana-link' | 'scripts/pyroscope-link' | 'scripts/sentry-link' | 'scripts/discover-axiom' | 'scripts/discover-grafana' | 'scripts/discover-pyroscope' | 'scripts/discover-k8s' | 'scripts/discover-slack' | 'git_log' | 'git_blame' | 'gh_pr_view' | 'gh_pr_diff' | 'gh_repo_clone';
 
 export interface ToolCall {
   tool: ToolName;
@@ -116,6 +116,13 @@ export interface IncidentScenario {
   description: string;
   prompt: string;
   initOutput: string;
+  discoveryOutputs?: {
+    axiom?: string;
+    grafana?: string;
+    pyroscope?: string;
+    k8s?: string;
+    slack?: string;
+  };
   severity?: 'P1' | 'P2' | 'P3' | 'P4'; // P1 = system down, requires immediate mitigation
   // Legacy keyword mocks (deprecated)
   toolMocks: {
