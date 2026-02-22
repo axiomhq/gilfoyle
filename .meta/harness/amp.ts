@@ -35,6 +35,49 @@ function createMockScript(name: string): string {
   return `#!/bin/bash\nexec bun "${MOCK_TOOL_PATH}" scripts-${name} "$@"\n`;
 }
 
+function createGitShim(scenarioFile: string, enableFixtureBackedMocks: boolean): string {
+  if (enableFixtureBackedMocks) {
+    return `#!/bin/bash
+export GILFOYLE_SCENARIO_FILE="${scenarioFile}"
+case "$1" in
+  log)   shift; exec bun "${MOCK_TOOL_PATH}" mock-git-log "$@" ;;
+  blame) shift; exec bun "${MOCK_TOOL_PATH}" mock-git-blame "$@" ;;
+  *)
+    echo "error: git command blocked by eval harness (allowed: log, blame)" >&2
+    exit 1
+    ;;
+esac
+`;
+  }
+
+  return `#!/bin/bash
+echo "error: git command blocked by eval harness" >&2
+exit 1
+`;
+}
+
+function createGhShim(scenarioFile: string, enableFixtureBackedMocks: boolean): string {
+  if (enableFixtureBackedMocks) {
+    return `#!/bin/bash
+export GILFOYLE_SCENARIO_FILE="${scenarioFile}"
+case "$1:$2" in
+  pr:view)   shift 2; exec bun "${MOCK_TOOL_PATH}" mock-gh-pr-view "$@" ;;
+  pr:diff)   shift 2; exec bun "${MOCK_TOOL_PATH}" mock-gh-pr-diff "$@" ;;
+  repo:clone) shift 2; exec bun "${MOCK_TOOL_PATH}" mock-gh-repo-clone "$@" ;;
+  *)
+    echo "error: gh command blocked by eval harness (allowed: pr view, pr diff, repo clone)" >&2
+    exit 1
+    ;;
+esac
+`;
+  }
+
+  return `#!/bin/bash
+echo "error: gh command blocked by eval harness" >&2
+exit 1
+`;
+}
+
 export const ampHarness: HarnessRunner = {
   name: 'amp',
 
@@ -61,33 +104,14 @@ export const ampHarness: HarnessRunner = {
       chmodSync(scriptPath, 0o755);
     }
 
-    // Create mock git/gh binaries for bug fix protocol scenarios
-    if (scenario.fixtures?.gitLog || scenario.fixtures?.gitBlame || scenario.fixtures?.pullRequests) {
-      // Mock git: routes subcommands to mock-tool.ts
-      const gitScript = `#!/bin/bash
-export GILFOYLE_SCENARIO_FILE="${scenarioFile}"
-case "$1" in
-  log)   shift; exec bun "${MOCK_TOOL_PATH}" mock-git-log "$@" ;;
-  blame) shift; exec bun "${MOCK_TOOL_PATH}" mock-git-blame "$@" ;;
-  *)     echo "mock-git: unsupported subcommand: $1" >&2; exit 1 ;;
-esac
-`;
-      writeFileSync(join(binDir, 'git'), gitScript);
-      chmodSync(join(binDir, 'git'), 0o755);
-
-      // Mock gh: routes subcommands to mock-tool.ts
-      const ghScript = `#!/bin/bash
-export GILFOYLE_SCENARIO_FILE="${scenarioFile}"
-case "$1:$2" in
-  pr:view)  shift 2; exec bun "${MOCK_TOOL_PATH}" mock-gh-pr-view "$@" ;;
-  pr:diff)  shift 2; exec bun "${MOCK_TOOL_PATH}" mock-gh-pr-diff "$@" ;;
-  repo:clone) shift 2; exec bun "${MOCK_TOOL_PATH}" mock-gh-repo-clone "$@" ;;
-  *)        echo "mock-gh: unsupported subcommand: $1 $2" >&2; exit 1 ;;
-esac
-`;
-      writeFileSync(join(binDir, 'gh'), ghScript);
-      chmodSync(join(binDir, 'gh'), 0o755);
-    }
+    // Always install git/gh shims first in PATH so evals never hit real GitHub.
+    const enableFixtureBackedMocks = Boolean(
+      scenario.fixtures?.gitLog || scenario.fixtures?.gitBlame || scenario.fixtures?.pullRequests,
+    );
+    writeFileSync(join(binDir, 'git'), createGitShim(scenarioFile, enableFixtureBackedMocks));
+    chmodSync(join(binDir, 'git'), 0o755);
+    writeFileSync(join(binDir, 'gh'), createGhShim(scenarioFile, enableFixtureBackedMocks));
+    chmodSync(join(binDir, 'gh'), 0o755);
 
     const elapsed = () => `${((Date.now() - start) / 1000).toFixed(0)}s`;
     const log = (msg: string) => console.error(`[amp] ${scenario.id} (${elapsed()}): ${msg}`);
@@ -105,7 +129,12 @@ esac
         options: {
           cwd: tmpDir,
           skills: tmpDir,
-          env: { GILFOYLE_SCENARIO_FILE: scenarioFile, PATH: `${binDir}:${process.env.PATH}` },
+          env: {
+            GILFOYLE_SCENARIO_FILE: scenarioFile,
+            PATH: `${binDir}:${process.env.PATH}`,
+            GH_TOKEN: '__EVAL_BLOCKED__',
+            GITHUB_TOKEN: '__EVAL_BLOCKED__',
+          },
           dangerouslyAllowAll: true,
         },
       })) {
