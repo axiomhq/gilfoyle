@@ -1,4 +1,5 @@
 import type { HarnessRunner, IncidentScenario, RunConfig, RunTrace, ToolCall, ToolName } from './types.js';
+import { installGitShims, blockProcessEnv } from './sandbox.js';
 import { Codex, type ModelReasoningEffort } from '@openai/codex-sdk';
 import { readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -92,6 +93,8 @@ export const codexHarness: HarnessRunner = {
       chmodSync(scriptPath, 0o755);
     }
 
+    const binDir = installGitShims(tmpDir, scenarioFile, scenario);
+
     const apiKey = process.env.CODEX_API_KEY ?? process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new Error('OPENAI_API_KEY (or CODEX_API_KEY) not set');
@@ -103,6 +106,8 @@ export const codexHarness: HarnessRunner = {
       apiKey,
       baseUrl: process.env.OPENAI_BASE_URL,
     });
+
+    const restoreEnv = blockProcessEnv(binDir);
 
     try {
       const thread = codex.startThread({
@@ -156,6 +161,7 @@ export const codexHarness: HarnessRunner = {
       const msg = err instanceof Error ? err.message : String(err);
       finalText += `\nHARNESS ERROR: ${msg}\n`;
     } finally {
+      restoreEnv();
       try {
         rmSync(tmpDir, { recursive: true, force: true });
       } catch {

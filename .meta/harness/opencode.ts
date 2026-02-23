@@ -7,6 +7,7 @@
  */
 
 import type { HarnessRunner, IncidentScenario, RunConfig, RunTrace, ToolCall, ToolName, TokenUsage } from './types.js';
+import { installGitShims, blockProcessEnv } from './sandbox.js';
 import { createOpencode } from '@opencode-ai/sdk';
 import type { Part, ToolPart } from '@opencode-ai/sdk';
 import { writeFileSync, mkdirSync, rmSync, readFileSync, copyFileSync, chmodSync } from 'node:fs';
@@ -115,6 +116,8 @@ export const opencodeHarness: HarnessRunner = {
       chmodSync(scriptPath, 0o755);
     }
 
+    const binDir = installGitShims(tmpDir, scenarioFile, scenario);
+
     const skillContent = readFileSync(SKILL_PATH, 'utf-8');
     writeFileSync(join(tmpDir, 'AGENTS.md'), skillContent);
 
@@ -129,6 +132,7 @@ export const opencodeHarness: HarnessRunner = {
     let opencode: Awaited<ReturnType<typeof createOpencode>> | undefined;
     let eventAbort: AbortController | undefined;
     const prevXdgCache = process.env.XDG_CACHE_HOME;
+    const restoreEnv = blockProcessEnv(binDir);
 
     try {
       // Isolate each server's cache to prevent concurrent processes from
@@ -379,6 +383,7 @@ IMPORTANT: All scripts are in ${scriptsDir}. Run them with the full path. Exampl
     } finally {
       if (prevXdgCache !== undefined) process.env.XDG_CACHE_HOME = prevXdgCache;
       else delete process.env.XDG_CACHE_HOME;
+      restoreEnv();
       eventAbort?.abort();
       try { opencode?.server.close(); } catch {}
       try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}

@@ -7,6 +7,7 @@
  */
 
 import type { HarnessRunner, IncidentScenario, RunConfig, RunTrace, ToolCall, ToolName, TokenUsage } from './types.js';
+import { installGitShims, blockedGitHubEnv } from './sandbox.js';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { writeFileSync, mkdirSync, rmSync, readFileSync, copyFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -61,6 +62,8 @@ export const claudeHarness: HarnessRunner = {
       chmodSync(scriptPath, 0o755);
     }
 
+    const binDir = installGitShims(tmpDir, scenarioFile, scenario);
+
     const elapsed = () => `${((Date.now() - start) / 1000).toFixed(0)}s`;
     const log = (msg: string) => console.error(`[claude] ${scenario.id} (${elapsed()}): ${msg}`);
     const pendingTools = new Map<string, { tool: ToolName; input: unknown }>();
@@ -88,6 +91,7 @@ export const claudeHarness: HarnessRunner = {
           env: {
             ...process.env as Record<string, string>,
             GILFOYLE_SCENARIO_FILE: scenarioFile,
+            ...blockedGitHubEnv(binDir),
           },
         },
       })) {
