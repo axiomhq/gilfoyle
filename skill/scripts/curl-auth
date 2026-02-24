@@ -81,11 +81,11 @@ run_curl() {
 case "$TOOL" in
     grafana)
         if [[ -n "${GRAFANA_ACCESS_CMD:-}" ]]; then
-            # cloudflared access curl requires URL first
+            # cloudflared access curl requires URL as the first positional argument
             if [[ -n "$DATA" ]]; then
-                $GRAFANA_ACCESS_CMD -s "$URL" -X "$METHOD" -H "Content-Type: application/json" -d "$DATA" "$@"
+                $GRAFANA_ACCESS_CMD "$URL" -s -X "$METHOD" -H "Content-Type: application/json" -d "$DATA" "$@"
             else
-                $GRAFANA_ACCESS_CMD -s "$URL" "$@"
+                $GRAFANA_ACCESS_CMD "$URL" -s "$@"
             fi
         elif [[ -n "${GRAFANA_CF_ACCESS_CLIENT_ID:-}" && -n "${GRAFANA_CF_ACCESS_CLIENT_SECRET:-}" ]]; then
             curl "${CURL_ARGS[@]}" \
@@ -103,10 +103,11 @@ case "$TOOL" in
     
     pyroscope)
         if [[ -n "${PYROSCOPE_ACCESS_CMD:-}" ]]; then
+            # cloudflared access curl requires URL as the first positional argument
             if [[ -n "$DATA" ]]; then
-                $PYROSCOPE_ACCESS_CMD -s "$URL" -X "$METHOD" -H "Content-Type: application/json" -d "$DATA" "$@"
+                $PYROSCOPE_ACCESS_CMD "$URL" -s -X "$METHOD" -H "Content-Type: application/json" -d "$DATA" "$@"
             else
-                $PYROSCOPE_ACCESS_CMD -s "$URL" "$@"
+                $PYROSCOPE_ACCESS_CMD "$URL" -s "$@"
             fi
         elif [[ -n "${PYROSCOPE_CF_ACCESS_CLIENT_ID:-}" && -n "${PYROSCOPE_CF_ACCESS_CLIENT_SECRET:-}" ]]; then
             curl "${CURL_ARGS[@]}" \
