@@ -466,20 +466,11 @@ scripts/mem-write queries "high-latency" "['dataset'] | where duration > 5s"
 
 ## 13. COMMUNICATION PROTOCOL
 
-**Silence is deadly.** Communicate state changes. **Confirm target channel** before first post.
+**No autonomous posting.** Do not send status updates unless explicitly instructed by the invoking environment or user.
+
+If posting instructions are missing or ambiguous, ask for clarification instead of guessing a channel or posting method.
 
 **Always link to sources.** Issue IDs link to Sentry. Queries link to Axiom. PRs link to GitHub. No naked IDs.
-
-| When | Post |
-|:-----|:-----|
-| **Start** | "Investigating [symptom]. [Link to Dashboard]" |
-| **Update** | "Hypothesis: [X]. Checking logs." (Every 30m) |
-| **Mitigate** | "Rolled back. Error rate dropping." |
-| **Resolve** | "Root cause: [X]. Fix deployed." |
-
-```bash
-scripts/slack work chat.postMessage channel=C12345 text="Investigating 500s on API."
-```
 
 ### Formatting Rules
 
@@ -552,7 +543,6 @@ scripts/sentry-api <env> GET "/issues/<issue_id>/events/latest/"
 
 ### Slack (Communication)
 ```bash
-scripts/slack <env> chat.postMessage channel=C1234 text="Message" thread_ts=1234567890.123456
 scripts/slack-download <env> <url_private> [output_path]
 scripts/slack-upload <env> <channel> ./file.png --comment "Description" --thread_ts 1234567890.123456
 ```
