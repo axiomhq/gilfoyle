@@ -4,6 +4,7 @@ import { google } from '@ai-sdk/google';
 import { wrapAISDKModel } from 'axiom/ai';
 import { z } from 'zod';
 import type { EvalInput, EvalOutput } from '../harness/types.js';
+import { parseJudgeOutput } from './judge-output.js';
 import { assessRunHealth } from './run-health.js';
 
 if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
@@ -33,6 +34,50 @@ The agent produced the following output during its investigation. Look for the a
 1. Find the agent's final root cause statement in the output above.
 2. Evaluate whether it correctly identifies the root cause (must mention the expected keywords).
 3. Check discriminativeness against the counterfactual causes.`;
+
+const judgmentSchema = z.object({
+  score: z.number().describe('Score from 0 to 100 indicating how well the agent identified the root cause'),
+  correct: z.boolean().describe('Whether the agent correctly identified the root cause'),
+  discriminative: z.boolean().describe('Whether the evidence specifically supports the correct cause over the counterfactuals'),
+  explanation: z.string().describe('One sentence explaining the judgment'),
+});
+
+async function callJudge(
+  prompt: string,
+  scenarioId: string,
+): Promise<z.infer<typeof judgmentSchema>> {
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await generateText({
+        model: wrapAISDKModel(google('gemini-3-flash-preview')),
+        prompt,
+        output: Output.object({ schema: judgmentSchema }),
+        maxOutputTokens: 1000,
+      });
+
+      try {
+        return result.output;
+      } catch {
+        if (result.text) {
+          return parseJudgeOutput(judgmentSchema, result.text);
+        }
+        throw new Error('Gemini returned no output and no text');
+      }
+    } catch (err) {
+      if (attempt < MAX_ATTEMPTS - 1) {
+        console.error(
+          `[rca-accuracy] Gemini attempt ${attempt + 1} failed for ${scenarioId}, retrying: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  throw new Error('Unreachable');
+}
 
 export const RCAAccuracyScorer = Scorer<{
   input: EvalInput;
@@ -72,37 +117,8 @@ export const RCAAccuracyScorer = Scorer<{
       .replace('{counterfactual_causes}', (scenario.expected.rootCauseMustNotMention?.length ? scenario.expected.rootCauseMustNotMention.join(', ') : 'None specified'))
       .replace('{agent_output}', agentOutput);
 
-    const judgmentSchema = z.object({
-      score: z.number().describe('Score from 0 to 100 indicating how well the agent identified the root cause'),
-      correct: z.boolean().describe('Whether the agent correctly identified the root cause'),
-      discriminative: z.boolean().describe('Whether the evidence specifically supports the correct cause over the counterfactuals'),
-      explanation: z.string().describe('One sentence explaining the judgment'),
-    });
-
     try {
-      const result = await generateText({
-        model: wrapAISDKModel(google('gemini-3-flash-preview')),
-        prompt,
-        output: Output.object({ schema: judgmentSchema }),
-        maxOutputTokens: 1000,
-      });
-      // AI SDK throws AI_NoOutputGeneratedError when finishReason !== "stop"
-      // (known Gemini bug: vercel/ai#11348). Fall back to parsing .text.
-      let judgment: z.infer<typeof judgmentSchema>;
-      try {
-        judgment = result.output;
-      } catch {
-        if (result.text) {
-          const parsed = judgmentSchema.safeParse(JSON.parse(result.text));
-          if (parsed.success) {
-            judgment = parsed.data;
-          } else {
-            throw new Error('Gemini returned text but failed schema validation');
-          }
-        } else {
-          throw new Error('Gemini returned no output and no text');
-        }
-      }
+      const judgment = await callJudge(prompt, scenario.id);
       const rawScore = judgment.score;
       const score = Number.isFinite(rawScore) ? Math.max(0, Math.min(1, rawScore / 100)) : 0;
       return {

@@ -4,6 +4,7 @@ import { google } from '@ai-sdk/google';
 import { wrapAISDKModel } from 'axiom/ai';
 import { z } from 'zod';
 import type { EvalInput, EvalOutput, ToolCall, ToolName } from '../harness/types.js';
+import { parseJudgeOutput } from './judge-output.js';
 import { assessRunHealth } from './run-health.js';
 
 if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
@@ -39,6 +40,43 @@ const judgmentSchema = z.object({
   contextualization: z.number().describe('Score 0-100: are data points interpreted, not just pasted?'),
   explanation: z.string().describe('One sentence explaining the judgment'),
 });
+
+async function callJudge(
+  prompt: string,
+  scenarioId: string,
+): Promise<z.infer<typeof judgmentSchema>> {
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await generateText({
+        model: wrapAISDKModel(google('gemini-3-flash-preview')),
+        prompt,
+        output: Output.object({ schema: judgmentSchema }),
+        maxOutputTokens: 1000,
+      });
+
+      try {
+        return result.output;
+      } catch {
+        if (result.text) {
+          return parseJudgeOutput(judgmentSchema, result.text);
+        }
+        throw new Error('Gemini returned no output and no text');
+      }
+    } catch (err) {
+      if (attempt < MAX_ATTEMPTS - 1) {
+        console.error(
+          `[evidence-quality] Gemini attempt ${attempt + 1} failed for ${scenarioId}, retrying: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  throw new Error('Unreachable');
+}
 
 function computeDeterministicScore(input: EvalInput, output: EvalOutput) {
   const requiredEvidence = input.scenario.expected.requiredEvidence ?? [];
@@ -147,29 +185,7 @@ export const EvidenceQualityScorer = Scorer<{
         .replace('{expected_root_cause}', scenario.expected.rootCauseMustMention.join(', '))
         .replace('{counterfactual_causes}', (scenario.expected.rootCauseMustNotMention?.length ? scenario.expected.rootCauseMustNotMention.join(', ') : 'None specified'));
 
-      const result = await generateText({
-        model: wrapAISDKModel(google('gemini-3-flash-preview')),
-        prompt,
-        output: Output.object({ schema: judgmentSchema }),
-        maxOutputTokens: 1000,
-      });
-      // AI SDK throws AI_NoOutputGeneratedError when finishReason !== "stop"
-      // (known Gemini bug: vercel/ai#11348). Fall back to parsing .text.
-      let judgment: z.infer<typeof judgmentSchema>;
-      try {
-        judgment = result.output;
-      } catch {
-        if (result.text) {
-          const parsed = judgmentSchema.safeParse(JSON.parse(result.text));
-          if (parsed.success) {
-            judgment = parsed.data;
-          } else {
-            throw new Error('Gemini returned text but failed schema validation');
-          }
-        } else {
-          throw new Error('Gemini returned no output and no text');
-        }
-      }
+      const judgment = await callJudge(prompt, input.scenario.id);
 
       const llmScore = (
         clamp01(judgment.specificity / 100) * 0.4 +

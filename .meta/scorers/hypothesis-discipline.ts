@@ -4,6 +4,7 @@ import { google } from '@ai-sdk/google';
 import { wrapAISDKModel } from 'axiom/ai';
 import { z } from 'zod';
 import type { EvalInput, EvalOutput, ToolCall } from '../harness/types.js';
+import { parseJudgeOutput } from './judge-output.js';
 import { assessRunHealth } from './run-health.js';
 
 if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
@@ -64,10 +65,9 @@ async function callJudge(
         return result.output;
       } catch {
         if (result.text) {
-          const parsed = judgmentSchema.safeParse(JSON.parse(result.text));
-          if (parsed.success) return parsed.data;
+          return parseJudgeOutput(judgmentSchema, result.text);
         }
-        throw new Error('Gemini returned text but failed schema validation');
+        throw new Error('Gemini returned no output and no text');
       }
     } catch (err) {
       if (attempt < MAX_ATTEMPTS - 1) {
