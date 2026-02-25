@@ -1,6 +1,6 @@
 import { Scorer } from 'axiom/ai/evals';
 import type { EvalInput, EvalOutput, ToolCall } from '../harness/types.js';
-import { classifyQueryFailure, isQueryTool, type QueryFailureKind } from './query-error-classification.js';
+import { analyzeQueryHealth } from './query-health.js';
 
 /**
  * Query Validity Scorer
@@ -20,7 +20,8 @@ export const QueryValidityScorer = Scorer<{
   'query-validity',
   ({ input, output }) => {
     const toolCalls = output.trace.toolCalls;
-    const queryCalls = toolCalls.filter((tc: ToolCall) => isQueryTool(tc));
+    const queryHealth = analyzeQueryHealth(toolCalls);
+    const queryCalls = queryHealth.queryCalls;
     const allowNoQueries = input.scenario.scoring?.allowNoQueries === true;
     const requiredQueries = input.scenario.expected.requiredQueries ?? [];
 
@@ -37,16 +38,8 @@ export const QueryValidityScorer = Scorer<{
       };
     }
 
-    const failures = queryCalls.map((tc) => {
-      const classified = classifyQueryFailure(tc);
-      return { tc, classified };
-    });
-    const validCalls = failures.filter((f) => !f.classified.hasFailure);
-    const invalidCalls = failures.filter((f) => f.classified.hasFailure);
-    const validityScore = validCalls.length / queryCalls.length;
-    const syntaxFailures = invalidCalls.filter((f) => f.classified.kind === 'syntax').length;
-    const syntaxScore = 1 - (syntaxFailures / queryCalls.length);
-    const failureClassCounts = countFailureClasses(invalidCalls.map((f) => f.classified.kind));
+    const validityScore = queryHealth.validityScore;
+    const syntaxScore = queryHealth.syntaxScore;
 
     // Score 2: required queries check
     let requiredScore = 1;
@@ -79,26 +72,18 @@ export const QueryValidityScorer = Scorer<{
         syntaxScore,
         requiredScore,
         totalQueryCalls: queryCalls.length,
-        validCalls: validCalls.length,
-        invalidCalls: invalidCalls.length,
-        failureClassCounts,
-        invalidDetails: invalidCalls.map(({ tc, classified }) => ({
-          tool: tc.tool,
-          class: classified.kind,
-          message: classified.message.slice(0, 300),
-          errors: tc.queryErrors,
-          input: typeof tc.input === 'string' ? tc.input.slice(0, 200) : JSON.stringify(tc.input).slice(0, 200),
+        validCalls: queryHealth.validCalls,
+        invalidCalls: queryHealth.invalidCalls,
+        failureClassCounts: queryHealth.failureClassCounts,
+        invalidDetails: queryHealth.failures.map(({ call, failure, inputText }) => ({
+          tool: call.tool,
+          class: failure.kind,
+          message: failure.message.slice(0, 300),
+          errors: call.queryErrors,
+          input: inputText.slice(0, 200),
         })),
         requiredResults,
       },
     };
   }
 );
-
-function countFailureClasses(classes: QueryFailureKind[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const cls of classes) {
-    out[cls] = (out[cls] ?? 0) + 1;
-  }
-  return out;
-}

@@ -1,6 +1,6 @@
 import { Scorer } from 'axiom/ai/evals';
 import type { EvalInput, EvalOutput } from '../harness/types.js';
-import { classifyQueryFailure, isQueryTool } from './query-error-classification.js';
+import { analyzeQueryHealth } from './query-health.js';
 
 /**
  * Query Repair Scorer
@@ -17,7 +17,8 @@ export const QueryRepairScorer = Scorer<{
   'query-repair',
   ({ input, output }) => {
     const allowNoQueries = input.scenario.scoring?.allowNoQueries === true;
-    const queryCalls = output.trace.toolCalls.filter(isQueryTool);
+    const queryHealth = analyzeQueryHealth(output.trace.toolCalls);
+    const queryCalls = queryHealth.queryCalls;
 
     if (queryCalls.length === 0) {
       return {
@@ -31,13 +32,7 @@ export const QueryRepairScorer = Scorer<{
       };
     }
 
-    const classified = queryCalls.map((call, index) => ({
-      call,
-      index,
-      failure: classifyQueryFailure(call),
-    }));
-
-    const failures = classified.filter((entry) => entry.failure.hasFailure);
+    const failures = queryHealth.failures;
     if (failures.length === 0) {
       return {
         score: 1,
@@ -51,26 +46,7 @@ export const QueryRepairScorer = Scorer<{
       };
     }
 
-    let repaired = 0;
-    const unrepaired: Array<{ index: number; tool: string; class: string }> = [];
-
-    for (const failed of failures) {
-      const hasRecovery = classified
-        .slice(failed.index + 1)
-        .some((later) => later.call.tool === failed.call.tool && !later.failure.hasFailure);
-
-      if (hasRecovery) {
-        repaired += 1;
-      } else {
-        unrepaired.push({
-          index: failed.index,
-          tool: failed.call.tool,
-          class: failed.failure.kind,
-        });
-      }
-    }
-
-    const score = repaired / failures.length;
+    const score = queryHealth.repairScore;
 
     return {
       score,
@@ -78,9 +54,9 @@ export const QueryRepairScorer = Scorer<{
         applicable: true,
         queryCalls: queryCalls.length,
         failures: failures.length,
-        repaired,
-        unrepairedCount: unrepaired.length,
-        unrepaired,
+        repaired: queryHealth.repaired,
+        unrepairedCount: queryHealth.unrepairedCount,
+        unrepaired: queryHealth.unrepaired,
       },
     };
   },
