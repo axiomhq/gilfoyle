@@ -301,15 +301,21 @@ done
 echo ""
 echo "Run scripts/discover-<tool> to see available assets before querying."
 
-# Check for Memory Bloat
-MEMORY_KB="$CONFIG_DIR/memory/kb"
-if [[ -d "$MEMORY_KB" ]]; then
-    TOTAL_LINES=$(find "$MEMORY_KB" -name "*.md" -type f -exec cat {} + | wc -l | tr -d ' ')
-    if [[ "$TOTAL_LINES" -gt 1000 ]]; then
-        echo ""
-        echo -e "${RED}⚠️  MEMORY BLOAT DETECTED ($TOTAL_LINES lines)${NC}"
-        echo "   Performance degrading. Start a new session to run 'scripts/sleep'."
-    fi
+# ─── Org Memory ──────────────────────────────────────────────────────
+
+ORGS_DIR="$CONFIG_DIR/memory/orgs"
+if [[ -d "$ORGS_DIR" ]] && [[ -n "$(ls -A "$ORGS_DIR" 2>/dev/null)" ]]; then
+    echo ""
+    echo "Org memory (read with: find $ORGS_DIR -path '*/kb/*.md' -type f -exec cat {} +):"
+    for org_dir in "$ORGS_DIR"/*/; do
+        [[ -d "$org_dir" ]] || continue
+        org_name=$(basename "$org_dir")
+        org_kb_dir="${org_dir%/}/kb"
+        if [[ -d "$org_kb_dir" ]]; then
+            file_count=$(find "$org_kb_dir" -name "*.md" -type f 2>/dev/null | wc -l | tr -d ' ')
+            echo "  ${org_name}: ${file_count} files (${org_kb_dir})"
+        fi
+    done
 fi
 
 echo ""
