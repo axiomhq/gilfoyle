@@ -337,31 +337,14 @@ Measure customer-facing health. Applies to any telemetry source—metrics, logs,
 
 **Grafana (metrics):** See `reference/grafana.md` for PromQL equivalents.
 
-### B. RED METHOD (Services)
+### B. RED (Services) & USE (Resources)
 
-For request-driven services. Measures the *work* the service does.
+- **RED** (request-driven): Rate, Errors, Duration — measures the *work* a service does.
+- **USE** (infrastructure): Utilization, Saturation, Errors — measures *capacity* of CPU/memory/disk/network.
 
-| Signal | What to measure |
-|:-------|:----------------|
-| **Rate** | Request throughput per service |
-| **Errors** | Error rate (5xx / total) |
-| **Duration** | Latency percentiles (p50, p95, p99) |
+Measure via APL (`reference/apl.md`) or PromQL (`reference/grafana.md`).
 
-Measure via logs (APL — see `reference/apl.md`) or metrics (PromQL — see `reference/grafana.md`).
-
-### C. USE METHOD (Resources)
-
-For infrastructure resources (CPU, memory, disk, network). Measures the *capacity* of the resource.
-
-| Signal | What to measure |
-|:-------|:----------------|
-| **Utilization** | CPU, memory, disk usage |
-| **Saturation** | Queue depth, load average, waiting threads |
-| **Errors** | Hardware/network errors |
-
-Typically measured via metrics. See `reference/grafana.md` for PromQL patterns.
-
-### D. DIFFERENTIAL ANALYSIS
+### C. DIFFERENTIAL ANALYSIS
 
 Compare a "bad" cohort or time window against a "good" baseline to find what changed. Find dimensions that are statistically over- or under-represented in the problem window.
 
@@ -376,7 +359,7 @@ Compare a "bad" cohort or time window against a "good" baseline to find what cha
 
 For jq parsing and interpretation of spotlight output, see `reference/apl.md` → Differential Analysis.
 
-### E. CODE FORENSICS
+### D. CODE FORENSICS
 
 - **Log to Code:** Grep for exact static string part of log message
 - **Metric to Code:** Grep for metric name to find instrumentation point
@@ -589,15 +572,4 @@ scripts/slack-upload <env> <channel> ./file.png --comment "Description" --thread
 
 ## Reference Files
 
-- `reference/apl.md`—APL operators, functions, and spotlight analysis
-- `reference/axiom.md`—Axiom API endpoints (70+)
-- `reference/blocks.md`—Slack Block Kit formatting
-- `reference/failure-modes.md`—Common failure patterns
-- `reference/grafana.md`—Grafana queries and PromQL patterns
-- `reference/memory-system.md`—Full memory documentation
-- `reference/postmortem-template.md`—Incident retrospective template
-- `reference/pyroscope.md`—Continuous profiling with Pyroscope
-- `reference/query-patterns.md`—Ready-to-use APL investigation queries
-- `reference/sentry.md`—Sentry API endpoints and examples
-- `reference/slack.md`—Slack script usage and operations
-- `reference/slack-api.md`—Slack API method reference
+All in `reference/`: `apl.md` (operators/functions/spotlight), `axiom.md` (API), `blocks.md` (Slack Block Kit), `failure-modes.md`, `grafana.md` (PromQL), `memory-system.md`, `postmortem-template.md`, `pyroscope.md` (profiling), `query-patterns.md` (APL recipes), `sentry.md`, `slack.md`, `slack-api.md`.
