@@ -385,7 +385,9 @@ Every finding must link to its source — dashboards, queries, error reports, PR
 4. **Documented patterns**—In `kb/queries.md` and `kb/patterns.md`
 5. **Data responses**—Any answer citing tool-derived numbers (e.g. burn rates, error counts, usage stats, etc). Questions don't require investigation, but if you cite numbers from a query, include the source link.
 
-**Rule: If you ran a query and cite its results, generate a permalink.** Run the appropriate link tool for every query whose results appear in your response:
+**Rule: If you ran a query and cite its results, generate a permalink.** Run the appropriate link tool for every query whose results appear in your response.
+
+**Axiom chart-friendly links:** When your query aggregates over time (`summarize ... by bin(_time, ...)` or `bin_auto(_time)`), pass a simplified version to `scripts/axiom-link` that keeps the `summarize` as the last operator — strip any trailing `extend`, `order by`, or `project-reorder`. This lets Axiom render the result as a time-series chart instead of a flat table. If the query has no time binning, pass it as-is.
 - **Axiom:** `scripts/axiom-link`
 - **Grafana:** `scripts/grafana-link`
 - **Pyroscope:** `scripts/pyroscope-link`
