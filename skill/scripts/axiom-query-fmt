@@ -16,7 +16,9 @@ for arg in "$@"; do
 done
 
 if [[ "$MODE" == "raw" ]]; then
-  cat
+  INPUT=$(cat)
+  echo "$INPUT" | jq -r '"# \(.status.rowsMatched // 0)/\(.status.rowsExamined // 0) rows, \(.status.blocksExamined // 0) blocks, \((.status.elapsedTime // 0) / 1000 | floor)ms"' >&2 2>/dev/null
+  echo "$INPUT"
   exit 0
 fi
 
