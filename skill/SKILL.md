@@ -421,13 +421,14 @@ Every query prints a stats line: `# matched/examined rows, blocks, elapsed_ms`. 
 1. **`_time` filter FIRST**—always `where _time between (ago(1h) .. now())` before other filters. Without it, every block is scanned.
 2. **Most selective filter first**—Axiom does NOT reorder `where` clauses. Put the filter that eliminates the most rows earliest.
 3. **`project` early**—specify only the fields you need. `project *` on wide datasets (1000+ fields) wastes I/O and can OOM (HTTP 432).
-4. **Prefer simple, case-sensitive string ops**—`_cs` variants are faster. Prefer `startswith`/`endswith` over `contains` when applicable. Use `has` for term matching. `matches regex` is last resort.
-5. **Use duration literals**—`where duration > 10s` not manual conversion.
-6. **Avoid `search`**—scans ALL fields. Use `has`/`contains` on specific fields.
-7. **Avoid runtime `parse_json()`**—CPU-heavy, no indexing. Filter before parsing if unavoidable.
-8. **Avoid `pack(*)`**—creates dict of ALL fields per row. Use `pack` with named fields only.
-9. **Limit results**—use `take 10` or `top 20` instead of default 1000 when exploring.
-10. **Field quoting**—quote identifiers with dots/dashes/spaces: `['geo.country']`. For map field keys, use index notation: `['attributes.custom']['http.protocol']`.
+4. **Prefer simple, case-sensitive string ops**—`_cs` variants are faster. Prefer `startswith`/`endswith` over `contains` when applicable. `matches regex` is last resort.
+5. **Use `has`/`has_cs` for unique-looking strings**—IDs, UUIDs, trace IDs, error codes, session tokens. `has` leverages full-text indexes when available and is much faster than `contains` for high-entropy terms. Use `contains` only when you need true substring matching (e.g., partial paths).
+6. **Use duration literals**—`where duration > 10s` not manual conversion.
+7. **Avoid `search`**—scans ALL fields. Use `has`/`contains` on specific fields.
+8. **Avoid runtime `parse_json()`**—CPU-heavy, no indexing. Filter before parsing if unavoidable.
+9. **Avoid `pack(*)`**—creates dict of ALL fields per row. Use `pack` with named fields only.
+10. **Limit results**—use `take 10` or `top 20` instead of default 1000 when exploring.
+11. **Field quoting**—quote identifiers with dots/dashes/spaces: `['geo.country']`. For map field keys, use index notation: `['attributes.custom']['http.protocol']`.
 
 **Need more?** Open `reference/apl.md` for operators/functions, `reference/query-patterns.md` for ready-to-use investigation queries.
 
