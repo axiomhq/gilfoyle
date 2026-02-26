@@ -388,13 +388,37 @@ For jq parsing and interpretation of spotlight output, see `reference/apl.md` �
 
 See `reference/apl.md` for full operator, function, and pattern reference.
 
-**Critical rules:**
-- **Time filter FIRST**—always `where _time between (ago(1h) .. now())` before other conditions
-- **Use `has_cs` over `contains`**—5-10x faster, case-sensitive
-- **Prefer `_cs` operators**—case-sensitive variants are always faster
-- **Use duration literals**—`where duration > 10s` not manual conversion
-- **Avoid `search`**—scans ALL fields. Last resort only.
-- **Field escaping**—dots need `\\.`: `['kubernetes.node_labels.nodepool\\.axiom\\.co/name']`
+### Query cost discipline
+
+**Queries are expensive. Every query scans real data and costs money. Be surgical.**
+
+**Probe before you investigate.** Always start with the smallest possible query to understand dataset size, shape, and field names before running anything heavier:
+
+```apl
+// 1. Schema discovery (cheap—metadata-focused; still counts as a query)
+['dataset'] | getschema
+
+// 2. Sample ONE event to see actual field values and types
+['dataset'] | where _time > ago(5m) | take 1
+
+// 3. Check cardinality of fields you plan to filter/group on
+['dataset'] | where _time > ago(5m) | summarize count() by level | top 10 by count_
+```
+
+**Never skip probing.** Running queries with wrong field names or unexpected types means wasted iterations and re-runs. Probe, then query.
+
+### Query performance rules
+
+1. **`_time` filter FIRST**—always `where _time between (ago(1h) .. now())` before other filters. Without it, every block is scanned.
+2. **Most selective filter first**—Axiom does NOT reorder `where` clauses. Put the filter that eliminates the most rows earliest.
+3. **`project` early**—specify only the fields you need. `project *` on wide datasets (1000+ fields) wastes I/O and can OOM (HTTP 432).
+4. **Prefer simple, case-sensitive string ops**—`_cs` variants are faster. Prefer `startswith`/`endswith` over `contains` when applicable. Use `has` for term matching. `matches regex` is last resort.
+5. **Use duration literals**—`where duration > 10s` not manual conversion.
+6. **Avoid `search`**—scans ALL fields. Use `has`/`contains` on specific fields.
+7. **Avoid runtime `parse_json()`**—CPU-heavy, no indexing. Filter before parsing if unavoidable.
+8. **Avoid `pack(*)`**—creates dict of ALL fields per row. Use `pack` with named fields only.
+9. **Limit results**—use `take 10` or `top 20` instead of default 1000 when exploring.
+10. **Field quoting**—quote identifiers with dots/dashes/spaces: `['geo.country']`. For map field keys, use index notation: `['attributes.custom']['http.protocol']`.
 
 **Need more?** Open `reference/apl.md` for operators/functions, `reference/query-patterns.md` for ready-to-use investigation queries.
 
