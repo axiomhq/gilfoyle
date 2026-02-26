@@ -407,6 +407,15 @@ See `reference/apl.md` for full operator, function, and pattern reference.
 
 **Never skip probing.** Running queries with wrong field names or unexpected types means wasted iterations and re-runs. Probe, then query.
 
+### Read the cost line after every query
+
+Every query prints a stats line: `# matched/examined rows, blocks, elapsed_ms`. **Read it.** Use it to calibrate:
+
+- **High rows examined, low matched?** Your filters are too broad. Add more selective `where` clauses or tighten the time range.
+- **Many blocks examined?** You're scanning too much data. Narrow `_time`, add selective filters before expensive ones.
+- **Slow elapsed time (>5s)?** Consider shorter time ranges, add `project`, or use `take` to sample before running the full query.
+- **Costs climbing?** If queries are getting progressively more expensive, pause and ask whether you're on the right track. Widening scope is fine when deliberate — but runaway cost means you're guessing, not investigating.
+
 ### Query performance rules
 
 1. **`_time` filter FIRST**—always `where _time between (ago(1h) .. now())` before other filters. Without it, every block is scanned.
