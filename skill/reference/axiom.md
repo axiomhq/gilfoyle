@@ -75,11 +75,11 @@ Summary of all operations available via Axiom API with a personal access token (
 
 | Operation | Endpoint | Description |
 |-----------|----------|-------------|
-| List virtual fields | `GET /v1/vfields?dataset={dataset}` | List virtual fields for a dataset |
-| Get virtual field | `GET /v1/vfields/{id}` | Get virtual field by ID |
-| Create virtual field | `POST /v1/vfields` | Create computed field with APL expression |
-| Update virtual field | `PUT /v1/vfields/{id}` | Update virtual field expression |
-| Delete virtual field | `DELETE /v1/vfields/{id}` | Delete virtual field |
+| List virtual fields | `GET /v2/vfields?dataset={dataset}` | List virtual fields for a dataset |
+| Get virtual field | `GET /v2/vfields/{id}` | Get virtual field by ID |
+| Create virtual field | `POST /v2/vfields` | Create computed field with APL expression |
+| Update virtual field | `PUT /v2/vfields/{id}` | Update virtual field expression |
+| Delete virtual field | `DELETE /v2/vfields/{id}` | Delete virtual field |
 
 ---
 
@@ -87,11 +87,11 @@ Summary of all operations available via Axiom API with a personal access token (
 
 | Operation | Endpoint | Description |
 |-----------|----------|-------------|
-| List annotations | `GET /v1/annotations` | List all annotations (filter by datasets, start, end) |
-| Get annotation | `GET /v1/annotations/{id}` | Get annotation by ID |
-| Create annotation | `POST /v1/annotations` | Create annotation marking an event on charts |
-| Update annotation | `PUT /v1/annotations/{id}` | Update annotation properties |
-| Delete annotation | `DELETE /v1/annotations/{id}` | Delete annotation |
+| List annotations | `GET /v2/annotations` | List all annotations (filter by datasets, start, end) |
+| Get annotation | `GET /v2/annotations/{id}` | Get annotation by ID |
+| Create annotation | `POST /v2/annotations` | Create annotation marking an event on charts |
+| Update annotation | `PUT /v2/annotations/{id}` | Update annotation properties |
+| Delete annotation | `DELETE /v2/annotations/{id}` | Delete annotation |
 
 **Fields:** `datasets[]`, `type`, `time`, `endTime`, `title`, `description`, `url`
 
@@ -101,12 +101,12 @@ Summary of all operations available via Axiom API with a personal access token (
 
 | Operation | Endpoint | Description |
 |-----------|----------|-------------|
-| List monitors | `GET /v1/monitors` | List all configured monitors |
-| Get monitor | `GET /v1/monitors/{id}` | Get monitor configuration |
-| Get monitor history | `GET /v1/monitors/{id}/history` | Get alert history for a monitor |
-| Create monitor | `POST /v1/monitors` | Create new monitor (Threshold/MatchEvent/AnomalyDetection) |
-| Update monitor | `PUT /v1/monitors/{id}` | Update monitor configuration |
-| Delete monitor | `DELETE /v1/monitors/{id}` | Delete monitor |
+| List monitors | `GET /v2/monitors` | List all configured monitors |
+| Get monitor | `GET /v2/monitors/{id}` | Get monitor configuration |
+| Get monitor history | `GET /v2/monitors/{id}/history` | Get alert history for a monitor |
+| Create monitor | `POST /v2/monitors` | Create new monitor (Threshold/MatchEvent/AnomalyDetection) |
+| Update monitor | `PUT /v2/monitors/{id}` | Update monitor configuration |
+| Delete monitor | `DELETE /v2/monitors/{id}` | Delete monitor |
 
 **Monitor types:** `Threshold`, `MatchEvent`, `AnomalyDetection`  
 **Operators:** `Below`, `BelowOrEqual`, `Above`, `AboveOrEqual`, `AboveOrBelow`
@@ -117,11 +117,11 @@ Summary of all operations available via Axiom API with a personal access token (
 
 | Operation | Endpoint | Description |
 |-----------|----------|-------------|
-| List notifiers | `GET /v1/notifiers` | List all notification channels |
-| Get notifier | `GET /v1/notifiers/{id}` | Get notifier configuration |
-| Create notifier | `POST /v1/notifiers` | Create notification channel |
-| Update notifier | `PUT /v1/notifiers/{id}` | Update notifier configuration |
-| Delete notifier | `DELETE /v1/notifiers/{id}` | Delete notifier |
+| List notifiers | `GET /v2/notifiers` | List all notification channels |
+| Get notifier | `GET /v2/notifiers/{id}` | Get notifier configuration |
+| Create notifier | `POST /v2/notifiers` | Create notification channel |
+| Update notifier | `PUT /v2/notifiers/{id}` | Update notifier configuration |
+| Delete notifier | `DELETE /v2/notifiers/{id}` | Delete notifier |
 
 **Channel types:** Slack, Email, PagerDuty, OpsGenie, Discord, Microsoft Teams, Custom Webhooks
 
@@ -131,11 +131,11 @@ Summary of all operations available via Axiom API with a personal access token (
 
 | Operation | Endpoint | Description |
 |-----------|----------|-------------|
-| List saved queries | `GET /v1/apl-starred-queries` | List saved/starred APL queries |
-| Get saved query | `GET /v1/apl-starred-queries/{id}` | Get saved query by ID |
-| Create saved query | `POST /v1/apl-starred-queries` | Save an APL query |
-| Update saved query | `PUT /v1/apl-starred-queries/{id}` | Update saved query |
-| Delete saved query | `DELETE /v1/apl-starred-queries/{id}` | Delete saved query |
+| List saved queries | `GET /v2/apl-starred-queries` | List saved/starred APL queries |
+| Get saved query | `GET /v2/apl-starred-queries/{id}` | Get saved query by ID |
+| Create saved query | `POST /v2/apl-starred-queries` | Save an APL query |
+| Update saved query | `PUT /v2/apl-starred-queries/{id}` | Update saved query |
+| Delete saved query | `DELETE /v2/apl-starred-queries/{id}` | Delete saved query |
 
 **Query params:** `limit`, `offset`, `dataset`, `who` (`team`/`all`/user ID), `qs`
 
@@ -145,11 +145,11 @@ Summary of all operations available via Axiom API with a personal access token (
 
 | Operation | Endpoint | Description |
 |-----------|----------|-------------|
-| List views | `GET /v1/views` | List all views |
-| Get view | `GET /v1/views/{id}` | Get view by ID |
-| Create view | `POST /v1/views` | Create a view (pre-filtered dataset) |
-| Update view | `PUT /v1/views/{id}` | Update view configuration |
-| Delete view | `DELETE /v1/views/{id}` | Delete view |
+| List views | `GET /v2/views` | List all views |
+| Get view | `GET /v2/views/{id}` | Get view by ID |
+| Create view | `POST /v2/views` | Create a view (pre-filtered dataset) |
+| Update view | `PUT /v2/views/{id}` | Update view configuration |
+| Delete view | `DELETE /v2/views/{id}` | Delete view |
 
 **Fields:** `name`, `aplQuery`, `datasets[]`, `description`
 
@@ -159,11 +159,11 @@ Summary of all operations available via Axiom API with a personal access token (
 
 | Operation | Endpoint | Description |
 |-----------|----------|-------------|
-| List tokens | `GET /v1/tokens` | List all API tokens |
-| Get token | `GET /v1/tokens/{id}` | Get token metadata (not the token value) |
-| Create token | `POST /v1/tokens` | Create new API token with capabilities |
-| Regenerate token | `POST /v1/tokens/{id}/regenerate` | Regenerate token value |
-| Delete token | `DELETE /v1/tokens/{id}` | Delete API token |
+| List tokens | `GET /v2/tokens` | List all API tokens |
+| Get token | `GET /v2/tokens/{id}` | Get token metadata (not the token value) |
+| Create token | `POST /v2/tokens` | Create new API token with capabilities |
+| Regenerate token | `POST /v2/tokens/{id}/regenerate` | Regenerate token value |
+| Delete token | `DELETE /v2/tokens/{id}` | Delete API token |
 
 **Capabilities:** `datasetCapabilities`, `orgCapabilities`, `viewCapabilities`
 
