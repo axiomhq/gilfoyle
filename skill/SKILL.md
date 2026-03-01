@@ -214,10 +214,8 @@ Your final message MUST include: what broke (repro signal), root cause mechanism
 
 ## 6. CONCLUSION VALIDATION (MANDATORY)
 
-Before declaring **any** stop condition (RESOLVED, MONITORING, ESCALATED, STALLED), run both checks.
+Before declaring **any** stop condition (RESOLVED, MONITORING, ESCALATED, STALLED), run this self-check.
 This applies to **pure RCA** too. No fix ≠ no validation.
-
-### Step 1: Self-Check (Same Context)
 
 If any answer is "no" or "not sure," keep investigating.
 
@@ -228,49 +226,6 @@ If any answer is "no" or "not sure," keep investigating.
 4. Is there a simpler explanation I didn't rule out?
 5. If no fix was applied (pure RCA), is the evidence still sufficient to explain the symptom?
 ```
-
-### Step 2: Oracle Judge (Independent Review)
-
-Call the Oracle with your conclusion and evidence. Different model, fresh context, no sunk cost bias.
-
-```
-oracle({
-  task: "Review this incident investigation conclusion.
-
-        Check for:
-        1. Correlation vs causation (mechanism proven?)
-        2. Untested assumptions in the reasoning chain
-        3. Alternative explanations not ruled out
-        4. Evidence gaps or weak inferences
-
-        Be adversarial. Try to poke holes. If solid, say so.",
-  context: `
-## ORIGINAL INCIDENT
-
-**Report:** [User message/alert]
-**Symptom:** [What was broken]
-**Impact:** [Who/what was affected]
-**Started:** [Start time]
-
-## INVESTIGATION SUMMARY
-
-**Hypotheses tested:** [List]
-**Key evidence:** [Queries + links]
-
-## CONCLUSION
-
-**Root Cause:** [Statement]
-**Why this explains symptom:** [Mechanism + evidence]
-
-## IF FIX APPLIED
-
-**Fix:** [Action]
-**Verification:** [Query/test showing recovery]
-`
-})
-```
-
-If the Oracle finds gaps, keep investigating and report the gaps.
 
 ---
 
