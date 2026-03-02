@@ -52,13 +52,13 @@ scripts/init
 **First run:** If no config exists, `scripts/init` creates `{{CONFIG_PATH}}` and memory directories automatically. If no deployments are configured, it prints setup guidance and exits early (no point discovering nothing). Walk the user through adding at least one tool (Axiom, Grafana, Pyroscope, Sentry, or Slack) to the config, then re-run `scripts/init`.
 
 **Progressive discovery (MANDATORY):** `scripts/init` only confirms which tools are configured (e.g., "axiom: prod ✓"). It does NOT reveal datasets, datasources, or UIDs. You MUST run the tool's discovery script before your first query to that tool:
-- `scripts/discover-axiom` — datasets (REQUIRED before `scripts/axiom-query`)
-- `scripts/discover-grafana` — datasources and UIDs (REQUIRED before `scripts/grafana-query`)
-- `scripts/discover-pyroscope` — applications (REQUIRED before `scripts/pyroscope-diff`)
+- `scripts/discover-axiom [env ...]` — datasets (REQUIRED before `scripts/axiom-query`)
+- `scripts/discover-grafana [env ...]` — datasources and UIDs (REQUIRED before `scripts/grafana-query`)
+- `scripts/discover-pyroscope [env ...]` — applications (REQUIRED before `scripts/pyroscope-diff`)
 - `scripts/discover-k8s` — contexts and namespaces
-- `scripts/discover-slack` — workspaces and channels
+- `scripts/discover-slack [env ...]` — workspaces and channels
 
-**Only discover tools you actually need for the investigation.**
+All discover scripts accept optional env names to limit scope (e.g., `discover-axiom prod staging`). Without args, they discover all configured envs. **Only discover tools you actually need for the investigation.**
 
 - **DO NOT GUESS** dataset names like `['logs']`. You don't know them until you run `scripts/discover-axiom`.
 - **DO NOT GUESS** Grafana datasource UIDs. You don't know them until you run `scripts/discover-grafana`.
@@ -459,7 +459,7 @@ See `reference/postmortem-template.md` for retrospective format.
 
 ### Axiom (Logs & Events)
 ```bash
-# Discover available datasets first
+# Discover available datasets (pass env names to limit: discover-axiom prod staging)
 scripts/discover-axiom
 
 scripts/axiom-query <env> <<< "['dataset'] | getschema"
@@ -469,7 +469,7 @@ scripts/axiom-query <env> --ndjson <<< "['dataset'] | where _time > ago(1h) | pr
 
 ### Grafana (Metrics)
 ```bash
-# Discover available datasources and UIDs first
+# Discover datasources and UIDs (pass env names to limit: discover-grafana prod)
 scripts/discover-grafana
 
 scripts/grafana-query <env> prometheus 'rate(http_requests_total[5m])'
@@ -477,7 +477,7 @@ scripts/grafana-query <env> prometheus 'rate(http_requests_total[5m])'
 
 ### Pyroscope (Profiling)
 ```bash
-# Discover available applications first
+# Discover applications (pass env names to limit: discover-pyroscope prod)
 scripts/discover-pyroscope
 
 scripts/pyroscope-diff <env> <app_name> -2h -1h -1h now

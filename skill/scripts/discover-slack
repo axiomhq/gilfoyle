@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Gilfoyle Slack Discovery
-# Usage: ./scripts/discover-slack
+# Usage: ./scripts/discover-slack [env ...]
 
 set -euo pipefail
 
@@ -18,10 +18,13 @@ if [[ ! -f "$CONFIG_SCRIPT" ]]; then
     exit 1
 fi
 
-workspaces=$("$CONFIG_SCRIPT" --list slack)
-
-if [[ "$workspaces" == "(none configured)" ]]; then
-    exit 0
+if [[ $# -gt 0 ]]; then
+    workspaces="$*"
+else
+    workspaces=$("$CONFIG_SCRIPT" --list slack)
+    if [[ "$workspaces" == "(none configured)" ]]; then
+        exit 0
+    fi
 fi
 
 echo -e "${BLUE}=== Slack Workspaces ===${NC}"

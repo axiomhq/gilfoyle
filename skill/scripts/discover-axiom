@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Gilfoyle Axiom Discovery
-# Usage: ./scripts/discover-axiom
+# Usage: ./scripts/discover-axiom [env ...]
 
 set -euo pipefail
 
@@ -18,10 +18,13 @@ if [[ ! -f "$CONFIG_SCRIPT" ]]; then
     exit 1
 fi
 
-deployments=$("$CONFIG_SCRIPT" --list axiom)
-
-if [[ "$deployments" == "(none configured)" ]]; then
-    exit 0
+if [[ $# -gt 0 ]]; then
+    deployments="$*"
+else
+    deployments=$("$CONFIG_SCRIPT" --list axiom)
+    if [[ "$deployments" == "(none configured)" ]]; then
+        exit 0
+    fi
 fi
 
 echo -e "${BLUE}=== Axiom Deployments ===${NC}"

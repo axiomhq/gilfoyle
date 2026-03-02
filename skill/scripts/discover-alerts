@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Gilfoyle Alert Discovery
-# Usage: ./scripts/discover-alerts
+# Usage: ./scripts/discover-alerts [env ...]
 #
 # Checks all Grafana deployments for FIRING alerts.
 
@@ -20,10 +20,13 @@ if [[ ! -f "$CONFIG_SCRIPT" ]]; then
     exit 1
 fi
 
-deployments=$("$CONFIG_SCRIPT" --list grafana)
-
-if [[ "$deployments" == "(none configured)" ]]; then
-    exit 0
+if [[ $# -gt 0 ]]; then
+    deployments="$*"
+else
+    deployments=$("$CONFIG_SCRIPT" --list grafana)
+    if [[ "$deployments" == "(none configured)" ]]; then
+        exit 0
+    fi
 fi
 
 echo -e "${BLUE}=== Active Alerts (Grafana) ===${NC}"
