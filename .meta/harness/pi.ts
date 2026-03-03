@@ -40,11 +40,18 @@ function createMockScript(name: string, scenarioFile: string): string {
   return `#!/bin/bash\nexport GILFOYLE_SCENARIO_FILE="${scenarioFile}"\nexec bun "${MOCK_TOOL_PATH}" scripts-${name} "$@"\n`;
 }
 
-function extractScriptFromBashCommand(cmd: string): ToolName | null {
+function extractToolFromBashCommand(cmd: string): ToolName | null {
   const match = cmd.match(
     /scripts\/(init|discover-axiom|discover-grafana|discover-pyroscope|discover-k8s|discover-slack|axiom-query|grafana-query|slack|mem-write|rollback|flag-revert|axiom-link|grafana-link|pyroscope-link|sentry-link)/,
   );
   if (match) return `scripts/${match[1]}` as ToolName;
+
+  if (/\bgit\s+log\b/.test(cmd)) return 'git_log';
+  if (/\bgit\s+blame\b/.test(cmd)) return 'git_blame';
+  if (/\bgh\s+pr\s+view\b/.test(cmd)) return 'gh_pr_view';
+  if (/\bgh\s+pr\s+diff\b/.test(cmd)) return 'gh_pr_diff';
+  if (/\bgh\s+repo\s+clone\b/.test(cmd)) return 'gh_repo_clone';
+
   return null;
 }
 
@@ -295,7 +302,7 @@ export const piHarness: HarnessRunner = {
             const command = extractBashCommand(event.args);
             if (!command) return;
 
-            const scriptName = extractScriptFromBashCommand(command);
+            const scriptName = extractToolFromBashCommand(command);
             if (!scriptName) return;
 
             const eventRecord = event as Record<string, unknown>;
