@@ -50,6 +50,8 @@ jobs:
             model: gpt-5.2-codex
           - harness: claude
             model: claude-opus-4-6
+          - harness: pi
+            model: anthropic/claude-opus-4-6
     env:
       AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
       AXIOM_DATASET: gilfoyle-evals
@@ -77,6 +79,8 @@ jobs:
         run: bun install -g opencode-ai
       - name: Run eval
         working-directory: .meta
+        env:
+          PI_THINKING_LEVEL: ${{ matrix.harness == 'pi' && 'medium' || '' }}
         run: bunx axiom eval 2>&1 | tee eval-output.log
       - name: Check for failures
         working-directory: .meta

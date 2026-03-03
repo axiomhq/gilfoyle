@@ -1,4 +1,4 @@
-export type HarnessName = 'amp' | 'opencode' | 'claude' | 'codex';
+export type HarnessName = 'amp' | 'opencode' | 'claude' | 'codex' | 'pi';
 export type ModelName = string;
 export type ToolName = 'scripts/init' | 'scripts/axiom-query' | 'scripts/grafana-query' | 'scripts/slack' | 'scripts/mem-write' | 'scripts/rollback' | 'scripts/flag-revert' | 'scripts/axiom-link' | 'scripts/grafana-link' | 'scripts/pyroscope-link' | 'scripts/sentry-link' | 'scripts/discover-axiom' | 'scripts/discover-grafana' | 'scripts/discover-pyroscope' | 'scripts/discover-k8s' | 'scripts/discover-slack' | 'git_log' | 'git_blame' | 'gh_pr_view' | 'gh_pr_diff' | 'gh_repo_clone';
 
