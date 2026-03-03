@@ -17,6 +17,8 @@ function defaultModelForHarness(harness: HarnessName): ModelName | undefined {
       return 'claude-opus-4-6';
     case 'codex':
       return 'gpt-5.2-codex';
+    case 'pi':
+      return 'anthropic/claude-opus-4-6';
     default:
       return DEFAULT_MODEL;
   }
@@ -88,6 +90,8 @@ Eval<EvalInput, ExpectedOutput, EvalOutput>(evalName, {
             ? 'openai'
             : config.harness === 'claude'
               ? 'anthropic'
+              : config.harness === 'pi'
+                ? 'pi'
               : 'xai';
         span.setAttribute('gen_ai.system', aiSystem);
         span.setAttribute('gen_ai.operation.name', 'chat');

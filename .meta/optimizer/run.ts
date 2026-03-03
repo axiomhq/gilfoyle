@@ -9,6 +9,7 @@
  *   bun optimizer/run.ts --apply            # Apply suggested fix
  *   bun optimizer/run.ts --harness=opencode # Use OpenCode harness
  *   bun optimizer/run.ts --harness=codex    # Use Codex harness
+ *   bun optimizer/run.ts --harness=pi       # Use Pi harness
  *   bun optimizer/run.ts --verbose          # Show detailed output
  */
 
@@ -37,7 +38,7 @@ Usage:
 
 Options:
   --apply           Apply the suggested fix to SKILL.md
-  --harness=NAME    Use harness (amp, opencode, codex) [default: amp]
+  --harness=NAME    Use harness (amp, opencode, codex, pi) [default: amp]
   --model=NAME      Use model [default: claude-opus-4]
   --verbose, -v     Show detailed output
   --help, -h        Show this help
@@ -46,6 +47,7 @@ Environment:
   ANTHROPIC_API_KEY   Required for amp harness and optimizer analysis
   XAI_API_KEY         Required for opencode harness
   OPENAI_API_KEY      Required for codex harness
+  GEMINI_API_KEY      Required for pi harness with google/* models
 `);
       process.exit(0);
     }

@@ -50,6 +50,8 @@ jobs:
             model: gpt-5.2-codex
           - harness: claude
             model: claude-opus-4-6
+          - harness: pi
+            model: anthropic/claude-opus-4-6
     env:
       AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
       AXIOM_DATASET: gilfoyle-evals
@@ -63,6 +65,7 @@ jobs:
       EVAL_HARNESS: ${{ matrix.harness }}
       EVAL_MODEL: ${{ matrix.model }}
       EVAL_TIMEOUT_MS: 900000
+      PI_THINKING_LEVEL: medium
       GIT_COMMIT: ${{ github.sha }}
       GIT_BRANCH: ${{ github.ref_name }}
     steps:
