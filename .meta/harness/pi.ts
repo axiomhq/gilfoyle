@@ -189,7 +189,7 @@ export const piHarness: HarnessRunner = {
     const scriptsDir = join(tmpDir, 'scripts');
     mkdirSync(scriptsDir, { recursive: true });
 
-    const scenarioFile = join(tmpDir, 'scenario.json');
+    const scenarioFile = join(tmpdir(), `gilfoyle-eval-scenario-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
     writeFileSync(scenarioFile, JSON.stringify(scenario));
     copyFileSync(SKILL_PATH, join(tmpDir, 'SKILL.md'));
 
@@ -219,8 +219,6 @@ export const piHarness: HarnessRunner = {
 
     const binDir = installGitShims(tmpDir, scenarioFile, scenario);
     const restoreEnv = blockProcessEnv(binDir);
-    const previousScenarioFile = process.env.GILFOYLE_SCENARIO_FILE;
-    process.env.GILFOYLE_SCENARIO_FILE = scenarioFile;
 
     const skillContent = readFileSync(SKILL_PATH, 'utf-8');
     const pendingTools = new Map<string, { tool: ToolName; input: string }>();
@@ -347,7 +345,7 @@ export const piHarness: HarnessRunner = {
         }
       });
 
-      const prompt = `You are Gilfoyle. Investigate this incident:\n\n${scenario.prompt}\n\nRun scripts/init first to discover available environments, then use scripts/axiom-query and scripts/grafana-query to investigate. State your ROOT CAUSE clearly with evidence.`;
+      const prompt = `You are Gilfoyle. Investigate this incident:\n\n${scenario.prompt}\n\nRun scripts/init first to discover available environments, then use scripts/axiom-query and scripts/grafana-query to investigate. State your ROOT CAUSE clearly with evidence.\nDo not inspect fixture or scenario files directly; use only scripts for evidence gathering.`;
 
       let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -380,11 +378,14 @@ export const piHarness: HarnessRunner = {
       }
 
       restoreEnv();
-      if (previousScenarioFile !== undefined) process.env.GILFOYLE_SCENARIO_FILE = previousScenarioFile;
-      else delete process.env.GILFOYLE_SCENARIO_FILE;
 
       try {
         rmSync(tmpDir, { recursive: true, force: true });
+      } catch {
+        // ignore cleanup errors
+      }
+      try {
+        rmSync(scenarioFile, { force: true });
       } catch {
         // ignore cleanup errors
       }
