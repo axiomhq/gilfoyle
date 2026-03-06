@@ -16,13 +16,13 @@ Most agent evals are a retrieval game in disguise. This one isn't. The agent get
                    │     Scenario Loader    │  │     Scorers      │
                    │                        │  │                  │
                    │  Hand-crafted          │  │  query-validity  │
-                   │    scenarios/*.ts      │  │  axiom-time-bounds│
-                   │                        │  │  rca-accuracy    │
+                   │    scenarios/*.ts      │  │  rca-accuracy    │
                    │                        │  │  evidence-quality│
-                   │  Synthesized           │  │  efficiency      │
-                   │    synthesizer/        │  │  wall-clock      │
-                   │    generated/*.json    │  │  token-budget    │
-                   │                        │  └──────────────────┘
+                   │                        │  │  efficiency      │
+                   │  Synthesized           │  │  wall-clock      │
+                   │    synthesizer/        │  │  token-budget    │
+                   │    generated/*.json    │  └──────────────────┘
+                   │                        │
                    └────────────┬──────────┘
                                 │
                    ┌────────────▼──────────┐
