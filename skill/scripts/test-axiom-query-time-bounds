@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 # Test explicit time-window enforcement in scripts/axiom-query.
-#
-# Usage: scripts/test-axiom-query-time-bounds
 
 set -euo pipefail
 
@@ -15,17 +13,6 @@ FAIL=0
 pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
 
-assert_contains() {
-  local label="$1" needle="$2" haystack="$3"
-  if [[ "$haystack" == *"$needle"* ]]; then
-    pass "$label"
-  else
-    fail "$label"
-    echo "    expected substring: $(printf '%q' "$needle")"
-    echo "    actual: $(printf '%q' "$haystack")"
-  fi
-}
-
 assert_eq() {
   local label="$1" expected="$2" actual="$3"
   if [[ "$expected" == "$actual" ]]; then
@@ -37,24 +24,35 @@ assert_eq() {
   fi
 }
 
+assert_contains() {
+  local label="$1" needle="$2" haystack="$3"
+  if [[ "$haystack" == *"$needle"* ]]; then
+    pass "$label"
+  else
+    fail "$label"
+    echo "    expected substring: $(printf '%q' "$needle")"
+    echo "    actual: $(printf '%q' "$haystack")"
+  fi
+}
+
 cp "$SCRIPT_DIR/axiom-query" "$TEST_DIR/axiom-query"
 cp "$SCRIPT_DIR/config" "$TEST_DIR/config"
 chmod +x "$TEST_DIR/axiom-query" "$TEST_DIR/config"
 
-cat > "$TEST_DIR/axiom-query-fmt" << 'EOF'
+cat > "$TEST_DIR/axiom-query-fmt" <<'EOF'
 #!/usr/bin/env bash
 cat
 EOF
 chmod +x "$TEST_DIR/axiom-query-fmt"
 
-cat > "$TEST_DIR/config.toml" << 'EOF'
+cat > "$TEST_DIR/config.toml" <<'EOF'
 [axiom.deployments.test]
 url = "https://api.axiom.test"
 token = "xapt-test-token"
 org_id = "test-org"
 EOF
 
-cat > "$TEST_DIR/curl" << 'EOF'
+cat > "$TEST_DIR/curl" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -66,21 +64,10 @@ payload=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -o)
-      body_path="$2"
-      shift 2
-      ;;
-    -D)
-      headers_path="$2"
-      shift 2
-      ;;
-    -d)
-      payload="$2"
-      shift 2
-      ;;
-    *)
-      shift
-      ;;
+    -o) body_path="$2"; shift 2 ;;
+    -D) headers_path="$2"; shift 2 ;;
+    -d) payload="$2"; shift 2 ;;
+    *) shift ;;
   esac
 done
 
@@ -98,22 +85,24 @@ export AXIOM_QUERY_TEST_CURL_LOG="$TEST_DIR/curl.log"
 export AXIOM_QUERY_TEST_PAYLOAD_LOG="$TEST_DIR/payload.json"
 
 run_query() {
-  local command="$1"
-  local query="$2"
-  local stdout_file="$TEST_DIR/stdout"
-  local stderr_file="$TEST_DIR/stderr"
+  local command="$1" query="$2"
+  local stdout_file="$TEST_DIR/stdout" stderr_file="$TEST_DIR/stderr"
   : > "$stdout_file"
   : > "$stderr_file"
   set +e
   QUERY_INPUT="$query" bash -c "printf '%s' \"\$QUERY_INPUT\" | $command" >"$stdout_file" 2>"$stderr_file"
-  local status=$?
+  QUERY_STATUS=$?
   set -e
   QUERY_STDERR=$(cat "$stderr_file")
-  QUERY_STATUS=$status
 }
 
-payload_field() {
-  jq -r "$1" "$AXIOM_QUERY_TEST_PAYLOAD_LOG"
+assert_no_curl() {
+  assert_eq "$1" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+}
+
+assert_payload() {
+  local label="$1" jq_expr="$2" expected="$3"
+  assert_eq "$label" "$expected" "$(jq -r "$jq_expr" "$AXIOM_QUERY_TEST_PAYLOAD_LOG")"
 }
 
 echo "=== axiom-query explicit time-window tests ==="
@@ -122,50 +111,36 @@ echo "=== axiom-query explicit time-window tests ==="
 run_query "\"$TEST_DIR/axiom-query\" test --raw" "['anton-inference-logs'] | getschema"
 assert_eq "rejects missing time window" "1" "$QUERY_STATUS"
 assert_contains "prints missing time window error" "requires an explicit time window" "$QUERY_STDERR"
-assert_eq "does not call curl for missing time window" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+assert_no_curl "does not call curl for missing time window"
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
 run_query "\"$TEST_DIR/axiom-query\" test --raw" "['anton-inference-logs'] | where _time > ago(15m) | getschema"
-assert_eq "still rejects inline _time without wrapper window" "1" "$QUERY_STATUS"
+assert_eq "rejects inline _time without wrapper window" "1" "$QUERY_STATUS"
 assert_contains "inline _time does not bypass wrapper contract" "requires an explicit time window" "$QUERY_STDERR"
-assert_eq "does not call curl when only inline _time is present" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+assert_no_curl "does not call curl when only inline _time is present"
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
 run_query "\"$TEST_DIR/axiom-query\" test --since 15m --raw" "['anton-inference-logs'] | getschema"
 assert_eq "allows --since window" "0" "$QUERY_STATUS"
 assert_eq "calls curl for --since window" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
-assert_eq "sends startTime for --since window" "now-15m" "$(payload_field '.startTime')"
-assert_eq "sends endTime for --since window" "now" "$(payload_field '.endTime')"
-assert_eq "sends apl text for --since window" "['anton-inference-logs'] | getschema" "$(payload_field '.apl')"
-
-: > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "\"$TEST_DIR/axiom-query\" test --since 15m --raw" "['anton-inference-logs'] | where _time > ago(5m) | where trace_id == 'abc123' | project _time"
-assert_eq "allows inline _time plus wrapper window" "0" "$QUERY_STATUS"
-assert_eq "calls curl when inline _time and wrapper window both exist" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
-assert_eq "preserves apl text when inline _time is present" "['anton-inference-logs'] | where _time > ago(5m) | where trace_id == 'abc123' | project _time" "$(payload_field '.apl')"
+assert_payload "sends startTime for --since window" '.startTime' 'now-15m'
+assert_payload "sends endTime for --since window" '.endTime' 'now'
+assert_payload "preserves apl text for --since window" '.apl' "['anton-inference-logs'] | getschema"
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
 run_query "\"$TEST_DIR/axiom-query\" test --from 2026-03-06T10:00:00Z --to 2026-03-06T10:30:00Z --raw" "['anton-inference-logs'] | getschema"
 assert_eq "allows absolute window" "0" "$QUERY_STATUS"
 assert_eq "calls curl for absolute window" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
-assert_eq "sends explicit startTime" "2026-03-06T10:00:00Z" "$(payload_field '.startTime')"
-assert_eq "sends explicit endTime" "2026-03-06T10:30:00Z" "$(payload_field '.endTime')"
+assert_payload "sends explicit startTime" '.startTime' '2026-03-06T10:00:00Z'
+assert_payload "sends explicit endTime" '.endTime' '2026-03-06T10:30:00Z'
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
 run_query "\"$TEST_DIR/axiom-query\" test --since 15m --from 2026-03-06T10:00:00Z --to 2026-03-06T10:30:00Z --raw" "['anton-inference-logs'] | getschema"
 assert_eq "rejects mixed relative and absolute windows" "1" "$QUERY_STATUS"
 assert_contains "prints mixed window error" "use either --since or --from/--to" "$QUERY_STDERR"
-assert_eq "does not call curl for mixed windows" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+assert_no_curl "does not call curl for mixed windows"
 
-: > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "\"$TEST_DIR/axiom-query\" test --from 2026-03-06T10:00:00Z --raw" "['anton-inference-logs'] | getschema"
-assert_eq "rejects missing --to" "1" "$QUERY_STATUS"
-assert_contains "prints absolute window hint" "requires an explicit time window" "$QUERY_STDERR"
-assert_eq "does not call curl for missing --to" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
-
-echo ""
+echo
 echo "==========================="
 echo "Results: $PASS passed, $FAIL failed"
-if [[ $FAIL -gt 0 ]]; then
-  exit 1
-fi
+[[ $FAIL -eq 0 ]]

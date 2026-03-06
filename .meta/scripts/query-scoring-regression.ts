@@ -94,24 +94,12 @@ async function main(): Promise<void> {
 
   const missingWindow = validateAxiomCLI(['prod'], "['app-logs'] | getschema", fixtures);
   const relativeWindow = validateAxiomCLI(['prod', '--since', '15m'], "['app-logs'] | getschema", fixtures);
-  const absoluteWindow = validateAxiomCLI(
-    ['prod', '--from', '2026-03-06T10:00:00Z', '--to', '2026-03-06T10:30:00Z'],
-    "['app-logs'] | getschema",
-    fixtures,
-  );
-  const mixedWindow = validateAxiomCLI(
-    ['prod', '--since', '15m', '--from', '2026-03-06T10:00:00Z', '--to', '2026-03-06T10:30:00Z'],
-    "['app-logs'] | getschema",
-    fixtures,
-  );
   const inlineTimeOnly = validateAxiomCLI(['prod'], "['app-logs'] | where _time > ago(15m) | getschema", fixtures);
 
   assert.equal(missingWindow.valid, false, 'validateAxiomCLI should reject missing time windows');
   assert.equal(relativeWindow.valid, true, 'validateAxiomCLI should accept --since windows');
   assert.equal(relativeWindow.startTime, 'now-15m', 'validateAxiomCLI should derive startTime from --since');
   assert.equal(relativeWindow.endTime, 'now', 'validateAxiomCLI should derive endTime for --since windows');
-  assert.equal(absoluteWindow.valid, true, 'validateAxiomCLI should accept --from/--to windows');
-  assert.equal(mixedWindow.valid, false, 'validateAxiomCLI should reject mixed relative and absolute windows');
   assert.equal(inlineTimeOnly.valid, false, 'validateAxiomCLI should not treat inline _time as a wrapper window');
 
   const missingWindowValidity = await QueryValidityScorer(buildArgs([

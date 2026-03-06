@@ -263,7 +263,7 @@ try {
           process.exit(1);
         }
 
-        const results = executeAPL(aplCheck.parsed!, fixtures, cliCheck);
+        const results = executeAPL(aplCheck.parsed!, fixtures);
         const totalRows = fixtures.datasets[aplCheck.parsed!.dataset]?.length ?? 0;
         console.log(formatAxiomOutput(results, totalRows));
       } else {

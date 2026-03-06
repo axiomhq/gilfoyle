@@ -219,13 +219,8 @@ function parseAPLStage(text: string): APLStage {
 
 // ─── APL Executor ────────────────────────────────────────────────────────
 
-export function executeAPL(
-  parsed: ParsedAPL,
-  fixtures: ScenarioFixtures,
-  timeWindow?: Pick<CLIValidation, 'startTime' | 'endTime'>,
-): LogRow[] {
+export function executeAPL(parsed: ParsedAPL, fixtures: ScenarioFixtures): LogRow[] {
   let rows = [...(fixtures.datasets[parsed.dataset] ?? [])];
-  rows = filterRowsByTimeWindow(rows, fixtures, timeWindow);
 
   for (const stage of parsed.stages) {
     switch (stage.type) {
@@ -549,51 +544,6 @@ function valueToEpochMs(value: unknown): number | null {
   const asDate = new Date(String(value));
   const epoch = asDate.getTime();
   return Number.isFinite(epoch) ? epoch : null;
-}
-
-function latestFixtureEpochMs(fixtures: ScenarioFixtures): number | null {
-  let latest: number | null = null;
-  for (const rows of Object.values(fixtures.datasets)) {
-    for (const row of rows) {
-      const epoch = valueToEpochMs(row._time);
-      if (epoch == null) continue;
-      latest = latest == null ? epoch : Math.max(latest, epoch);
-    }
-  }
-  return latest;
-}
-
-function resolveTimeExpression(value: string, fixtures: ScenarioFixtures): number | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (trimmed === 'now') return latestFixtureEpochMs(fixtures);
-
-  const relativeMatch = trimmed.match(/^now-(.+)$/i);
-  if (relativeMatch) {
-    const now = latestFixtureEpochMs(fixtures);
-    const duration = parseDurationMs(relativeMatch[1] ?? '');
-    if (now == null || duration == null) return null;
-    return now - duration;
-  }
-
-  return valueToEpochMs(trimmed);
-}
-
-function filterRowsByTimeWindow(
-  rows: LogRow[],
-  fixtures: ScenarioFixtures,
-  timeWindow?: Pick<CLIValidation, 'startTime' | 'endTime'>,
-): LogRow[] {
-  if (!timeWindow?.startTime || !timeWindow.endTime) return rows;
-
-  const start = resolveTimeExpression(timeWindow.startTime, fixtures);
-  const end = resolveTimeExpression(timeWindow.endTime, fixtures);
-  if (start == null || end == null) return rows;
-
-  return rows.filter((row) => {
-    const epoch = valueToEpochMs(row._time);
-    return epoch != null && epoch >= start && epoch <= end;
-  });
 }
 
 function executeDistinct(rows: LogRow[], fields: string[]): LogRow[] {

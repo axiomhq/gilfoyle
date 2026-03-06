@@ -138,7 +138,7 @@ export function createMockRouter(scenario: IncidentScenario): MockToolRouter {
             }
 
             queryValid = true;
-            const rows = executeAPL(aplVal.parsed!, scenario.fixtures, cliVal);
+            const rows = executeAPL(aplVal.parsed!, scenario.fixtures);
             const totalRows = scenario.fixtures.datasets[aplVal.parsed!.dataset]?.length ?? 0;
             output = formatAxiomOutput(rows, totalRows);
           } else {
