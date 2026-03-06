@@ -16,7 +16,8 @@ Most agent evals are a retrieval game in disguise. This one isn't. The agent get
                    │     Scenario Loader    │  │     Scorers      │
                    │                        │  │                  │
                    │  Hand-crafted          │  │  query-validity  │
-                   │    scenarios/*.ts      │  │  rca-accuracy    │
+                   │    scenarios/*.ts      │  │  axiom-time-bounds│
+                   │                        │  │  rca-accuracy    │
                    │                        │  │  evidence-quality│
                    │  Synthesized           │  │  efficiency      │
                    │    synthesizer/        │  │  wall-clock      │
@@ -273,6 +274,10 @@ Measures whether the agent can write valid APL and PromQL. If it can't, nothing 
 
 Score 0 if no query tool calls were made at all.
 
+### axiom-time-bounds (hard gate)
+
+Fails the run if any `scripts/axiom-query` call omits an explicit `_time` bound. This is distinct from syntax validity because a query like `['dataset'] | getschema` is syntactically valid APL but still disallowed by Gilfoyle policy.
+
 ### rca-accuracy (LLM judge)
 
 **Primary scorer for correctness.**
@@ -405,6 +410,7 @@ Avg: 7212753218.4
 ├── scorers/
 │   ├── index.ts                  # Scorer exports
 │   ├── query-validity.ts         # Syntax validity + required queries (hard gate)
+│   ├── axiom-time-bounds.ts      # Explicit _time enforcement for APL (hard gate)
 │   ├── rca.ts                    # LLM judge (Gemini) with keyword fallback
 │   ├── evidence.ts               # Tool usage + keyword presence + data point citations
 │   └── efficiency.ts             # Budget compliance + failure rate + redundancy detection

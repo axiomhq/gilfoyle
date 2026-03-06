@@ -6,7 +6,7 @@
 
 ```apl
 // Step 1: Get schema with types
-['dataset'] | getschema
+['dataset'] | where _time > ago(15m) | getschema
 
 // Step 2: Sample raw events to see actual data shape (especially map fields)
 ['dataset'] | where _time > ago(15m) | take 1

@@ -15,6 +15,7 @@
     "eval:claude:opus": "EVAL_HARNESS=claude EVAL_MODEL=claude-opus-4-6 axiom eval",
     "eval:pi": "EVAL_HARNESS=pi axiom eval",
     "eval:pi:opus": "EVAL_HARNESS=pi EVAL_MODEL=anthropic/claude-opus-4-6 axiom eval",
+    "regression:axiom-time-bounds": "bun run scripts/axiom-time-bounds-regression.ts",
     "eval:diagnostics": "bun run scripts/eval-diagnostics.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",

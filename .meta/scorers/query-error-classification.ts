@@ -26,6 +26,8 @@ const PATTERNS: Record<Exclude<QueryFailureKind, 'none'>, RegExp[]> = {
     /\bunknown flag\b/i,
     /\bmissing arguments?\b/i,
     /\bno query provided via stdin\b/i,
+    /\bexplicit _time bound\b/i,
+    /\bevery axiom apl query must include an explicit _time bound\b/i,
     /\busage:\s+(?:axiom-query|grafana-query)\b/i,
   ],
   unknown_target: [/\bunknown dataset\b/i, /\bunknown metric\b/i],

@@ -11,15 +11,40 @@
 #
 # Examples:
 #   # Simple query
-#   axiom-query prod <<< "['logs'] | take 5"
+#   axiom-query prod <<< "['logs'] | where _time > ago(1h) | take 5"
 #
 #   # JSON processing
-#   axiom-query prod --ndjson <<< "['logs'] | take 5" | jq -c '.status'
+#   axiom-query prod --ndjson <<< "['logs'] | where _time > ago(1h) | take 5" | jq -c '.status'
 #
 #   # Raw API output
-#   axiom-query prod --raw <<< "['logs']"
+#   axiom-query prod --raw <<< "['logs'] | where _time > ago(1h) | take 5"
 
 set -euo pipefail
+
+has_explicit_time_bound() {
+  local apl="$1"
+  local compact
+  compact=$(printf '%s' "$apl" | tr '\n\t' '  ' | tr '[:upper:]' '[:lower:]' | sed -E 's/[[:space:]]+/ /g')
+
+  if printf '%s\n' "$compact" | grep -Eq '\bwhere[[:space:]]+_time[[:space:]]+between[[:space:]]*\('; then
+    return 0
+  fi
+
+  if printf '%s\n' "$compact" | grep -Eq '\bwhere[[:space:]]+_time[[:space:]]*(>=|>)[[:space:]]*ago[[:space:]]*\('; then
+    return 0
+  fi
+
+  if printf '%s\n' "$compact" | grep -Eq '\bmake-series\b.*\bon[[:space:]]+_time[[:space:]]+from[[:space:]]+(ago[[:space:]]*\(|datetime[[:space:]]*\().*\bto[[:space:]]+(ago[[:space:]]*\(|now[[:space:]]*\(|datetime[[:space:]]*\()'; then
+    return 0
+  fi
+
+  if printf '%s\n' "$compact" | grep -Eq '\b_time[[:space:]]*(>=|>)[[:space:]]*(ago[[:space:]]*\(|datetime[[:space:]]*\()' &&
+    printf '%s\n' "$compact" | grep -Eq '\b_time[[:space:]]*(<=|<)[[:space:]]*(ago[[:space:]]*\(|now[[:space:]]*\(|datetime[[:space:]]*\()'; then
+    return 0
+  fi
+
+  return 1
+}
 
 if [[ $# -lt 1 ]]; then
   echo "Usage: axiom-query <deployment> [options] <<< 'query'" >&2
@@ -61,13 +86,19 @@ if [[ -t 0 ]]; then
   echo "Error: No query provided. Pipe a query to stdin." >&2
   echo "" >&2
   echo "Examples:" >&2
-  echo "  axiom-query $DEPLOYMENT <<< \"['logs'] | take 5\"" >&2
+  echo "  axiom-query $DEPLOYMENT <<< \"['logs'] | where _time > ago(1h) | take 5\"" >&2
   exit 1
 fi
 
 APL=$(cat)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APL_JSON=$(printf '%s' "$APL" | jq -Rs .)
+
+if ! has_explicit_time_bound "$APL"; then
+  echo "error: every Axiom APL query must include an explicit _time bound" >&2
+  echo "hint: use where _time between (...) or where _time > ago(...); trace_id/session_id/thread_ts/getschema are not substitutes" >&2
+  exit 1
+fi
 
 # Load config from unified config file
 # shellcheck disable=SC1090
@@ -105,4 +136,5 @@ if [[ "$PRINT_TRACE" == true ]]; then
   fi
 fi
 
+# shellcheck disable=SC2086 # intentional flag splitting for formatter options
 cat "$RESP_BODY" | "$SCRIPT_DIR/axiom-query-fmt" $FMT_ARGS

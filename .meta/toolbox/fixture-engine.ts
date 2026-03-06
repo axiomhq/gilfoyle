@@ -10,6 +10,7 @@
 
 import type { LogRow, MetricSeries, ScenarioFixtures, } from '../harness/types.js';
 import { validateAPLSyntax, validatePromQLSyntax } from './apl-validator.js';
+import { axiomTimeBoundError } from './axiom-time-bounds.js';
 
 // ─── APL Parser ──────────────────────────────────────────────────────────
 
@@ -84,7 +85,29 @@ export function validateAPL(query: string, fixtures: ScenarioFixtures): APLValid
     }
   }
 
+  if (errors.length === 0 && !hasExplicitTimeBoundStage(stages)) {
+    errors.push(axiomTimeBoundError());
+  }
+
   return { valid: errors.length === 0, errors, parsed: { dataset, stages } };
+}
+
+function hasExplicitTimeBoundStage(stages: APLStage[]): boolean {
+  const whereExpressions = stages
+    .filter((stage): stage is Extract<APLStage, { type: 'where' }> => stage.type === 'where')
+    .map((stage) => stage.expr.toLowerCase().replace(/\s+/g, ' ').trim());
+
+  if (whereExpressions.some((expr) => /^_time\s+between\s*\(/.test(expr))) {
+    return true;
+  }
+
+  if (whereExpressions.some((expr) => /^_time\s*(>=|>)\s*ago\s*\(/.test(expr))) {
+    return true;
+  }
+
+  const combined = whereExpressions.join(' | ');
+  return /\b_time\s*(>=|>)\s*(ago\s*\(|datetime\s*\()/i.test(combined)
+    && /\b_time\s*(<=|<)\s*(ago\s*\(|now\s*\(|datetime\s*\()/i.test(combined);
 }
 
 function splitPipes(text: string): string[] {

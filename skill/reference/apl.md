@@ -49,9 +49,9 @@ axiom-query staging -f /tmp/q.apl
 
 Fields typed as `map[string]` in `getschema` (e.g., `attributes`, `attributes.custom`, `resource`, `resource.attributes`) are opaque containers — `getschema` only shows the column name and type `map[string]`, NOT the keys inside. You must discover map contents explicitly.
 
-**Step 1: Identify map columns** — Run `getschema` and look for `map` types:
+**Step 1: Identify map columns** — Run `getschema` with an explicit `_time` bound and look for `map` types:
 ```apl
-['traces-dataset'] | getschema
+['traces-dataset'] | where _time > ago(15m) | getschema
 // Look for: attributes        map[string]...
 //           attributes.custom  map[string]...
 //           resource           map[string]...

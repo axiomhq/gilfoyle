@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# Test explicit _time enforcement in scripts/axiom-query.
+#
+# Usage: scripts/test-axiom-query-time-bounds
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEST_DIR=$(mktemp -d)
+trap 'rm -rf "$TEST_DIR"' EXIT
+
+PASS=0
+FAIL=0
+
+pass() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
+fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
+
+assert_contains() {
+  local label="$1" needle="$2" haystack="$3"
+  if [[ "$haystack" == *"$needle"* ]]; then
+    pass "$label"
+  else
+    fail "$label"
+    echo "    expected substring: $(printf '%q' "$needle")"
+    echo "    actual: $(printf '%q' "$haystack")"
+  fi
+}
+
+assert_eq() {
+  local label="$1" expected="$2" actual="$3"
+  if [[ "$expected" == "$actual" ]]; then
+    pass "$label"
+  else
+    fail "$label"
+    echo "    expected: $(printf '%q' "$expected")"
+    echo "    actual:   $(printf '%q' "$actual")"
+  fi
+}
+
+cp "$SCRIPT_DIR/axiom-query" "$TEST_DIR/axiom-query"
+cp "$SCRIPT_DIR/config" "$TEST_DIR/config"
+chmod +x "$TEST_DIR/axiom-query" "$TEST_DIR/config"
+
+cat > "$TEST_DIR/axiom-query-fmt" << 'EOF'
+#!/usr/bin/env bash
+cat
+EOF
+chmod +x "$TEST_DIR/axiom-query-fmt"
+
+cat > "$TEST_DIR/config.toml" << 'EOF'
+[axiom.deployments.test]
+url = "https://api.axiom.test"
+token = "xapt-test-token"
+org_id = "test-org"
+EOF
+
+cat > "$TEST_DIR/curl" << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+log_path="${AXIOM_QUERY_TEST_CURL_LOG:?}"
+body_path=""
+headers_path=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o)
+      body_path="$2"
+      shift 2
+      ;;
+    -D)
+      headers_path="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+echo "called" >> "$log_path"
+printf 'x-axiom-trace-id: test-trace\n' > "$headers_path"
+printf '{"status":"ok"}\n' > "$body_path"
+printf '200'
+EOF
+chmod +x "$TEST_DIR/curl"
+
+export GILFOYLE_CONFIG="$TEST_DIR/config.toml"
+export PATH="$TEST_DIR:$PATH"
+export AXIOM_QUERY_TEST_CURL_LOG="$TEST_DIR/curl.log"
+
+run_query() {
+  local query="$1"
+  local stdout_file="$TEST_DIR/stdout"
+  local stderr_file="$TEST_DIR/stderr"
+  : > "$stdout_file"
+  : > "$stderr_file"
+  set +e
+  "$TEST_DIR/axiom-query" test --raw <<< "$query" >"$stdout_file" 2>"$stderr_file"
+  local status=$?
+  set -e
+  QUERY_STDERR=$(cat "$stderr_file")
+  QUERY_STATUS=$status
+}
+
+echo "=== axiom-query explicit _time tests ==="
+
+: > "$AXIOM_QUERY_TEST_CURL_LOG"
+run_query "['anton-inference-logs'] | where trace_id == 'abc123' | project _time"
+assert_eq "rejects unbounded id query" "1" "$QUERY_STATUS"
+assert_contains "prints explicit _time error" "explicit _time bound" "$QUERY_STDERR"
+assert_eq "does not call curl for rejected query" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+
+: > "$AXIOM_QUERY_TEST_CURL_LOG"
+run_query "['anton-inference-logs'] | getschema"
+assert_eq "rejects unbounded getschema" "1" "$QUERY_STATUS"
+assert_contains "prints explicit _time error for getschema" "explicit _time bound" "$QUERY_STDERR"
+assert_eq "does not call curl for rejected getschema" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+
+: > "$AXIOM_QUERY_TEST_CURL_LOG"
+run_query "['anton-inference-logs'] | where _time > ago(15m) | getschema"
+assert_eq "allows bounded getschema" "0" "$QUERY_STATUS"
+assert_eq "calls curl for bounded getschema" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+
+: > "$AXIOM_QUERY_TEST_CURL_LOG"
+run_query "['anton-inference-logs'] | where _time > ago(1h) | where session_id == 'ses-123' | project _time"
+assert_eq "allows ago window" "0" "$QUERY_STATUS"
+assert_eq "calls curl for ago window" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+
+: > "$AXIOM_QUERY_TEST_CURL_LOG"
+run_query "['anton-inference-logs'] | where _time >= datetime(2026-03-06T10:00:00Z) | where trace_id == 'abc123' | project _time"
+assert_eq "rejects lower-bound-only datetime query" "1" "$QUERY_STATUS"
+assert_eq "does not call curl for lower-bound-only datetime query" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+
+echo ""
+echo "==========================="
+echo "Results: $PASS passed, $FAIL failed"
+if [[ $FAIL -gt 0 ]]; then
+  exit 1
+fi
