@@ -13,45 +13,45 @@ kubernetes.node_labels.nodepool\.axiom\.co/name
 **APL syntax:** Use `['field.name']` with `\\.` to escape dots within special field names:
 ```apl
 // Double backslash escapes dots in field names with special chars
-['k8s-logs-prod'] | distinct ['kubernetes.node_labels.nodepool\\.axiom\\.co/name']
-['k8s-logs-prod'] | distinct ['kubernetes.node_labels.karpenter\\.sh/nodepool']
+['k8s-logs-prod'] | where _time > ago(15m) | distinct ['kubernetes.node_labels.nodepool\\.axiom\\.co/name']
+['k8s-logs-prod'] | where _time > ago(15m) | distinct ['kubernetes.node_labels.karpenter\\.sh/nodepool']
 ```
 
 **Running from shell - use heredoc (RECOMMENDED):**
 ```bash
-# Heredoc with quoted 'EOF' prevents shell expansion - only need \\. 
-axiom-query staging - << 'EOF'
-['k8s-logs-prod'] | distinct ['kubernetes.node_labels.nodepool\\.axiom\\.co/name']
+# Heredoc with quoted 'EOF' prevents shell expansion - only need \\.
+scripts/axiom-query staging --since 15m << 'EOF'
+['k8s-logs-prod'] | where _time > ago(15m) | distinct ['kubernetes.node_labels.nodepool\\.axiom\\.co/name']
 EOF
 ```
 
 **Alternative - stdin:**
 ```bash
 # Pipe with $'...' - need \\\\ (quadruple) because shell + APL both escape
-echo $'[\'k8s-logs-prod\'] | distinct [\'kubernetes.node_labels.nodepool\\\\.axiom\\\\.co/name\']' | axiom-query staging -
+echo $'[\'k8s-logs-prod\'] | where _time > ago(15m) | distinct [\'kubernetes.node_labels.nodepool\\\\.axiom\\\\.co/name\']' | scripts/axiom-query staging --since 15m
 ```
 
 **Alternative - file:**
 ```bash
-# Write query to file (only need \\.), then use -f
-echo "['k8s-logs-prod'] | distinct ['kubernetes.node_labels.nodepool\\.axiom\\.co/name']" > /tmp/q.apl
-axiom-query staging -f /tmp/q.apl
+# Write query to file (only need \\.), then pipe it in
+echo "['k8s-logs-prod'] | where _time > ago(15m) | distinct ['kubernetes.node_labels.nodepool\\.axiom\\.co/name']" > /tmp/q.apl
+cat /tmp/q.apl | scripts/axiom-query staging --since 15m
 ```
 
 **Map field access:** For nested maps, use bracket notation:
 ```apl
 // Access nested map fields
-['dataset'] | extend value = ['attributes.custom']['key']
-['dataset'] | extend value = tostring(['attributes']['nested.key'])
+['dataset'] | where _time > ago(15m) | extend value = ['attributes.custom']['key']
+['dataset'] | where _time > ago(15m) | extend value = tostring(['attributes']['nested.key'])
 ```
 
 ### Map Type Discovery (CRITICAL for OTel Traces)
 
 Fields typed as `map[string]` in `getschema` (e.g., `attributes`, `attributes.custom`, `resource`, `resource.attributes`) are opaque containers — `getschema` only shows the column name and type `map[string]`, NOT the keys inside. You must discover map contents explicitly.
 
-**Step 1: Identify map columns** — Run `getschema` and look for `map` types:
+**Step 1: Identify map columns** — Run `getschema` with an explicit `_time` bound and look for `map` types:
 ```apl
-['traces-dataset'] | getschema
+['traces-dataset'] | where _time > ago(15m) | getschema
 // Look for: attributes        map[string]...
 //           attributes.custom  map[string]...
 //           resource           map[string]...
@@ -171,7 +171,7 @@ Negations: `!has`, `!contains`, `!startswith`, `!in`
 ['dataset'] | where _time between (ago(1h) .. now()) | where status in (500, 502, 503)
 
 // SLOW: Avoid
-['dataset'] | where message matches regex ".*error.*"
+['dataset'] | where _time between (ago(1h) .. now()) | where message matches regex ".*error.*"
 ```
 
 ## Logical Operators
@@ -191,20 +191,20 @@ Negations: `!has`, `!contains`, `!startswith`, `!in`
 ## Search Operator (Full-Text)
 ```apl
 // Search all fields (case-insensitive by default)
-['logs'] | search "error"
+['logs'] | where _time between (ago(1h) .. now()) | search "error"
 
 // Case-sensitive
-['logs'] | search kind=case_sensitive "ERROR"
+['logs'] | where _time between (ago(1h) .. now()) | search kind=case_sensitive "ERROR"
 
 // Field-specific
-['logs'] | search message:"timeout"
+['logs'] | where _time between (ago(1h) .. now()) | search message:"timeout"
 
 // Wildcards
-['logs'] | search "error*"        // hasprefix
-['logs'] | search "*timeout*"     // contains
+['logs'] | where _time between (ago(1h) .. now()) | search "error*"        // hasprefix
+['logs'] | where _time between (ago(1h) .. now()) | search "*timeout*"     // contains
 
 // Combined
-['logs'] | search "error" and ("api" or "auth")
+['logs'] | where _time between (ago(1h) .. now()) | search "error" and ("api" or "auth")
 ```
 
 ## Join Kinds
@@ -218,20 +218,20 @@ Negations: `!has`, `!contains`, `!startswith`, `!in`
 | `leftsemi` | Left rows with match |
 
 ```apl
-['requests'] | join kind=inner (['users']) on user_id
-['logs'] | join kind=leftouter (['metadata']) on $left.id == $right.log_id
+['requests'] | where _time between (ago(1h) .. now()) | join kind=inner (['users'] | where _time between (ago(1h) .. now())) on user_id
+['logs'] | where _time between (ago(1h) .. now()) | join kind=leftouter (['metadata'] | where _time between (ago(1h) .. now())) on $left.id == $right.log_id
 ```
 
 ## Parse Operator
 ```apl
 // Simple pattern
-['logs'] | parse uri with * "/api/" version "/" endpoint
+['logs'] | where _time between (ago(1h) .. now()) | parse uri with * "/api/" version "/" endpoint
 
 // With types
-['logs'] | parse message with * "duration=" duration:int "ms"
+['logs'] | where _time between (ago(1h) .. now()) | parse message with * "duration=" duration:int "ms"
 
 // Regex mode
-['logs'] | parse kind=regex message with @"user=(?P<user>\w+)"
+['logs'] | where _time between (ago(1h) .. now()) | parse kind=regex message with @"user=(?P<user>\w+)"
 ```
 
 ## Lookup Operator (Enrich Data)
@@ -240,14 +240,14 @@ let LookupTable = datatable(code:int, meaning:string)[
   200, "OK", 
   500, "Internal Error"
 ];
-['logs'] | lookup LookupTable on $left.status == $right.code
+['logs'] | where _time between (ago(1h) .. now()) | lookup LookupTable on $left.status == $right.code
 ```
 
 ## Make-Series (Time Series Arrays)
 ```apl
 // Create array-based time series for series_* functions
 ['logs'] | make-series count() default=0 on _time from ago(1h) to now() step 5m
-['logs'] | make-series avg(duration) on _time step 10m by service
+['logs'] | make-series avg(duration) on _time from ago(1h) to now() step 10m by service
 ```
 
 ## Aggregation Functions (use with `summarize`)
@@ -536,18 +536,18 @@ Compare a time window (bad) against a baseline (good) to find what changed:
 
 ```bash
 # Compare last 30m (bad) to the 30m before that (good)
-scripts/axiom-query <env> <<< "['dataset'] | where _time > ago(1h) | summarize spotlight(_time > ago(30m), service, user_agent, region, status)"
+scripts/axiom-query <env> --since 1h <<< "['dataset'] | summarize spotlight(_time > ago(30m), service, user_agent, region, status)"
 ```
 
 **Parsing Spotlight with jq:**
 ```bash
 # Summary: all dimensions with top finding
-scripts/axiom-query <env> "..." --raw | jq '.. | objects | select(.differences?)
+scripts/axiom-query <env> --since 1h --raw <<< "..." | jq '.. | objects | select(.differences?)
   | {dim: .dimension, effect: .delta_score,
      top: (.differences | sort_by(-.frequency_ratio) | .[0] | {v: .value[0:60], r: .frequency_ratio, c: .comparison_count})}'
 
 # Top 5 OVER-represented values (ratio=1 means ONLY during problem)
-scripts/axiom-query <env> "..." --raw | jq '.. | objects | select(.differences?)
+scripts/axiom-query <env> --since 1h --raw <<< "..." | jq '.. | objects | select(.differences?)
   | {dim: .dimension, over: [.differences | sort_by(-.frequency_ratio) | .[:5] | .[]
      | {v: .value[0:60], r: .frequency_ratio, c: .comparison_count}]}'
 ```

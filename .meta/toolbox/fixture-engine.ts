@@ -794,6 +794,66 @@ function normalizeCompact(value: string): string {
   return normalizeLoose(value).replace(/[\s_-]+/g, '');
 }
 
+function valueFromArg(arg: string, prefix: '--since=' | '--from=' | '--to='): string | null {
+  return arg.startsWith(prefix) ? arg.slice(prefix.length).trim() : null;
+}
+
+function validateAxiomTimeWindowArgs(args: string[]): string[] {
+  const errors: string[] = [];
+  let since: string | undefined;
+  let from: string | undefined;
+  let to: string | undefined;
+
+  for (let i = 1; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg.startsWith('--')) continue;
+
+    const inlineSince = valueFromArg(arg, '--since=');
+    if (inlineSince != null) {
+      since = inlineSince;
+      continue;
+    }
+
+    const inlineFrom = valueFromArg(arg, '--from=');
+    if (inlineFrom != null) {
+      from = inlineFrom;
+      continue;
+    }
+
+    const inlineTo = valueFromArg(arg, '--to=');
+    if (inlineTo != null) {
+      to = inlineTo;
+      continue;
+    }
+
+    if (arg === '--since' || arg === '--from' || arg === '--to') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        errors.push(`Missing value for ${arg}`);
+        continue;
+      }
+      if (arg === '--since') since = value;
+      if (arg === '--from') from = value;
+      if (arg === '--to') to = value;
+      i += 1;
+    }
+  }
+
+  if (since && (from || to)) {
+    errors.push('Use either --since or --from/--to, not both');
+  }
+
+  if (!since && !from && !to) {
+    errors.push('Missing time window. Pass --since <duration> or --from <timestamp> --to <timestamp>.');
+  }
+
+  if (!since && ((from && !to) || (!from && to))) {
+    errors.push('Absolute windows require both --from and --to');
+  }
+
+  return errors;
+}
+
 function resolveDeployment(input: string, fixtures: ScenarioFixtures): string | undefined {
   const requested = stripWrappingQuotes(input);
   if (!requested) return undefined;
@@ -886,15 +946,23 @@ export function validateAxiomCLI(
     errors.push('No query provided. Pipe query via stdin or pass --query/--query-file.');
   }
 
+  errors.push(...validateAxiomTimeWindowArgs(args));
+
   // Check for invalid args
-  const validFlags = ['--raw', '--ndjson', '--full', '--trace', '--query', '--query-file'];
+  const validFlags = ['--raw', '--ndjson', '--full', '--trace', '--query', '--query-file', '--since', '--from', '--to'];
   for (let i = 1; i < args.length; i++) {
     const arg = args[i];
-    if (arg === '--query' || arg === '--query-file') {
+    if (arg === '--query' || arg === '--query-file' || arg === '--since' || arg === '--from' || arg === '--to') {
       i += 1;
       continue;
     }
-    if (arg.startsWith('--query=') || arg.startsWith('--query-file=')) {
+    if (
+      arg.startsWith('--query=')
+      || arg.startsWith('--query-file=')
+      || arg.startsWith('--since=')
+      || arg.startsWith('--from=')
+      || arg.startsWith('--to=')
+    ) {
       continue;
     }
     if (arg.startsWith('--') && !validFlags.includes(arg)) {

@@ -54,9 +54,9 @@ discover_dep() {
         echo -e "deployment: ${BOLD}$dep${NC}"
         
         # Strategy 1: Popularity (Top queried datasets in last 2 years)
-        POPULARITY_QUERY="['axiom-history'] | where _time > ago(730d) | summarize count() by dataset | top 20 by count_"
-        
-        POPULAR_DATASETS=$(echo "$POPULARITY_QUERY" | "$SCRIPT_DIR/axiom-query" "$dep" --raw 2>/dev/null | jq -r '.tables[0].columns[0][] // empty' 2>/dev/null || echo "")
+        POPULARITY_QUERY="['axiom-history'] | summarize count() by dataset | top 20 by count_"
+
+        POPULAR_DATASETS=$(echo "$POPULARITY_QUERY" | "$SCRIPT_DIR/axiom-query" "$dep" --since 730d --raw 2>/dev/null | jq -r '.tables[0].columns[0][] // empty' 2>/dev/null || echo "")
         
         END_QUERY=$(current_time_ms)
         DURATION_QUERY=$(( END_QUERY - START_TIME ))
@@ -64,7 +64,9 @@ discover_dep() {
         if [[ -n "$POPULAR_DATASETS" ]]; then
             count=$(echo "$POPULAR_DATASETS" | grep -c .)
             echo -e "  ${GREEN}Top datasets found ($count)${NC} (${DURATION_QUERY}ms)"
-            echo "$POPULAR_DATASETS" | sed 's/^/  - /'
+            while IFS= read -r dataset; do
+                [[ -n "$dataset" ]] && echo "  - $dataset"
+            done <<< "$POPULAR_DATASETS"
         else
             # Strategy 2: Fallback
             response=$("$SCRIPT_DIR/axiom-api" "$dep" GET "/v1/datasets" 2>/dev/null || echo "")

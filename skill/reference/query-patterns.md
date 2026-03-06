@@ -1,12 +1,14 @@
 # Signal Reading Query Patterns
 
+When you run these with `scripts/axiom-query`, always pass a wrapper window such as `--since 15m` or `--from ... --to ...`. The APL examples below keep explicit `_time` filters because they are good query hygiene, but the wrapper time window is required too.
+
 ## Schema & Value Discovery (MANDATORY FIRST STEP)
 
 **Always run schema discovery before writing investigation queries.** Do not guess field names.
 
 ```apl
 // Step 1: Get schema with types
-['dataset'] | getschema
+['dataset'] | where _time > ago(15m) | getschema
 
 // Step 2: Sample raw events to see actual data shape (especially map fields)
 ['dataset'] | where _time > ago(15m) | take 1
@@ -67,7 +69,7 @@ Ready-to-use APL queries for common investigation scenarios.
 
 ```apl
 // Latency by individual host (find saturated nodes)
-['traces'] | where ['service.name'] == '<service>'
+['traces'] | where _time between (ago(1h) .. now()) | where ['service.name'] == '<service>'
 | summarize p99=percentile(duration, 99) by ['resource.host.name'], bin(_time, 1m)
 
 // Percentiles over time (logs with duration_ms field)

@@ -3,6 +3,7 @@ import { EfficiencyScorer } from '../scorers/efficiency.js';
 import { QueryRepairScorer } from '../scorers/query-repair.js';
 import { QueryValidityScorer } from '../scorers/query-validity.js';
 import type { EvalInput, EvalOutput, ToolCall } from '../harness/types.js';
+import { validateAxiomCLI } from '../toolbox/fixture-engine.js';
 
 function mustHaveScore(label: string, score: number | null): number {
   if (score == null) {
@@ -83,7 +84,48 @@ async function main(): Promise<void> {
     `efficiency should penalize classifier-detected failures; got ${classifierEfficiencyScore}`,
   );
 
-  // Regression #2: with identical failure-rate, repaired failures should
+  // Regression #2: validateAxiomCLI must enforce wrapper time windows.
+  const fixtures = {
+    datasets: { 'app-logs': [{ _time: '2026-03-06T10:05:00Z', message: 'ok' }] },
+    metrics: {},
+    datasources: [],
+    validDeployments: ['prod'],
+  };
+
+  const missingWindow = validateAxiomCLI(['prod'], "['app-logs'] | getschema", fixtures);
+  const relativeWindow = validateAxiomCLI(['prod', '--since', '15m'], "['app-logs'] | getschema", fixtures);
+  const inlineTimeOnly = validateAxiomCLI(['prod'], "['app-logs'] | where _time > ago(15m) | getschema", fixtures);
+
+  assert.equal(missingWindow.valid, false, 'validateAxiomCLI should reject missing time windows');
+  assert.equal(relativeWindow.valid, true, 'validateAxiomCLI should accept --since windows');
+  assert.equal(inlineTimeOnly.valid, false, 'validateAxiomCLI should not treat inline _time as a wrapper window');
+
+  const missingWindowValidity = await QueryValidityScorer(buildArgs([
+    {
+      tool: 'scripts/axiom-query',
+      input: "scripts/axiom-query prod <<< \"['app-logs'] | getschema\"",
+      output: 'error: Missing time window. Pass --since <duration> or --from <timestamp> --to <timestamp>.',
+      queryValid: false,
+      queryErrors: ['Missing time window. Pass --since <duration> or --from <timestamp> --to <timestamp>.'],
+    },
+  ]));
+  const boundedWindowValidity = await QueryValidityScorer(buildArgs([
+    {
+      tool: 'scripts/axiom-query',
+      input: "scripts/axiom-query prod --since 15m <<< \"['app-logs'] | getschema\"",
+      output: '# 1/1 rows, 10ms',
+      queryValid: true,
+    },
+  ]));
+  const missingWindowValidityScore = mustHaveScore('query-validity (missing window)', missingWindowValidity.score);
+  const boundedWindowValidityScore = mustHaveScore('query-validity (bounded window)', boundedWindowValidity.score);
+
+  assert.ok(
+    missingWindowValidityScore < boundedWindowValidityScore,
+    `query-validity should penalize missing wrapper windows; missing=${missingWindowValidityScore} bounded=${boundedWindowValidityScore}`,
+  );
+
+  // Regression #3: with identical failure-rate, repaired failures should
   // produce better efficiency than unrepaired failures.
   const fullyRepaired: ToolCall[] = [
     {

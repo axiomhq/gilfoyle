@@ -117,7 +117,7 @@ function main() {
 
 function runAplRows(apl: string): Row[] {
   const query = JSON.stringify(apl);
-  const cmd = `echo ${query} | ${join(repoRoot, 'scripts/axiom-query')} ${deploy} --raw`;
+  const cmd = `echo ${query} | ${join(repoRoot, 'scripts/axiom-query')} ${deploy} --since 30d --raw`;
   const raw = execSync(cmd, {
     cwd: repoRoot,
     encoding: 'utf8',
