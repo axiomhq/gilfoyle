@@ -1,86 +1,49 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
+const fs = require('node:fs');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 
-function splitPipes(text) {
-  const stages = [];
-  let current = '';
-  let depth = 0;
-  let inString = false;
-  let stringChar = '';
-
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i];
-
-    if (inString) {
-      current += ch;
-      if (ch === stringChar && text[i - 1] !== '\\') inString = false;
-      continue;
-    }
-
-    if (ch === '"' || ch === '\'') {
-      inString = true;
-      stringChar = ch;
-      current += ch;
-      continue;
-    }
-
-    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
-    if (ch === ')' || ch === ']' || ch === '}') depth -= 1;
-
-    if (ch === '|' && depth === 0) {
-      if (current.trim()) stages.push(current.trim());
-      current = '';
-      continue;
-    }
-
-    current += ch;
-  }
-
-  if (current.trim()) stages.push(current.trim());
-  return stages;
+function resolveGilfoyleRoot() {
+  if (process.env.GILFOYLE_ROOT) return process.env.GILFOYLE_ROOT;
+  return path.resolve(__dirname, '..', '..');
 }
 
-function extractStages(input) {
-  const trimmed = input.trim();
-  const match = trimmed.match(/\[['"][^'"]+['"]\][\s\S]*/);
-  const apl = match ? match[0].trim() : trimmed;
-  const datasetMatch = apl.match(/^\[['"][^'"]+['"]\]/);
-  if (!datasetMatch) return [];
+async function loadAnalyzer(rootDir) {
+  const wasmDir = path.join(rootDir, '.meta', 'toolbox', 'wasm');
+  const wasmPath = path.join(wasmDir, 'apl-parser.wasm');
+  const shimPath = path.join(wasmDir, 'wasm_exec.js');
 
-  const rest = apl.slice(datasetMatch[0].length).trim();
-  if (!rest.startsWith('|')) return [];
+  if (!fs.existsSync(wasmPath)) {
+    throw new Error(`missing ${wasmPath} (run git lfs pull)`);
+  }
 
-  return splitPipes(rest.slice(1))
-    .map((stage) => stage.toLowerCase().replace(/\s+/g, ' ').trim())
-    .filter(Boolean);
+  await import(pathToFileURL(shimPath).href);
+  const go = new globalThis.Go();
+  const wasmBuf = fs.readFileSync(wasmPath);
+  const instance = await WebAssembly.instantiate(wasmBuf, go.importObject);
+  go.run(instance.instance);
+
+  if (typeof globalThis.AnalyzeAPL !== 'function') {
+    throw new Error('AnalyzeAPL export not found');
+  }
+
+  return globalThis.AnalyzeAPL;
 }
 
-function hasExplicitTimeBound(input) {
-  const stages = extractStages(input);
-  const whereExpressions = stages
-    .filter((stage) => stage.startsWith('where '))
-    .map((stage) => stage.slice(6).trim());
+async function main() {
+  const query = fs.readFileSync(0, 'utf8');
+  const analyze = await loadAnalyzer(resolveGilfoyleRoot());
+  const result = analyze(query);
 
-  if (whereExpressions.some((expr) => /\b_time\s+between\s*\(/.test(expr))) {
-    return true;
+  if (!result?.valid) {
+    process.exit(0);
   }
 
-  if (whereExpressions.some((expr) => /\b_time\s*(>=|>)\s*ago\s*\(/.test(expr))) {
-    return true;
-  }
-
-  if (stages.some((stage) =>
-    stage.startsWith('make-series ')
-      && /\bon\s+_time\s+from\s+(ago\s*\(|datetime\s*\().*\bto\s+(ago\s*\(|datetime\s*\(|now\s*\()/.test(stage)
-  )) {
-    return true;
-  }
-
-  const combined = whereExpressions.join(' | ');
-  return /\b_time\s*(>=|>)\s*(ago\s*\(|datetime\s*\()/i.test(combined)
-    && /\b_time\s*(<=|<)\s*(ago\s*\(|datetime\s*\(|now\s*\()/i.test(combined);
+  process.exit(result.requiresTimeBound && !result.hasExplicitTimeBound ? 1 : 0);
 }
 
-const input = fs.readFileSync(0, 'utf8');
-process.exit(hasExplicitTimeBound(input) ? 0 : 1);
+main().catch((error) => {
+  console.error(`error: ${error.message}`);
+  process.exit(2);
+});

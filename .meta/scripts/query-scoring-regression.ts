@@ -107,9 +107,33 @@ async function main(): Promise<void> {
       output: '# 1/1 rows, 10ms',
     },
   ]));
+  const nestedJoinApl = await AxiomTimeBoundsScorer(buildArgs([
+    {
+      tool: 'scripts/axiom-query',
+      input: "scripts/axiom-query prod <<< \"['requests'] | where _time > ago(1h) | join kind=inner (['users']) on user_id\"",
+      output: '# 1/1 rows, 10ms',
+    },
+  ]));
+  const topLevelUnionApl = await AxiomTimeBoundsScorer(buildArgs([
+    {
+      tool: 'scripts/axiom-query',
+      input: "scripts/axiom-query prod <<< \"union ['east'], ['west'] | where _time > ago(1h) | take 5\"",
+      output: '# 1/1 rows, 10ms',
+    },
+  ]));
+  const stringLiteralApl = await AxiomTimeBoundsScorer(buildArgs([
+    {
+      tool: 'scripts/axiom-query',
+      input: "scripts/axiom-query prod <<< \"['app-logs'] | where message == '_time > ago(1h)' | take 5\"",
+      output: '# 1/1 rows, 10ms',
+    },
+  ]));
   const unboundedAplScore = mustHaveScore('axiom-time-bounds (unbounded)', unboundedApl.score);
   const boundedAplScore = mustHaveScore('axiom-time-bounds (bounded)', boundedApl.score);
   const spotlightOnlyAplScore = mustHaveScore('axiom-time-bounds (spotlight only)', spotlightOnlyApl.score);
+  const nestedJoinAplScore = mustHaveScore('axiom-time-bounds (nested join)', nestedJoinApl.score);
+  const topLevelUnionAplScore = mustHaveScore('axiom-time-bounds (top-level union)', topLevelUnionApl.score);
+  const stringLiteralAplScore = mustHaveScore('axiom-time-bounds (string literal)', stringLiteralApl.score);
 
   assert.equal(
     unboundedAplScore,
@@ -125,6 +149,21 @@ async function main(): Promise<void> {
     spotlightOnlyAplScore,
     0,
     `axiom-time-bounds should reject _time mentions outside where/make-series; got ${spotlightOnlyAplScore}`,
+  );
+  assert.equal(
+    nestedJoinAplScore,
+    0,
+    `axiom-time-bounds should reject joins with unbounded nested scans; got ${nestedJoinAplScore}`,
+  );
+  assert.equal(
+    topLevelUnionAplScore,
+    1,
+    `axiom-time-bounds should allow top-level union queries with an outer _time bound; got ${topLevelUnionAplScore}`,
+  );
+  assert.equal(
+    stringLiteralAplScore,
+    0,
+    `axiom-time-bounds should reject string literal pseudo-bounds; got ${stringLiteralAplScore}`,
   );
 
   // Regression #3: with identical failure-rate, repaired failures should

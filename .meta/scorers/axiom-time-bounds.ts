@@ -1,14 +1,14 @@
 import { Scorer } from 'axiom/ai/evals';
 import type { EvalInput, EvalOutput, ToolCall } from '../harness/types.js';
+import { initAPLValidator } from '../toolbox/apl-validator.js';
 import { axiomTimeBoundError, hasExplicitAxiomTimeBound } from '../toolbox/axiom-time-bounds.js';
 
-function getInputText(tc: ToolCall): string {
-  if (typeof tc.input === 'string') return tc.input;
-  if (tc.input == null) return '';
+function formatViolationInput(input: ToolCall['input']): string {
+  if (typeof input === 'string') return input.slice(0, 240);
   try {
-    return JSON.stringify(tc.input);
+    return JSON.stringify(input).slice(0, 240);
   } catch {
-    return String(tc.input);
+    return String(input).slice(0, 240);
   }
 }
 
@@ -18,7 +18,9 @@ export const AxiomTimeBoundsScorer = Scorer<{
   expected: { rootCause: string; evidence: string[] };
 }>(
   'axiom-time-bounds',
-  ({ output }) => {
+  async ({ output }) => {
+    await initAPLValidator();
+
     const axiomCalls = output.trace.toolCalls.filter((tc) => tc.tool === 'scripts/axiom-query');
 
     if (axiomCalls.length === 0) {
@@ -34,7 +36,7 @@ export const AxiomTimeBoundsScorer = Scorer<{
     const violations = axiomCalls
       .map((call, index) => ({
         index,
-        input: getInputText(call),
+        input: call.input,
       }))
       .filter(({ input }) => !hasExplicitAxiomTimeBound(input));
 
@@ -48,7 +50,7 @@ export const AxiomTimeBoundsScorer = Scorer<{
         requirement: axiomTimeBoundError(),
         violations: violations.map(({ index, input }) => ({
           index,
-          input: input.slice(0, 240),
+          input: formatViolationInput(input),
         })),
       },
     };

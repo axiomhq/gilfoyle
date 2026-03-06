@@ -6,6 +6,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GILFOYLE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 TEST_DIR=$(mktemp -d)
 trap 'rm -rf "$TEST_DIR"' EXIT
 
@@ -87,6 +88,7 @@ EOF
 chmod +x "$TEST_DIR/curl"
 
 export GILFOYLE_CONFIG="$TEST_DIR/config.toml"
+export GILFOYLE_ROOT
 export PATH="$TEST_DIR:$PATH"
 export AXIOM_QUERY_TEST_CURL_LOG="$TEST_DIR/curl.log"
 
@@ -145,8 +147,23 @@ assert_eq "does not call curl for spotlight pseudo-bound" "0" "$(wc -l < "$AXIOM
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
 run_query "['anton-inference-logs'] | where _time >= datetime(2026-03-06T10:00:00Z) | where trace_id == 'abc123' | project _time"
-assert_eq "rejects lower-bound-only datetime query" "1" "$QUERY_STATUS"
-assert_eq "does not call curl for lower-bound-only datetime query" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+assert_eq "allows explicit datetime lower bound" "0" "$QUERY_STATUS"
+assert_eq "calls curl for explicit datetime lower bound" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+
+: > "$AXIOM_QUERY_TEST_CURL_LOG"
+run_query "['requests'] | where _time > ago(1h) | join kind=inner (['users']) on user_id"
+assert_eq "rejects join with unbounded right table" "1" "$QUERY_STATUS"
+assert_eq "does not call curl for join with unbounded right table" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+
+: > "$AXIOM_QUERY_TEST_CURL_LOG"
+run_query "union ['east'], ['west'] | where _time > ago(1h) | take 5"
+assert_eq "allows top-level union with outer _time bound" "0" "$QUERY_STATUS"
+assert_eq "calls curl for top-level union with outer _time bound" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+
+: > "$AXIOM_QUERY_TEST_CURL_LOG"
+run_query "['anton-inference-logs'] | where message == '_time > ago(1h)' | take 5"
+assert_eq "rejects string literal pseudo-bound" "1" "$QUERY_STATUS"
+assert_eq "does not call curl for string literal pseudo-bound" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
 
 echo ""
 echo "==========================="

@@ -1,81 +1,55 @@
-const REQUIREMENT = 'Every Axiom APL query must include an explicit _time bound. Use where _time > ago(...), where _time between (...), or a bounded make-series window. trace_id/session_id/thread_ts/getschema are not substitutes.';
+import { analyzeAPL, type APLAnalysisResult } from './apl-validator.js';
 
-function splitPipes(text: string): string[] {
-  const stages: string[] = [];
-  let current = '';
-  let depth = 0;
-  let inString = false;
-  let stringChar = '';
+const REQUIREMENT = 'Every Axiom APL query that scans datasets must include an explicit _time bound. Use where _time between (...), where _time > ago(...), or another explicit _time comparison. trace_id/session_id/thread_ts/getschema are not substitutes.';
 
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-
-    if (inString) {
-      current += ch;
-      if (ch === stringChar && text[i - 1] !== '\\') inString = false;
-      continue;
-    }
-
-    if (ch === '"' || ch === '\'') {
-      inString = true;
-      stringChar = ch;
-      current += ch;
-      continue;
-    }
-
-    if (ch === '(' || ch === '[' || ch === '{') depth++;
-    if (ch === ')' || ch === ']' || ch === '}') depth--;
-
-    if (ch === '|' && depth === 0) {
-      if (current.trim()) stages.push(current.trim());
-      current = '';
-      continue;
-    }
-
-    current += ch;
-  }
-
-  if (current.trim()) stages.push(current.trim());
-  return stages;
+function looksLikeQuotedShellString(text: string): boolean {
+  return text.length >= 2
+    && ((text.startsWith('"') && text.endsWith('"'))
+      || (text.startsWith('\'') && text.endsWith('\'')));
 }
 
-function extractStages(input: string): string[] {
-  const apl = input.trim().match(/\[['"][^'"]+['"]\][\s\S]*/)?.[0]?.trim() ?? input.trim();
-  const datasetMatch = apl.match(/^\[['"][^'"]+['"]\]/);
-  if (!datasetMatch) return [];
-
-  const rest = apl.slice(datasetMatch[0].length).trim();
-  if (!rest.startsWith('|')) return [];
-
-  return splitPipes(rest.slice(1))
-    .map((stage) => stage.toLowerCase().replace(/\s+/g, ' ').trim())
-    .filter(Boolean);
+function stripOuterQuotes(text: string): string {
+  return looksLikeQuotedShellString(text) ? text.slice(1, -1) : text;
 }
 
-export function hasExplicitAxiomTimeBound(input: string): boolean {
-  const stages = extractStages(input);
-  const whereExpressions = stages
-    .filter((stage) => stage.startsWith('where '))
-    .map((stage) => stage.slice(6).trim());
+function extractHereStringQuery(text: string): string | null {
+  const hereStringIndex = text.indexOf('<<<');
+  if (hereStringIndex === -1) return null;
 
-  if (whereExpressions.some((expr) => /\b_time\s+between\s*\(/.test(expr))) {
-    return true;
+  const candidate = text.slice(hereStringIndex + 3).trim();
+  if (!candidate) return null;
+  return stripOuterQuotes(candidate);
+}
+
+function extractObjectQuery(input: Record<string, unknown>): string | null {
+  const candidate = input.apl ?? input.query ?? input.stdin ?? input.command;
+  return typeof candidate === 'string' && candidate.trim() ? candidate.trim() : null;
+}
+
+export function extractAxiomQuery(input: unknown): string | null {
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    return extractHereStringQuery(trimmed) ?? trimmed;
   }
 
-  if (whereExpressions.some((expr) => /\b_time\s*(>=|>)\s*ago\s*\(/.test(expr))) {
-    return true;
+  if (input && typeof input === 'object') {
+    return extractObjectQuery(input as Record<string, unknown>);
   }
 
-  if (stages.some((stage) =>
-    stage.startsWith('make-series ')
-      && /\bon\s+_time\s+from\s+(ago\s*\(|datetime\s*\().*\bto\s+(ago\s*\(|datetime\s*\(|now\s*\()/.test(stage)
-  )) {
-    return true;
-  }
+  return null;
+}
 
-  const combined = whereExpressions.join(' | ');
-  return /\b_time\s*(>=|>)\s*(ago\s*\(|datetime\s*\()/i.test(combined)
-    && /\b_time\s*(<=|<)\s*(ago\s*\(|datetime\s*\(|now\s*\()/i.test(combined);
+export function analyzeAxiomQueryTimeBounds(query: string): APLAnalysisResult {
+  return analyzeAPL(query.trim());
+}
+
+export function hasExplicitAxiomTimeBound(input: unknown): boolean {
+  const query = extractAxiomQuery(input);
+  if (!query) return false;
+
+  const analysis = analyzeAxiomQueryTimeBounds(query);
+  return analysis.valid && (!analysis.requiresTimeBound || analysis.hasExplicitTimeBound);
 }
 
 export function axiomTimeBoundError(): string {

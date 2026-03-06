@@ -71,7 +71,7 @@ APL_JSON=$(printf '%s' "$APL" | jq -Rs .)
 
 if ! printf '%s' "$APL" | "$SCRIPT_DIR/axiom-query-has-time-bound"; then
   echo "error: every Axiom APL query must include an explicit _time bound" >&2
-  echo "hint: use where _time between (...) or where _time > ago(...); trace_id/session_id/thread_ts/getschema are not substitutes" >&2
+  echo "hint: use where _time between (...), where _time > ago(...), or another explicit _time comparison; trace_id/session_id/thread_ts/getschema are not substitutes" >&2
   exit 1
 fi
 
