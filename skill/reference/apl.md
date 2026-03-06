@@ -13,36 +13,36 @@ kubernetes.node_labels.nodepool\.axiom\.co/name
 **APL syntax:** Use `['field.name']` with `\\.` to escape dots within special field names:
 ```apl
 // Double backslash escapes dots in field names with special chars
-['k8s-logs-prod'] | distinct ['kubernetes.node_labels.nodepool\\.axiom\\.co/name']
-['k8s-logs-prod'] | distinct ['kubernetes.node_labels.karpenter\\.sh/nodepool']
+['k8s-logs-prod'] | where _time > ago(15m) | distinct ['kubernetes.node_labels.nodepool\\.axiom\\.co/name']
+['k8s-logs-prod'] | where _time > ago(15m) | distinct ['kubernetes.node_labels.karpenter\\.sh/nodepool']
 ```
 
 **Running from shell - use heredoc (RECOMMENDED):**
 ```bash
 # Heredoc with quoted 'EOF' prevents shell expansion - only need \\. 
 axiom-query staging - << 'EOF'
-['k8s-logs-prod'] | distinct ['kubernetes.node_labels.nodepool\\.axiom\\.co/name']
+['k8s-logs-prod'] | where _time > ago(15m) | distinct ['kubernetes.node_labels.nodepool\\.axiom\\.co/name']
 EOF
 ```
 
 **Alternative - stdin:**
 ```bash
 # Pipe with $'...' - need \\\\ (quadruple) because shell + APL both escape
-echo $'[\'k8s-logs-prod\'] | distinct [\'kubernetes.node_labels.nodepool\\\\.axiom\\\\.co/name\']' | axiom-query staging -
+echo $'[\'k8s-logs-prod\'] | where _time > ago(15m) | distinct [\'kubernetes.node_labels.nodepool\\\\.axiom\\\\.co/name\']' | axiom-query staging -
 ```
 
 **Alternative - file:**
 ```bash
 # Write query to file (only need \\.), then use -f
-echo "['k8s-logs-prod'] | distinct ['kubernetes.node_labels.nodepool\\.axiom\\.co/name']" > /tmp/q.apl
+echo "['k8s-logs-prod'] | where _time > ago(15m) | distinct ['kubernetes.node_labels.nodepool\\.axiom\\.co/name']" > /tmp/q.apl
 axiom-query staging -f /tmp/q.apl
 ```
 
 **Map field access:** For nested maps, use bracket notation:
 ```apl
 // Access nested map fields
-['dataset'] | extend value = ['attributes.custom']['key']
-['dataset'] | extend value = tostring(['attributes']['nested.key'])
+['dataset'] | where _time > ago(15m) | extend value = ['attributes.custom']['key']
+['dataset'] | where _time > ago(15m) | extend value = tostring(['attributes']['nested.key'])
 ```
 
 ### Map Type Discovery (CRITICAL for OTel Traces)
@@ -171,7 +171,7 @@ Negations: `!has`, `!contains`, `!startswith`, `!in`
 ['dataset'] | where _time between (ago(1h) .. now()) | where status in (500, 502, 503)
 
 // SLOW: Avoid
-['dataset'] | where message matches regex ".*error.*"
+['dataset'] | where _time between (ago(1h) .. now()) | where message matches regex ".*error.*"
 ```
 
 ## Logical Operators
@@ -191,20 +191,20 @@ Negations: `!has`, `!contains`, `!startswith`, `!in`
 ## Search Operator (Full-Text)
 ```apl
 // Search all fields (case-insensitive by default)
-['logs'] | search "error"
+['logs'] | where _time between (ago(1h) .. now()) | search "error"
 
 // Case-sensitive
-['logs'] | search kind=case_sensitive "ERROR"
+['logs'] | where _time between (ago(1h) .. now()) | search kind=case_sensitive "ERROR"
 
 // Field-specific
-['logs'] | search message:"timeout"
+['logs'] | where _time between (ago(1h) .. now()) | search message:"timeout"
 
 // Wildcards
-['logs'] | search "error*"        // hasprefix
-['logs'] | search "*timeout*"     // contains
+['logs'] | where _time between (ago(1h) .. now()) | search "error*"        // hasprefix
+['logs'] | where _time between (ago(1h) .. now()) | search "*timeout*"     // contains
 
 // Combined
-['logs'] | search "error" and ("api" or "auth")
+['logs'] | where _time between (ago(1h) .. now()) | search "error" and ("api" or "auth")
 ```
 
 ## Join Kinds
@@ -218,20 +218,20 @@ Negations: `!has`, `!contains`, `!startswith`, `!in`
 | `leftsemi` | Left rows with match |
 
 ```apl
-['requests'] | join kind=inner (['users']) on user_id
-['logs'] | join kind=leftouter (['metadata']) on $left.id == $right.log_id
+['requests'] | where _time between (ago(1h) .. now()) | join kind=inner (['users'] | where _time between (ago(1h) .. now())) on user_id
+['logs'] | where _time between (ago(1h) .. now()) | join kind=leftouter (['metadata'] | where _time between (ago(1h) .. now())) on $left.id == $right.log_id
 ```
 
 ## Parse Operator
 ```apl
 // Simple pattern
-['logs'] | parse uri with * "/api/" version "/" endpoint
+['logs'] | where _time between (ago(1h) .. now()) | parse uri with * "/api/" version "/" endpoint
 
 // With types
-['logs'] | parse message with * "duration=" duration:int "ms"
+['logs'] | where _time between (ago(1h) .. now()) | parse message with * "duration=" duration:int "ms"
 
 // Regex mode
-['logs'] | parse kind=regex message with @"user=(?P<user>\w+)"
+['logs'] | where _time between (ago(1h) .. now()) | parse kind=regex message with @"user=(?P<user>\w+)"
 ```
 
 ## Lookup Operator (Enrich Data)
@@ -240,14 +240,14 @@ let LookupTable = datatable(code:int, meaning:string)[
   200, "OK", 
   500, "Internal Error"
 ];
-['logs'] | lookup LookupTable on $left.status == $right.code
+['logs'] | where _time between (ago(1h) .. now()) | lookup LookupTable on $left.status == $right.code
 ```
 
 ## Make-Series (Time Series Arrays)
 ```apl
 // Create array-based time series for series_* functions
 ['logs'] | make-series count() default=0 on _time from ago(1h) to now() step 5m
-['logs'] | make-series avg(duration) on _time step 10m by service
+['logs'] | make-series avg(duration) on _time from ago(1h) to now() step 10m by service
 ```
 
 ## Aggregation Functions (use with `summarize`)

@@ -67,7 +67,7 @@ Ready-to-use APL queries for common investigation scenarios.
 
 ```apl
 // Latency by individual host (find saturated nodes)
-['traces'] | where ['service.name'] == '<service>'
+['traces'] | where _time between (ago(1h) .. now()) | where ['service.name'] == '<service>'
 | summarize p99=percentile(duration, 99) by ['resource.host.name'], bin(_time, 1m)
 
 // Percentiles over time (logs with duration_ms field)

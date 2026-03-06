@@ -1,13 +1,15 @@
-const REQUIREMENT = 'Every Axiom APL query must include an explicit _time bound. Use where _time > ago(...), where _time between (...), or a bounded make-series window. trace_id/session_id/thread_ts/getschema are not substitutes.';
+#!/usr/bin/env node
 
-function splitPipes(text: string): string[] {
-  const stages: string[] = [];
+const fs = require('fs');
+
+function splitPipes(text) {
+  const stages = [];
   let current = '';
   let depth = 0;
   let inString = false;
   let stringChar = '';
 
-  for (let i = 0; i < text.length; i++) {
+  for (let i = 0; i < text.length; i += 1) {
     const ch = text[i];
 
     if (inString) {
@@ -23,8 +25,8 @@ function splitPipes(text: string): string[] {
       continue;
     }
 
-    if (ch === '(' || ch === '[' || ch === '{') depth++;
-    if (ch === ')' || ch === ']' || ch === '}') depth--;
+    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
+    if (ch === ')' || ch === ']' || ch === '}') depth -= 1;
 
     if (ch === '|' && depth === 0) {
       if (current.trim()) stages.push(current.trim());
@@ -39,8 +41,10 @@ function splitPipes(text: string): string[] {
   return stages;
 }
 
-function extractStages(input: string): string[] {
-  const apl = input.trim().match(/\[['"][^'"]+['"]\][\s\S]*/)?.[0]?.trim() ?? input.trim();
+function extractStages(input) {
+  const trimmed = input.trim();
+  const match = trimmed.match(/\[['"][^'"]+['"]\][\s\S]*/);
+  const apl = match ? match[0].trim() : trimmed;
   const datasetMatch = apl.match(/^\[['"][^'"]+['"]\]/);
   if (!datasetMatch) return [];
 
@@ -52,7 +56,7 @@ function extractStages(input: string): string[] {
     .filter(Boolean);
 }
 
-export function hasExplicitAxiomTimeBound(input: string): boolean {
+function hasExplicitTimeBound(input) {
   const stages = extractStages(input);
   const whereExpressions = stages
     .filter((stage) => stage.startsWith('where '))
@@ -78,6 +82,5 @@ export function hasExplicitAxiomTimeBound(input: string): boolean {
     && /\b_time\s*(<=|<)\s*(ago\s*\(|datetime\s*\(|now\s*\()/i.test(combined);
 }
 
-export function axiomTimeBoundError(): string {
-  return REQUIREMENT;
-}
+const input = fs.readFileSync(0, 'utf8');
+process.exit(hasExplicitTimeBound(input) ? 0 : 1);

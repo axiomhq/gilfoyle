@@ -38,8 +38,9 @@ assert_eq() {
 }
 
 cp "$SCRIPT_DIR/axiom-query" "$TEST_DIR/axiom-query"
+cp "$SCRIPT_DIR/axiom-query-has-time-bound" "$TEST_DIR/axiom-query-has-time-bound"
 cp "$SCRIPT_DIR/config" "$TEST_DIR/config"
-chmod +x "$TEST_DIR/axiom-query" "$TEST_DIR/config"
+chmod +x "$TEST_DIR/axiom-query" "$TEST_DIR/axiom-query-has-time-bound" "$TEST_DIR/config"
 
 cat > "$TEST_DIR/axiom-query-fmt" << 'EOF'
 #!/usr/bin/env bash
@@ -126,6 +127,21 @@ assert_eq "calls curl for bounded getschema" "1" "$(wc -l < "$AXIOM_QUERY_TEST_C
 run_query "['anton-inference-logs'] | where _time > ago(1h) | where session_id == 'ses-123' | project _time"
 assert_eq "allows ago window" "0" "$QUERY_STATUS"
 assert_eq "calls curl for ago window" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+
+: > "$AXIOM_QUERY_TEST_CURL_LOG"
+run_query "['anton-inference-logs'] | where trace_id == 'abc123' and _time > ago(1h) | project _time"
+assert_eq "allows ago window when _time is not first in where clause" "0" "$QUERY_STATUS"
+assert_eq "calls curl when _time is not first in where clause" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+
+: > "$AXIOM_QUERY_TEST_CURL_LOG"
+run_query "['anton-inference-logs'] | where message matches regex \"timeout|error\" and _time > ago(1h) | project _time"
+assert_eq "allows regex alternation before _time bound" "0" "$QUERY_STATUS"
+assert_eq "calls curl for regex alternation before _time bound" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+
+: > "$AXIOM_QUERY_TEST_CURL_LOG"
+run_query "['anton-inference-logs'] | summarize spotlight(_time > ago(30m), trace_id)"
+assert_eq "rejects spotlight pseudo-bound without where filter" "1" "$QUERY_STATUS"
+assert_eq "does not call curl for spotlight pseudo-bound" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
 run_query "['anton-inference-logs'] | where _time >= datetime(2026-03-06T10:00:00Z) | where trace_id == 'abc123' | project _time"

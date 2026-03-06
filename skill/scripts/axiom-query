@@ -21,31 +21,6 @@
 
 set -euo pipefail
 
-has_explicit_time_bound() {
-  local apl="$1"
-  local compact
-  compact=$(printf '%s' "$apl" | tr '\n\t' '  ' | tr '[:upper:]' '[:lower:]' | sed -E 's/[[:space:]]+/ /g')
-
-  if printf '%s\n' "$compact" | grep -Eq '\bwhere[[:space:]]+_time[[:space:]]+between[[:space:]]*\('; then
-    return 0
-  fi
-
-  if printf '%s\n' "$compact" | grep -Eq '\bwhere[[:space:]]+_time[[:space:]]*(>=|>)[[:space:]]*ago[[:space:]]*\('; then
-    return 0
-  fi
-
-  if printf '%s\n' "$compact" | grep -Eq '\bmake-series\b.*\bon[[:space:]]+_time[[:space:]]+from[[:space:]]+(ago[[:space:]]*\(|datetime[[:space:]]*\().*\bto[[:space:]]+(ago[[:space:]]*\(|now[[:space:]]*\(|datetime[[:space:]]*\()'; then
-    return 0
-  fi
-
-  if printf '%s\n' "$compact" | grep -Eq '\b_time[[:space:]]*(>=|>)[[:space:]]*(ago[[:space:]]*\(|datetime[[:space:]]*\()' &&
-    printf '%s\n' "$compact" | grep -Eq '\b_time[[:space:]]*(<=|<)[[:space:]]*(ago[[:space:]]*\(|now[[:space:]]*\(|datetime[[:space:]]*\()'; then
-    return 0
-  fi
-
-  return 1
-}
-
 if [[ $# -lt 1 ]]; then
   echo "Usage: axiom-query <deployment> [options] <<< 'query'" >&2
   exit 1
@@ -94,7 +69,7 @@ APL=$(cat)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APL_JSON=$(printf '%s' "$APL" | jq -Rs .)
 
-if ! has_explicit_time_bound "$APL"; then
+if ! printf '%s' "$APL" | "$SCRIPT_DIR/axiom-query-has-time-bound"; then
   echo "error: every Axiom APL query must include an explicit _time bound" >&2
   echo "hint: use where _time between (...) or where _time > ago(...); trace_id/session_id/thread_ts/getschema are not substitutes" >&2
   exit 1

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { AxiomTimeBoundsScorer } from '../scorers/axiom-time-bounds.js';
 import { EfficiencyScorer } from '../scorers/efficiency.js';
 import { QueryRepairScorer } from '../scorers/query-repair.js';
 import { QueryValidityScorer } from '../scorers/query-validity.js';
@@ -83,7 +84,50 @@ async function main(): Promise<void> {
     `efficiency should penalize classifier-detected failures; got ${classifierEfficiencyScore}`,
   );
 
-  // Regression #2: with identical failure-rate, repaired failures should
+  // Regression #2: unbounded APL should fail the explicit time-bound scorer,
+  // while bounded APL should pass.
+  const unboundedApl = await AxiomTimeBoundsScorer(buildArgs([
+    {
+      tool: 'scripts/axiom-query',
+      input: "scripts/axiom-query prod <<< \"['app-logs'] | getschema\"",
+      output: '# 1/1 rows, 10ms',
+    },
+  ]));
+  const boundedApl = await AxiomTimeBoundsScorer(buildArgs([
+    {
+      tool: 'scripts/axiom-query',
+      input: "scripts/axiom-query prod <<< \"['app-logs'] | where trace_id == 'abc123' and _time > ago(15m) | getschema\"",
+      output: '# 1/1 rows, 10ms',
+    },
+  ]));
+  const spotlightOnlyApl = await AxiomTimeBoundsScorer(buildArgs([
+    {
+      tool: 'scripts/axiom-query',
+      input: "scripts/axiom-query prod <<< \"['app-logs'] | summarize spotlight(_time > ago(30m), service)\"",
+      output: '# 1/1 rows, 10ms',
+    },
+  ]));
+  const unboundedAplScore = mustHaveScore('axiom-time-bounds (unbounded)', unboundedApl.score);
+  const boundedAplScore = mustHaveScore('axiom-time-bounds (bounded)', boundedApl.score);
+  const spotlightOnlyAplScore = mustHaveScore('axiom-time-bounds (spotlight only)', spotlightOnlyApl.score);
+
+  assert.equal(
+    unboundedAplScore,
+    0,
+    `axiom-time-bounds should fail unbounded APL; got ${unboundedAplScore}`,
+  );
+  assert.equal(
+    boundedAplScore,
+    1,
+    `axiom-time-bounds should pass bounded APL; got ${boundedAplScore}`,
+  );
+  assert.equal(
+    spotlightOnlyAplScore,
+    0,
+    `axiom-time-bounds should reject _time mentions outside where/make-series; got ${spotlightOnlyAplScore}`,
+  );
+
+  // Regression #3: with identical failure-rate, repaired failures should
   // produce better efficiency than unrepaired failures.
   const fullyRepaired: ToolCall[] = [
     {

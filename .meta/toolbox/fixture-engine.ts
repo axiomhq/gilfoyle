@@ -97,11 +97,11 @@ function hasExplicitTimeBoundStage(stages: APLStage[]): boolean {
     .filter((stage): stage is Extract<APLStage, { type: 'where' }> => stage.type === 'where')
     .map((stage) => stage.expr.toLowerCase().replace(/\s+/g, ' ').trim());
 
-  if (whereExpressions.some((expr) => /^_time\s+between\s*\(/.test(expr))) {
+  if (whereExpressions.some((expr) => /\b_time\s+between\s*\(/.test(expr))) {
     return true;
   }
 
-  if (whereExpressions.some((expr) => /^_time\s*(>=|>)\s*ago\s*\(/.test(expr))) {
+  if (whereExpressions.some((expr) => /\b_time\s*(>=|>)\s*ago\s*\(/.test(expr))) {
     return true;
   }
 
