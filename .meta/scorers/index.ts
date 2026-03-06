@@ -2,7 +2,6 @@ export { RCAAccuracyScorer } from './rca.js';
 export { EvidenceQualityScorer } from './evidence.js';
 export { EfficiencyScorer } from './efficiency.js';
 export { QueryValidityScorer } from './query-validity.js';
-export { AxiomTimeBoundsScorer } from './axiom-time-bounds.js';
 export { QueryYieldScorer } from './query-yield.js';
 export { QueryRepairScorer } from './query-repair.js';
 export { ExecutorCoverageScorer } from './executor-coverage.js';

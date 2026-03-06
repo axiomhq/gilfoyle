@@ -2,7 +2,7 @@ import { Eval } from 'axiom/ai/evals';
 import { withSpan } from 'axiom/ai';
 import { loadScenarios } from './scenarios/index.js';
 import { getHarness, type EvalInput, type EvalOutput, type HarnessName, type ModelName } from './harness/index.js';
-import { RCAAccuracyScorer, EvidenceQualityScorer, EfficiencyScorer, QueryValidityScorer, AxiomTimeBoundsScorer, QueryYieldScorer, QueryRepairScorer, ExecutorCoverageScorer, InitFirstScorer, SchemaFirstScorer, DiscoverFirstScorer, CounterfactualRejectionScorer, CausalGroundingScorer, MustNotMentionScorer, MemoryWriteScorer, HypothesisDisciplineScorer, SecretHygieneScorer, TriageFirstScorer, SlackCommsScorer, MemoryDistillationScorer, FirstRunScorer, RunValidityScorer, WallClockScorer, TokenBudgetScorer, SourceLinkScorer, BugfixDiligenceScorer } from './scorers/index.js';
+import { RCAAccuracyScorer, EvidenceQualityScorer, EfficiencyScorer, QueryValidityScorer, QueryYieldScorer, QueryRepairScorer, ExecutorCoverageScorer, InitFirstScorer, SchemaFirstScorer, DiscoverFirstScorer, CounterfactualRejectionScorer, CausalGroundingScorer, MustNotMentionScorer, MemoryWriteScorer, HypothesisDisciplineScorer, SecretHygieneScorer, TriageFirstScorer, SlackCommsScorer, MemoryDistillationScorer, FirstRunScorer, RunValidityScorer, WallClockScorer, TokenBudgetScorer, SourceLinkScorer, BugfixDiligenceScorer } from './scorers/index.js';
 
 const DEFAULT_HARNESS: HarnessName = 'amp';
 const DEFAULT_MODEL = 'xai/grok-4-1-fast';
@@ -124,7 +124,6 @@ Eval<EvalInput, ExpectedOutput, EvalOutput>(evalName, {
   scorers: [
     RunValidityScorer,
     QueryValidityScorer,
-    AxiomTimeBoundsScorer,
     QueryYieldScorer,
     QueryRepairScorer,
     ExecutorCoverageScorer,

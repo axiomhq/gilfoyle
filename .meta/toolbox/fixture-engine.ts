@@ -10,7 +10,6 @@
 
 import type { LogRow, MetricSeries, ScenarioFixtures, } from '../harness/types.js';
 import { validateAPLSyntax, validatePromQLSyntax } from './apl-validator.js';
-import { parseAxiomTimeWindowArgs } from './axiom-time-bounds.js';
 
 // ─── APL Parser ──────────────────────────────────────────────────────────
 
@@ -827,6 +826,11 @@ interface CLIValidationOptions {
   fallbackQuery?: string;
 }
 
+interface AxiomTimeWindow {
+  startTime: string;
+  endTime: string;
+}
+
 function stripWrappingQuotes(value: string): string {
   let out = value.trim();
   while (
@@ -845,6 +849,92 @@ function normalizeLoose(value: string): string {
 
 function normalizeCompact(value: string): string {
   return normalizeLoose(value).replace(/[\s_-]+/g, '');
+}
+
+function normalizeSinceValue(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  return trimmed.startsWith('now') ? trimmed : `now-${trimmed}`;
+}
+
+function valueFromArg(arg: string, prefix: '--since=' | '--from=' | '--to='): string | null {
+  return arg.startsWith(prefix) ? arg.slice(prefix.length).trim() : null;
+}
+
+function parseAxiomTimeWindowArgs(args: string[]): { timeWindow?: AxiomTimeWindow; errors: string[] } {
+  const errors: string[] = [];
+  let since: string | undefined;
+  let from: string | undefined;
+  let to: string | undefined;
+
+  for (let i = 1; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg.startsWith('--')) continue;
+
+    const inlineSince = valueFromArg(arg, '--since=');
+    if (inlineSince != null) {
+      since = inlineSince;
+      continue;
+    }
+
+    const inlineFrom = valueFromArg(arg, '--from=');
+    if (inlineFrom != null) {
+      from = inlineFrom;
+      continue;
+    }
+
+    const inlineTo = valueFromArg(arg, '--to=');
+    if (inlineTo != null) {
+      to = inlineTo;
+      continue;
+    }
+
+    if (arg === '--since' || arg === '--from' || arg === '--to') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        errors.push(`Missing value for ${arg}`);
+        continue;
+      }
+      if (arg === '--since') since = value;
+      if (arg === '--from') from = value;
+      if (arg === '--to') to = value;
+      i += 1;
+    }
+  }
+
+  if (since && (from || to)) {
+    errors.push('Use either --since or --from/--to, not both');
+  }
+
+  if (!since && !from && !to) {
+    errors.push('Missing time window. Pass --since <duration> or --from <timestamp> --to <timestamp>.');
+  }
+
+  if (!since && ((from && !to) || (!from && to))) {
+    errors.push('Absolute windows require both --from and --to');
+  }
+
+  if (since?.trim()) {
+    return {
+      errors,
+      timeWindow: {
+        startTime: normalizeSinceValue(since.trim()),
+        endTime: 'now',
+      },
+    };
+  }
+
+  if (from?.trim() && to?.trim()) {
+    return {
+      errors,
+      timeWindow: {
+        startTime: from.trim(),
+        endTime: to.trim(),
+      },
+    };
+  }
+
+  return { errors };
 }
 
 function resolveDeployment(input: string, fixtures: ScenarioFixtures): string | undefined {

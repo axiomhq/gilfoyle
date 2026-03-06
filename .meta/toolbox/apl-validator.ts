@@ -22,16 +22,9 @@ export interface SyntaxResult {
   error: string | null;
 }
 
-export interface APLAnalysisResult extends SyntaxResult {
-  requiresTimeBound: boolean;
-  hasExplicitTimeBound: boolean;
-}
-
 type ValidateFn = (query: string) => SyntaxResult;
-type AnalyzeFn = (query: string) => APLAnalysisResult;
 
 let aplValidateFn: ValidateFn | null = null;
-let aplAnalyzeFn: AnalyzeFn | null = null;
 let promqlValidateFn: ValidateFn | null = null;
 let aplInitialized = false;
 let promqlInitialized = false;
@@ -55,24 +48,7 @@ async function loadWasm(wasmFile: string, shimFile: string, globalName: string):
 
 export async function initAPLValidator(): Promise<void> {
   if (aplInitialized) return;
-  const wasmPath = join(WASM_DIR, 'apl-parser.wasm');
-  if (!existsSync(wasmPath)) {
-    throw new Error(
-      'apl-parser.wasm not found — WASM binaries are stored in Git LFS. Run: git lfs pull',
-    );
-  }
-
-  await import(join(WASM_DIR, 'wasm_exec.js'));
-  const go = new (globalThis as any).Go();
-  const wasmBuf = readFileSync(wasmPath);
-  const result = await WebAssembly.instantiate(wasmBuf, go.importObject);
-  go.run(result.instance);
-
-  aplValidateFn = (globalThis as any).ValidateAPL;
-  aplAnalyzeFn = (globalThis as any).AnalyzeAPL;
-  if (!aplValidateFn || !aplAnalyzeFn) {
-    throw new Error('APL validator exports not found — WASM failed to initialize');
-  }
+  aplValidateFn = await loadWasm('apl-parser.wasm', 'wasm_exec.js', 'ValidateAPL');
   aplInitialized = true;
 }
 
@@ -89,11 +65,6 @@ export async function initAllValidators(): Promise<void> {
 export function validateAPLSyntax(query: string): SyntaxResult {
   if (!aplValidateFn) throw new Error('APL validator not initialized — call initAPLValidator() first');
   return aplValidateFn(query);
-}
-
-export function analyzeAPL(query: string): APLAnalysisResult {
-  if (!aplAnalyzeFn) throw new Error('APL validator not initialized — call initAPLValidator() first');
-  return aplAnalyzeFn(query);
 }
 
 export function validatePromQLSyntax(query: string): SyntaxResult {

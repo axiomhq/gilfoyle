@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { AxiomTimeBoundsScorer } from '../scorers/axiom-time-bounds.js';
 import { EfficiencyScorer } from '../scorers/efficiency.js';
 import { QueryRepairScorer } from '../scorers/query-repair.js';
 import { QueryValidityScorer } from '../scorers/query-validity.js';
 import type { EvalInput, EvalOutput, ToolCall } from '../harness/types.js';
+import { validateAxiomCLI } from '../toolbox/fixture-engine.js';
 
 function mustHaveScore(label: string, score: number | null): number {
   if (score == null) {
@@ -84,90 +84,59 @@ async function main(): Promise<void> {
     `efficiency should penalize classifier-detected failures; got ${classifierEfficiencyScore}`,
   );
 
-  // Regression #2: axiom-query must carry an explicit wrapper time window,
-  // regardless of whether the APL text also contains _time filters.
-  const unboundedApl = await AxiomTimeBoundsScorer(buildArgs([
+  // Regression #2: validateAxiomCLI must enforce wrapper time windows.
+  const fixtures = {
+    datasets: { 'app-logs': [{ _time: '2026-03-06T10:05:00Z', message: 'ok' }] },
+    metrics: {},
+    datasources: [],
+    validDeployments: ['prod'],
+  };
+
+  const missingWindow = validateAxiomCLI(['prod'], "['app-logs'] | getschema", fixtures);
+  const relativeWindow = validateAxiomCLI(['prod', '--since', '15m'], "['app-logs'] | getschema", fixtures);
+  const absoluteWindow = validateAxiomCLI(
+    ['prod', '--from', '2026-03-06T10:00:00Z', '--to', '2026-03-06T10:30:00Z'],
+    "['app-logs'] | getschema",
+    fixtures,
+  );
+  const mixedWindow = validateAxiomCLI(
+    ['prod', '--since', '15m', '--from', '2026-03-06T10:00:00Z', '--to', '2026-03-06T10:30:00Z'],
+    "['app-logs'] | getschema",
+    fixtures,
+  );
+  const inlineTimeOnly = validateAxiomCLI(['prod'], "['app-logs'] | where _time > ago(15m) | getschema", fixtures);
+
+  assert.equal(missingWindow.valid, false, 'validateAxiomCLI should reject missing time windows');
+  assert.equal(relativeWindow.valid, true, 'validateAxiomCLI should accept --since windows');
+  assert.equal(relativeWindow.startTime, 'now-15m', 'validateAxiomCLI should derive startTime from --since');
+  assert.equal(relativeWindow.endTime, 'now', 'validateAxiomCLI should derive endTime for --since windows');
+  assert.equal(absoluteWindow.valid, true, 'validateAxiomCLI should accept --from/--to windows');
+  assert.equal(mixedWindow.valid, false, 'validateAxiomCLI should reject mixed relative and absolute windows');
+  assert.equal(inlineTimeOnly.valid, false, 'validateAxiomCLI should not treat inline _time as a wrapper window');
+
+  const missingWindowValidity = await QueryValidityScorer(buildArgs([
     {
       tool: 'scripts/axiom-query',
       input: "scripts/axiom-query prod <<< \"['app-logs'] | getschema\"",
-      output: '# 1/1 rows, 10ms',
+      output: 'error: Missing time window. Pass --since <duration> or --from <timestamp> --to <timestamp>.',
+      queryValid: false,
+      queryErrors: ['Missing time window. Pass --since <duration> or --from <timestamp> --to <timestamp>.'],
     },
   ]));
-  const boundedApl = await AxiomTimeBoundsScorer(buildArgs([
+  const boundedWindowValidity = await QueryValidityScorer(buildArgs([
     {
       tool: 'scripts/axiom-query',
       input: "scripts/axiom-query prod --since 15m <<< \"['app-logs'] | getschema\"",
       output: '# 1/1 rows, 10ms',
+      queryValid: true,
     },
   ]));
-  const inlineTimeOnlyApl = await AxiomTimeBoundsScorer(buildArgs([
-    {
-      tool: 'scripts/axiom-query',
-      input: "scripts/axiom-query prod <<< \"['app-logs'] | where _time > ago(15m) | getschema\"",
-      output: '# 1/1 rows, 10ms',
-    },
-  ]));
-  const absoluteWindowApl = await AxiomTimeBoundsScorer(buildArgs([
-    {
-      tool: 'scripts/axiom-query',
-      input: "scripts/axiom-query prod --from 2026-03-06T10:00:00Z --to 2026-03-06T10:30:00Z <<< \"['requests'] | getschema\"",
-      output: '# 1/1 rows, 10ms',
-    },
-  ]));
-  const mixedWindowApl = await AxiomTimeBoundsScorer(buildArgs([
-    {
-      tool: 'scripts/axiom-query',
-      input: "scripts/axiom-query prod --since 15m --from 2026-03-06T10:00:00Z --to 2026-03-06T10:30:00Z <<< \"['requests'] | getschema\"",
-      output: '# 1/1 rows, 10ms',
-    },
-  ]));
-  const objectWindowApl = await AxiomTimeBoundsScorer(buildArgs([
-    {
-      tool: 'scripts/axiom-query',
-      input: {
-        env: 'prod',
-        since: '15m',
-        query: "['app-logs'] | getschema",
-      },
-      output: '# 1/1 rows, 10ms',
-    },
-  ]));
-  const unboundedAplScore = mustHaveScore('axiom-time-bounds (unbounded)', unboundedApl.score);
-  const boundedAplScore = mustHaveScore('axiom-time-bounds (bounded)', boundedApl.score);
-  const inlineTimeOnlyAplScore = mustHaveScore('axiom-time-bounds (inline only)', inlineTimeOnlyApl.score);
-  const absoluteWindowAplScore = mustHaveScore('axiom-time-bounds (absolute window)', absoluteWindowApl.score);
-  const mixedWindowAplScore = mustHaveScore('axiom-time-bounds (mixed windows)', mixedWindowApl.score);
-  const objectWindowAplScore = mustHaveScore('axiom-time-bounds (object window)', objectWindowApl.score);
+  const missingWindowValidityScore = mustHaveScore('query-validity (missing window)', missingWindowValidity.score);
+  const boundedWindowValidityScore = mustHaveScore('query-validity (bounded window)', boundedWindowValidity.score);
 
-  assert.equal(
-    unboundedAplScore,
-    0,
-    `axiom-time-bounds should fail unbounded APL; got ${unboundedAplScore}`,
-  );
-  assert.equal(
-    boundedAplScore,
-    1,
-    `axiom-time-bounds should pass --since windows; got ${boundedAplScore}`,
-  );
-  assert.equal(
-    inlineTimeOnlyAplScore,
-    0,
-    `axiom-time-bounds should reject inline _time without wrapper flags; got ${inlineTimeOnlyAplScore}`,
-  );
-  assert.equal(
-    absoluteWindowAplScore,
-    1,
-    `axiom-time-bounds should allow absolute wrapper windows; got ${absoluteWindowAplScore}`,
-  );
-  assert.equal(
-    mixedWindowAplScore,
-    0,
-    `axiom-time-bounds should reject mixed --since and --from/--to windows; got ${mixedWindowAplScore}`,
-  );
-  assert.equal(
-    objectWindowAplScore,
-    1,
-    `axiom-time-bounds should accept object-style tool calls with wrapper windows; got ${objectWindowAplScore}`,
+  assert.ok(
+    missingWindowValidityScore < boundedWindowValidityScore,
+    `query-validity should penalize missing wrapper windows; missing=${missingWindowValidityScore} bounded=${boundedWindowValidityScore}`,
   );
 
   // Regression #3: with identical failure-rate, repaired failures should
