@@ -98,8 +98,6 @@ async function main(): Promise<void> {
 
   assert.equal(missingWindow.valid, false, 'validateAxiomCLI should reject missing time windows');
   assert.equal(relativeWindow.valid, true, 'validateAxiomCLI should accept --since windows');
-  assert.equal(relativeWindow.startTime, 'now-15m', 'validateAxiomCLI should derive startTime from --since');
-  assert.equal(relativeWindow.endTime, 'now', 'validateAxiomCLI should derive endTime for --since windows');
   assert.equal(inlineTimeOnly.valid, false, 'validateAxiomCLI should not treat inline _time as a wrapper window');
 
   const missingWindowValidity = await QueryValidityScorer(buildArgs([

@@ -768,17 +768,10 @@ export interface CLIValidation {
   deployment?: string;
   datasourceUid?: string;
   query?: string;
-  startTime?: string;
-  endTime?: string;
 }
 
 interface CLIValidationOptions {
   fallbackQuery?: string;
-}
-
-interface AxiomTimeWindow {
-  startTime: string;
-  endTime: string;
 }
 
 function stripWrappingQuotes(value: string): string {
@@ -801,17 +794,11 @@ function normalizeCompact(value: string): string {
   return normalizeLoose(value).replace(/[\s_-]+/g, '');
 }
 
-function normalizeSinceValue(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return trimmed;
-  return trimmed.startsWith('now') ? trimmed : `now-${trimmed}`;
-}
-
 function valueFromArg(arg: string, prefix: '--since=' | '--from=' | '--to='): string | null {
   return arg.startsWith(prefix) ? arg.slice(prefix.length).trim() : null;
 }
 
-function parseAxiomTimeWindowArgs(args: string[]): { timeWindow?: AxiomTimeWindow; errors: string[] } {
+function validateAxiomTimeWindowArgs(args: string[]): string[] {
   const errors: string[] = [];
   let since: string | undefined;
   let from: string | undefined;
@@ -864,27 +851,7 @@ function parseAxiomTimeWindowArgs(args: string[]): { timeWindow?: AxiomTimeWindo
     errors.push('Absolute windows require both --from and --to');
   }
 
-  if (since?.trim()) {
-    return {
-      errors,
-      timeWindow: {
-        startTime: normalizeSinceValue(since.trim()),
-        endTime: 'now',
-      },
-    };
-  }
-
-  if (from?.trim() && to?.trim()) {
-    return {
-      errors,
-      timeWindow: {
-        startTime: from.trim(),
-        endTime: to.trim(),
-      },
-    };
-  }
-
-  return { errors };
+  return errors;
 }
 
 function resolveDeployment(input: string, fixtures: ScenarioFixtures): string | undefined {
@@ -979,8 +946,7 @@ export function validateAxiomCLI(
     errors.push('No query provided. Pipe query via stdin or pass --query/--query-file.');
   }
 
-  const timeWindowCheck = parseAxiomTimeWindowArgs(args);
-  errors.push(...timeWindowCheck.errors);
+  errors.push(...validateAxiomTimeWindowArgs(args));
 
   // Check for invalid args
   const validFlags = ['--raw', '--ndjson', '--full', '--trace', '--query', '--query-file', '--since', '--from', '--to'];
@@ -1009,8 +975,6 @@ export function validateAxiomCLI(
     errors,
     deployment,
     query,
-    startTime: timeWindowCheck.timeWindow?.startTime,
-    endTime: timeWindowCheck.timeWindow?.endTime,
   };
 }
 
