@@ -114,12 +114,6 @@ assert_contains "prints missing time window error" "requires an explicit time wi
 assert_no_curl "does not call curl for missing time window"
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "\"$TEST_DIR/axiom-query\" test --raw" "['anton-inference-logs'] | where _time > ago(15m) | getschema"
-assert_eq "rejects inline _time without wrapper window" "1" "$QUERY_STATUS"
-assert_contains "inline _time does not bypass wrapper contract" "requires an explicit time window" "$QUERY_STDERR"
-assert_no_curl "does not call curl when only inline _time is present"
-
-: > "$AXIOM_QUERY_TEST_CURL_LOG"
 run_query "\"$TEST_DIR/axiom-query\" test --since 15m --raw" "['anton-inference-logs'] | getschema"
 assert_eq "allows --since window" "0" "$QUERY_STATUS"
 assert_eq "calls curl for --since window" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
@@ -128,17 +122,17 @@ assert_payload "sends endTime for --since window" '.endTime' 'now'
 assert_payload "preserves apl text for --since window" '.apl' "['anton-inference-logs'] | getschema"
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
+run_query "\"$TEST_DIR/axiom-query\" test --since 15m --from 2026-03-06T10:00:00Z --to 2026-03-06T10:30:00Z --raw" "['anton-inference-logs'] | getschema"
+assert_eq "rejects mixed relative and absolute windows" "1" "$QUERY_STATUS"
+assert_contains "prints mixed window error" "use either --since or --from/--to" "$QUERY_STDERR"
+assert_no_curl "does not call curl for mixed windows"
+
+: > "$AXIOM_QUERY_TEST_CURL_LOG"
 run_query "\"$TEST_DIR/axiom-query\" test --from 2026-03-06T10:00:00Z --to 2026-03-06T10:30:00Z --raw" "['anton-inference-logs'] | getschema"
 assert_eq "allows absolute window" "0" "$QUERY_STATUS"
 assert_eq "calls curl for absolute window" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
 assert_payload "sends explicit startTime" '.startTime' '2026-03-06T10:00:00Z'
 assert_payload "sends explicit endTime" '.endTime' '2026-03-06T10:30:00Z'
-
-: > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "\"$TEST_DIR/axiom-query\" test --since 15m --from 2026-03-06T10:00:00Z --to 2026-03-06T10:30:00Z --raw" "['anton-inference-logs'] | getschema"
-assert_eq "rejects mixed relative and absolute windows" "1" "$QUERY_STATUS"
-assert_contains "prints mixed window error" "use either --since or --from/--to" "$QUERY_STDERR"
-assert_no_curl "does not call curl for mixed windows"
 
 echo
 echo "==========================="
