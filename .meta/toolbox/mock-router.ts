@@ -99,35 +99,10 @@ export function createMockRouter(scenario: IncidentScenario): MockToolRouter {
             output = { error };
             break;
           }
-          const {
-            env,
-            query,
-            since,
-            from,
-            to,
-            startTime,
-            endTime,
-          } = input as {
-            env?: string;
-            query: string;
-            since?: string;
-            from?: string;
-            to?: string;
-            startTime?: string;
-            endTime?: string;
-          };
+          const { env, query } = input as { env?: string; query: string };
 
           if (scenario.fixtures) {
-            const cliArgs = [env ?? 'prod'];
-            if (since) {
-              cliArgs.push('--since', since);
-            } else if (from && to) {
-              cliArgs.push('--from', from, '--to', to);
-            } else if (startTime && endTime) {
-              cliArgs.push('--from', startTime, '--to', endTime);
-            }
-
-            const cliVal = validateAxiomCLI(cliArgs, query, scenario.fixtures);
+            const cliVal = validateAxiomCLI([env ?? 'prod'], query, scenario.fixtures);
             const aplVal = validateAPL(query, scenario.fixtures);
 
             if (!cliVal.valid || !aplVal.valid) {
