@@ -19,8 +19,8 @@ kubernetes.node_labels.nodepool\.axiom\.co/name
 
 **Running from shell - use heredoc (RECOMMENDED):**
 ```bash
-# Heredoc with quoted 'EOF' prevents shell expansion - only need \\. 
-axiom-query staging - << 'EOF'
+# Heredoc with quoted 'EOF' prevents shell expansion - only need \\.
+scripts/axiom-query staging --since 15m << 'EOF'
 ['k8s-logs-prod'] | where _time > ago(15m) | distinct ['kubernetes.node_labels.nodepool\\.axiom\\.co/name']
 EOF
 ```
@@ -28,14 +28,14 @@ EOF
 **Alternative - stdin:**
 ```bash
 # Pipe with $'...' - need \\\\ (quadruple) because shell + APL both escape
-echo $'[\'k8s-logs-prod\'] | where _time > ago(15m) | distinct [\'kubernetes.node_labels.nodepool\\\\.axiom\\\\.co/name\']' | axiom-query staging -
+echo $'[\'k8s-logs-prod\'] | where _time > ago(15m) | distinct [\'kubernetes.node_labels.nodepool\\\\.axiom\\\\.co/name\']' | scripts/axiom-query staging --since 15m
 ```
 
 **Alternative - file:**
 ```bash
-# Write query to file (only need \\.), then use -f
+# Write query to file (only need \\.), then pipe it in
 echo "['k8s-logs-prod'] | where _time > ago(15m) | distinct ['kubernetes.node_labels.nodepool\\.axiom\\.co/name']" > /tmp/q.apl
-axiom-query staging -f /tmp/q.apl
+cat /tmp/q.apl | scripts/axiom-query staging --since 15m
 ```
 
 **Map field access:** For nested maps, use bracket notation:
@@ -536,18 +536,18 @@ Compare a time window (bad) against a baseline (good) to find what changed:
 
 ```bash
 # Compare last 30m (bad) to the 30m before that (good)
-scripts/axiom-query <env> <<< "['dataset'] | where _time > ago(1h) | summarize spotlight(_time > ago(30m), service, user_agent, region, status)"
+scripts/axiom-query <env> --since 1h <<< "['dataset'] | summarize spotlight(_time > ago(30m), service, user_agent, region, status)"
 ```
 
 **Parsing Spotlight with jq:**
 ```bash
 # Summary: all dimensions with top finding
-scripts/axiom-query <env> "..." --raw | jq '.. | objects | select(.differences?)
+scripts/axiom-query <env> --since 1h --raw <<< "..." | jq '.. | objects | select(.differences?)
   | {dim: .dimension, effect: .delta_score,
      top: (.differences | sort_by(-.frequency_ratio) | .[0] | {v: .value[0:60], r: .frequency_ratio, c: .comparison_count})}'
 
 # Top 5 OVER-represented values (ratio=1 means ONLY during problem)
-scripts/axiom-query <env> "..." --raw | jq '.. | objects | select(.differences?)
+scripts/axiom-query <env> --since 1h --raw <<< "..." | jq '.. | objects | select(.differences?)
   | {dim: .dimension, over: [.differences | sort_by(-.frequency_ratio) | .[:5] | .[]
      | {v: .value[0:60], r: .frequency_ratio, c: .comparison_count}]}'
 ```

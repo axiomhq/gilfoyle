@@ -84,8 +84,8 @@ async function main(): Promise<void> {
     `efficiency should penalize classifier-detected failures; got ${classifierEfficiencyScore}`,
   );
 
-  // Regression #2: unbounded APL should fail the explicit time-bound scorer,
-  // while bounded APL should pass.
+  // Regression #2: axiom-query must carry an explicit wrapper time window,
+  // regardless of whether the APL text also contains _time filters.
   const unboundedApl = await AxiomTimeBoundsScorer(buildArgs([
     {
       tool: 'scripts/axiom-query',
@@ -96,44 +96,48 @@ async function main(): Promise<void> {
   const boundedApl = await AxiomTimeBoundsScorer(buildArgs([
     {
       tool: 'scripts/axiom-query',
-      input: "scripts/axiom-query prod <<< \"['app-logs'] | where trace_id == 'abc123' and _time > ago(15m) | getschema\"",
+      input: "scripts/axiom-query prod --since 15m <<< \"['app-logs'] | getschema\"",
       output: '# 1/1 rows, 10ms',
     },
   ]));
-  const spotlightOnlyApl = await AxiomTimeBoundsScorer(buildArgs([
+  const inlineTimeOnlyApl = await AxiomTimeBoundsScorer(buildArgs([
     {
       tool: 'scripts/axiom-query',
-      input: "scripts/axiom-query prod <<< \"['app-logs'] | summarize spotlight(_time > ago(30m), service)\"",
+      input: "scripts/axiom-query prod <<< \"['app-logs'] | where _time > ago(15m) | getschema\"",
       output: '# 1/1 rows, 10ms',
     },
   ]));
-  const nestedJoinApl = await AxiomTimeBoundsScorer(buildArgs([
+  const absoluteWindowApl = await AxiomTimeBoundsScorer(buildArgs([
     {
       tool: 'scripts/axiom-query',
-      input: "scripts/axiom-query prod <<< \"['requests'] | where _time > ago(1h) | join kind=inner (['users']) on user_id\"",
+      input: "scripts/axiom-query prod --from 2026-03-06T10:00:00Z --to 2026-03-06T10:30:00Z <<< \"['requests'] | getschema\"",
       output: '# 1/1 rows, 10ms',
     },
   ]));
-  const topLevelUnionApl = await AxiomTimeBoundsScorer(buildArgs([
+  const mixedWindowApl = await AxiomTimeBoundsScorer(buildArgs([
     {
       tool: 'scripts/axiom-query',
-      input: "scripts/axiom-query prod <<< \"union ['east'], ['west'] | where _time > ago(1h) | take 5\"",
+      input: "scripts/axiom-query prod --since 15m --from 2026-03-06T10:00:00Z --to 2026-03-06T10:30:00Z <<< \"['requests'] | getschema\"",
       output: '# 1/1 rows, 10ms',
     },
   ]));
-  const stringLiteralApl = await AxiomTimeBoundsScorer(buildArgs([
+  const objectWindowApl = await AxiomTimeBoundsScorer(buildArgs([
     {
       tool: 'scripts/axiom-query',
-      input: "scripts/axiom-query prod <<< \"['app-logs'] | where message == '_time > ago(1h)' | take 5\"",
+      input: {
+        env: 'prod',
+        since: '15m',
+        query: "['app-logs'] | getschema",
+      },
       output: '# 1/1 rows, 10ms',
     },
   ]));
   const unboundedAplScore = mustHaveScore('axiom-time-bounds (unbounded)', unboundedApl.score);
   const boundedAplScore = mustHaveScore('axiom-time-bounds (bounded)', boundedApl.score);
-  const spotlightOnlyAplScore = mustHaveScore('axiom-time-bounds (spotlight only)', spotlightOnlyApl.score);
-  const nestedJoinAplScore = mustHaveScore('axiom-time-bounds (nested join)', nestedJoinApl.score);
-  const topLevelUnionAplScore = mustHaveScore('axiom-time-bounds (top-level union)', topLevelUnionApl.score);
-  const stringLiteralAplScore = mustHaveScore('axiom-time-bounds (string literal)', stringLiteralApl.score);
+  const inlineTimeOnlyAplScore = mustHaveScore('axiom-time-bounds (inline only)', inlineTimeOnlyApl.score);
+  const absoluteWindowAplScore = mustHaveScore('axiom-time-bounds (absolute window)', absoluteWindowApl.score);
+  const mixedWindowAplScore = mustHaveScore('axiom-time-bounds (mixed windows)', mixedWindowApl.score);
+  const objectWindowAplScore = mustHaveScore('axiom-time-bounds (object window)', objectWindowApl.score);
 
   assert.equal(
     unboundedAplScore,
@@ -143,27 +147,27 @@ async function main(): Promise<void> {
   assert.equal(
     boundedAplScore,
     1,
-    `axiom-time-bounds should pass bounded APL; got ${boundedAplScore}`,
+    `axiom-time-bounds should pass --since windows; got ${boundedAplScore}`,
   );
   assert.equal(
-    spotlightOnlyAplScore,
+    inlineTimeOnlyAplScore,
     0,
-    `axiom-time-bounds should reject _time mentions outside where/make-series; got ${spotlightOnlyAplScore}`,
+    `axiom-time-bounds should reject inline _time without wrapper flags; got ${inlineTimeOnlyAplScore}`,
   );
   assert.equal(
-    nestedJoinAplScore,
-    0,
-    `axiom-time-bounds should reject joins with unbounded nested scans; got ${nestedJoinAplScore}`,
-  );
-  assert.equal(
-    topLevelUnionAplScore,
+    absoluteWindowAplScore,
     1,
-    `axiom-time-bounds should allow top-level union queries with an outer _time bound; got ${topLevelUnionAplScore}`,
+    `axiom-time-bounds should allow absolute wrapper windows; got ${absoluteWindowAplScore}`,
   );
   assert.equal(
-    stringLiteralAplScore,
+    mixedWindowAplScore,
     0,
-    `axiom-time-bounds should reject string literal pseudo-bounds; got ${stringLiteralAplScore}`,
+    `axiom-time-bounds should reject mixed --since and --from/--to windows; got ${mixedWindowAplScore}`,
+  );
+  assert.equal(
+    objectWindowAplScore,
+    1,
+    `axiom-time-bounds should accept object-style tool calls with wrapper windows; got ${objectWindowAplScore}`,
   );
 
   // Regression #3: with identical failure-rate, repaired failures should

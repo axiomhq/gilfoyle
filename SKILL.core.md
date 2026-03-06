@@ -330,9 +330,9 @@ Every query prints a stats line: `# matched/examined rows, blocks, elapsed_ms`. 
 
 ### Query performance rules
 
-1. **`_time` filter FIRST**—always `where _time between (ago(1h) .. now())` before other filters. Without it, every block is scanned.
-2. **Every APL query needs explicit `_time`**—there are no exceptions. `getschema`, discovery queries, `trace_id`, `session_id`, `thread_ts`, and similar filters do NOT replace an explicit time bound.
-3. **The wrapper enforces this**—`scripts/axiom-query` rejects any APL that omits explicit `_time`. If you do not know the right window yet, derive it from surrounding timestamps or ask. Do not skip `_time`.
+1. **Set the wrapper time window FIRST**—every `scripts/axiom-query` call must include `--since <duration>` or `--from <timestamp> --to <timestamp>`. `getschema`, discovery queries, `trace_id`, `session_id`, `thread_ts`, and similar filters do NOT replace a wrapper time window.
+2. **If the APL also filters on `_time`, put that filter FIRST**—use `where _time between (...)` before other filters. This keeps extra in-query narrowing fast.
+3. **The wrapper enforces this**—`scripts/axiom-query` rejects calls that omit `--since` or `--from/--to`, even if the query text already contains `_time`. If you do not know the right window yet, derive it from surrounding timestamps or ask. Do not skip the wrapper window.
 4. **Most selective filter first**—Axiom does NOT reorder `where` clauses. Put the filter that eliminates the most rows earliest.
 5. **`project` early**—specify only the fields you need. `project *` on wide datasets (1000+ fields) wastes I/O and can OOM (HTTP 432).
 6. **Prefer simple, case-sensitive string ops**—`_cs` variants are faster. Prefer `startswith`/`endswith` over `contains` when applicable. `matches regex` is last resort.
@@ -464,9 +464,9 @@ See `reference/postmortem-template.md` for retrospective format.
 # Discover available datasets (pass env names to limit: discover-axiom prod staging)
 scripts/discover-axiom
 
-scripts/axiom-query <env> <<< "['dataset'] | where _time > ago(15m) | getschema"
-scripts/axiom-query <env> <<< "['dataset'] | where _time > ago(1h) | project _time, message, level | take 5"
-scripts/axiom-query <env> --ndjson <<< "['dataset'] | where _time > ago(1h) | project _time, message | take 1"
+scripts/axiom-query <env> --since 15m <<< "['dataset'] | getschema"
+scripts/axiom-query <env> --since 1h <<< "['dataset'] | project _time, message, level | take 5"
+scripts/axiom-query <env> --since 1h --ndjson <<< "['dataset'] | project _time, message | take 1"
 ```
 
 ### Grafana (Metrics)

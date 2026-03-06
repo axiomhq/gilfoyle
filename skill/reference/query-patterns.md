@@ -1,5 +1,7 @@
 # Signal Reading Query Patterns
 
+When you run these with `scripts/axiom-query`, always pass a wrapper window such as `--since 15m` or `--from ... --to ...`. The APL examples below keep explicit `_time` filters because they are good query hygiene, but the wrapper time window is required too.
+
 ## Schema & Value Discovery (MANDATORY FIRST STEP)
 
 **Always run schema discovery before writing investigation queries.** Do not guess field names.

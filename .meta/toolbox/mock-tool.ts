@@ -83,15 +83,24 @@ function parseAxiomInvocation(rawArgs: string[]): ParsedInvocation {
   const args: string[] = [rawArgs[0]];
   const errors: string[] = [];
   let fallbackQuery: string | undefined;
+  const flagsWithValues = new Set(['--query', '--query-file', '--since', '--from', '--to']);
 
   for (let i = 1; i < rawArgs.length; i++) {
     const arg = rawArgs[i];
-    if (arg === '--query') {
+    if (flagsWithValues.has(arg)) {
       const value = rawArgs[i + 1];
       if (!value || value.startsWith('--')) {
-        errors.push('Missing value for --query');
+        errors.push(`Missing value for ${arg}`);
       } else {
-        fallbackQuery = appendQuery(fallbackQuery, value);
+        if (arg === '--query') {
+          fallbackQuery = appendQuery(fallbackQuery, value);
+        } else if (arg === '--query-file') {
+          const loaded = readQueryFile(value);
+          if (loaded.error) errors.push(loaded.error);
+          else if (loaded.query) fallbackQuery = appendQuery(fallbackQuery, loaded.query);
+        } else {
+          args.push(arg, value);
+        }
         i += 1;
       }
       continue;
@@ -100,22 +109,16 @@ function parseAxiomInvocation(rawArgs: string[]): ParsedInvocation {
       fallbackQuery = appendQuery(fallbackQuery, arg.slice('--query='.length));
       continue;
     }
-    if (arg === '--query-file') {
-      const path = rawArgs[i + 1];
-      if (!path || path.startsWith('--')) {
-        errors.push('Missing value for --query-file');
-      } else {
-        const loaded = readQueryFile(path);
-        if (loaded.error) errors.push(loaded.error);
-        else if (loaded.query) fallbackQuery = appendQuery(fallbackQuery, loaded.query);
-        i += 1;
-      }
-      continue;
-    }
     if (arg.startsWith('--query-file=')) {
       const loaded = readQueryFile(arg.slice('--query-file='.length));
       if (loaded.error) errors.push(loaded.error);
       else if (loaded.query) fallbackQuery = appendQuery(fallbackQuery, loaded.query);
+      continue;
+    }
+    if (arg.startsWith('--since=')
+      || arg.startsWith('--from=')
+      || arg.startsWith('--to=')) {
+      args.push(arg);
       continue;
     }
     if (arg.startsWith('--')) {
@@ -254,13 +257,13 @@ try {
           process.exit(1);
         }
 
-        const aplCheck = validateAPL(stdinQuery, fixtures);
+        const aplCheck = validateAPL(cliCheck.query ?? stdinQuery, fixtures);
         if (!aplCheck.valid) {
           console.error(`error: ${aplCheck.errors.join('; ')}`);
           process.exit(1);
         }
 
-        const results = executeAPL(aplCheck.parsed!, fixtures);
+        const results = executeAPL(aplCheck.parsed!, fixtures, cliCheck);
         const totalRows = fixtures.datasets[aplCheck.parsed!.dataset]?.length ?? 0;
         console.log(formatAxiomOutput(results, totalRows));
       } else {

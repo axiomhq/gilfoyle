@@ -1,6 +1,5 @@
 import { Scorer } from 'axiom/ai/evals';
 import type { EvalInput, EvalOutput, ToolCall } from '../harness/types.js';
-import { initAPLValidator } from '../toolbox/apl-validator.js';
 import { axiomTimeBoundError, hasExplicitAxiomTimeBound } from '../toolbox/axiom-time-bounds.js';
 
 function formatViolationInput(input: ToolCall['input']): string {
@@ -19,8 +18,6 @@ export const AxiomTimeBoundsScorer = Scorer<{
 }>(
   'axiom-time-bounds',
   async ({ output }) => {
-    await initAPLValidator();
-
     const axiomCalls = output.trace.toolCalls.filter((tc) => tc.tool === 'scripts/axiom-query');
 
     if (axiomCalls.length === 0) {

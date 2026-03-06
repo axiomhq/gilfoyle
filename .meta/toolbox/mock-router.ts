@@ -99,10 +99,35 @@ export function createMockRouter(scenario: IncidentScenario): MockToolRouter {
             output = { error };
             break;
           }
-          const { env, query } = input as { env?: string; query: string };
+          const {
+            env,
+            query,
+            since,
+            from,
+            to,
+            startTime,
+            endTime,
+          } = input as {
+            env?: string;
+            query: string;
+            since?: string;
+            from?: string;
+            to?: string;
+            startTime?: string;
+            endTime?: string;
+          };
 
           if (scenario.fixtures) {
-            const cliVal = validateAxiomCLI([env ?? 'prod'], query, scenario.fixtures);
+            const cliArgs = [env ?? 'prod'];
+            if (since) {
+              cliArgs.push('--since', since);
+            } else if (from && to) {
+              cliArgs.push('--from', from, '--to', to);
+            } else if (startTime && endTime) {
+              cliArgs.push('--from', startTime, '--to', endTime);
+            }
+
+            const cliVal = validateAxiomCLI(cliArgs, query, scenario.fixtures);
             const aplVal = validateAPL(query, scenario.fixtures);
 
             if (!cliVal.valid || !aplVal.valid) {
@@ -113,7 +138,7 @@ export function createMockRouter(scenario: IncidentScenario): MockToolRouter {
             }
 
             queryValid = true;
-            const rows = executeAPL(aplVal.parsed!, scenario.fixtures);
+            const rows = executeAPL(aplVal.parsed!, scenario.fixtures, cliVal);
             const totalRows = scenario.fixtures.datasets[aplVal.parsed!.dataset]?.length ?? 0;
             output = formatAxiomOutput(rows, totalRows);
           } else {

@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# Test explicit _time enforcement in scripts/axiom-query.
+# Test explicit time-window enforcement in scripts/axiom-query.
 #
 # Usage: scripts/test-axiom-query-time-bounds
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-GILFOYLE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 TEST_DIR=$(mktemp -d)
 trap 'rm -rf "$TEST_DIR"' EXIT
 
@@ -39,9 +38,8 @@ assert_eq() {
 }
 
 cp "$SCRIPT_DIR/axiom-query" "$TEST_DIR/axiom-query"
-cp "$SCRIPT_DIR/axiom-query-has-time-bound" "$TEST_DIR/axiom-query-has-time-bound"
 cp "$SCRIPT_DIR/config" "$TEST_DIR/config"
-chmod +x "$TEST_DIR/axiom-query" "$TEST_DIR/axiom-query-has-time-bound" "$TEST_DIR/config"
+chmod +x "$TEST_DIR/axiom-query" "$TEST_DIR/config"
 
 cat > "$TEST_DIR/axiom-query-fmt" << 'EOF'
 #!/usr/bin/env bash
@@ -61,8 +59,10 @@ cat > "$TEST_DIR/curl" << 'EOF'
 set -euo pipefail
 
 log_path="${AXIOM_QUERY_TEST_CURL_LOG:?}"
+payload_path="${AXIOM_QUERY_TEST_PAYLOAD_LOG:?}"
 body_path=""
 headers_path=""
+payload=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -74,6 +74,10 @@ while [[ $# -gt 0 ]]; do
       headers_path="$2"
       shift 2
       ;;
+    -d)
+      payload="$2"
+      shift 2
+      ;;
     *)
       shift
       ;;
@@ -81,6 +85,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "called" >> "$log_path"
+printf '%s' "$payload" > "$payload_path"
 printf 'x-axiom-trace-id: test-trace\n' > "$headers_path"
 printf '{"status":"ok"}\n' > "$body_path"
 printf '200'
@@ -88,82 +93,75 @@ EOF
 chmod +x "$TEST_DIR/curl"
 
 export GILFOYLE_CONFIG="$TEST_DIR/config.toml"
-export GILFOYLE_ROOT
 export PATH="$TEST_DIR:$PATH"
 export AXIOM_QUERY_TEST_CURL_LOG="$TEST_DIR/curl.log"
+export AXIOM_QUERY_TEST_PAYLOAD_LOG="$TEST_DIR/payload.json"
 
 run_query() {
-  local query="$1"
+  local command="$1"
+  local query="$2"
   local stdout_file="$TEST_DIR/stdout"
   local stderr_file="$TEST_DIR/stderr"
   : > "$stdout_file"
   : > "$stderr_file"
   set +e
-  "$TEST_DIR/axiom-query" test --raw <<< "$query" >"$stdout_file" 2>"$stderr_file"
+  QUERY_INPUT="$query" bash -c "printf '%s' \"\$QUERY_INPUT\" | $command" >"$stdout_file" 2>"$stderr_file"
   local status=$?
   set -e
   QUERY_STDERR=$(cat "$stderr_file")
   QUERY_STATUS=$status
 }
 
-echo "=== axiom-query explicit _time tests ==="
+payload_field() {
+  jq -r "$1" "$AXIOM_QUERY_TEST_PAYLOAD_LOG"
+}
+
+echo "=== axiom-query explicit time-window tests ==="
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "['anton-inference-logs'] | where trace_id == 'abc123' | project _time"
-assert_eq "rejects unbounded id query" "1" "$QUERY_STATUS"
-assert_contains "prints explicit _time error" "explicit _time bound" "$QUERY_STDERR"
-assert_eq "does not call curl for rejected query" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+run_query "\"$TEST_DIR/axiom-query\" test --raw" "['anton-inference-logs'] | getschema"
+assert_eq "rejects missing time window" "1" "$QUERY_STATUS"
+assert_contains "prints missing time window error" "requires an explicit time window" "$QUERY_STDERR"
+assert_eq "does not call curl for missing time window" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "['anton-inference-logs'] | getschema"
-assert_eq "rejects unbounded getschema" "1" "$QUERY_STATUS"
-assert_contains "prints explicit _time error for getschema" "explicit _time bound" "$QUERY_STDERR"
-assert_eq "does not call curl for rejected getschema" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+run_query "\"$TEST_DIR/axiom-query\" test --raw" "['anton-inference-logs'] | where _time > ago(15m) | getschema"
+assert_eq "still rejects inline _time without wrapper window" "1" "$QUERY_STATUS"
+assert_contains "inline _time does not bypass wrapper contract" "requires an explicit time window" "$QUERY_STDERR"
+assert_eq "does not call curl when only inline _time is present" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "['anton-inference-logs'] | where _time > ago(15m) | getschema"
-assert_eq "allows bounded getschema" "0" "$QUERY_STATUS"
-assert_eq "calls curl for bounded getschema" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+run_query "\"$TEST_DIR/axiom-query\" test --since 15m --raw" "['anton-inference-logs'] | getschema"
+assert_eq "allows --since window" "0" "$QUERY_STATUS"
+assert_eq "calls curl for --since window" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+assert_eq "sends startTime for --since window" "now-15m" "$(payload_field '.startTime')"
+assert_eq "sends endTime for --since window" "now" "$(payload_field '.endTime')"
+assert_eq "sends apl text for --since window" "['anton-inference-logs'] | getschema" "$(payload_field '.apl')"
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "['anton-inference-logs'] | where _time > ago(1h) | where session_id == 'ses-123' | project _time"
-assert_eq "allows ago window" "0" "$QUERY_STATUS"
-assert_eq "calls curl for ago window" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+run_query "\"$TEST_DIR/axiom-query\" test --since 15m --raw" "['anton-inference-logs'] | where _time > ago(5m) | where trace_id == 'abc123' | project _time"
+assert_eq "allows inline _time plus wrapper window" "0" "$QUERY_STATUS"
+assert_eq "calls curl when inline _time and wrapper window both exist" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+assert_eq "preserves apl text when inline _time is present" "['anton-inference-logs'] | where _time > ago(5m) | where trace_id == 'abc123' | project _time" "$(payload_field '.apl')"
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "['anton-inference-logs'] | where trace_id == 'abc123' and _time > ago(1h) | project _time"
-assert_eq "allows ago window when _time is not first in where clause" "0" "$QUERY_STATUS"
-assert_eq "calls curl when _time is not first in where clause" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+run_query "\"$TEST_DIR/axiom-query\" test --from 2026-03-06T10:00:00Z --to 2026-03-06T10:30:00Z --raw" "['anton-inference-logs'] | getschema"
+assert_eq "allows absolute window" "0" "$QUERY_STATUS"
+assert_eq "calls curl for absolute window" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+assert_eq "sends explicit startTime" "2026-03-06T10:00:00Z" "$(payload_field '.startTime')"
+assert_eq "sends explicit endTime" "2026-03-06T10:30:00Z" "$(payload_field '.endTime')"
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "['anton-inference-logs'] | where message matches regex \"timeout|error\" and _time > ago(1h) | project _time"
-assert_eq "allows regex alternation before _time bound" "0" "$QUERY_STATUS"
-assert_eq "calls curl for regex alternation before _time bound" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+run_query "\"$TEST_DIR/axiom-query\" test --since 15m --from 2026-03-06T10:00:00Z --to 2026-03-06T10:30:00Z --raw" "['anton-inference-logs'] | getschema"
+assert_eq "rejects mixed relative and absolute windows" "1" "$QUERY_STATUS"
+assert_contains "prints mixed window error" "use either --since or --from/--to" "$QUERY_STDERR"
+assert_eq "does not call curl for mixed windows" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
 
 : > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "['anton-inference-logs'] | summarize spotlight(_time > ago(30m), trace_id)"
-assert_eq "rejects spotlight pseudo-bound without where filter" "1" "$QUERY_STATUS"
-assert_eq "does not call curl for spotlight pseudo-bound" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
-
-: > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "['anton-inference-logs'] | where _time >= datetime(2026-03-06T10:00:00Z) | where trace_id == 'abc123' | project _time"
-assert_eq "allows explicit datetime lower bound" "0" "$QUERY_STATUS"
-assert_eq "calls curl for explicit datetime lower bound" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
-
-: > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "['requests'] | where _time > ago(1h) | join kind=inner (['users']) on user_id"
-assert_eq "rejects join with unbounded right table" "1" "$QUERY_STATUS"
-assert_eq "does not call curl for join with unbounded right table" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
-
-: > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "union ['east'], ['west'] | where _time > ago(1h) | take 5"
-assert_eq "allows top-level union with outer _time bound" "0" "$QUERY_STATUS"
-assert_eq "calls curl for top-level union with outer _time bound" "1" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
-
-: > "$AXIOM_QUERY_TEST_CURL_LOG"
-run_query "['anton-inference-logs'] | where message == '_time > ago(1h)' | take 5"
-assert_eq "rejects string literal pseudo-bound" "1" "$QUERY_STATUS"
-assert_eq "does not call curl for string literal pseudo-bound" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
+run_query "\"$TEST_DIR/axiom-query\" test --from 2026-03-06T10:00:00Z --raw" "['anton-inference-logs'] | getschema"
+assert_eq "rejects missing --to" "1" "$QUERY_STATUS"
+assert_contains "prints absolute window hint" "requires an explicit time window" "$QUERY_STDERR"
+assert_eq "does not call curl for missing --to" "0" "$(wc -l < "$AXIOM_QUERY_TEST_CURL_LOG" | tr -d ' ')"
 
 echo ""
 echo "==========================="

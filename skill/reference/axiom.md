@@ -21,6 +21,8 @@ Summary of all operations available via Axiom API with a personal access token (
 
 **Query parameters:** `apl`, `startTime`, `endTime`, `cursor`, `includeCursor`, `queryOptions`, `variables`
 
+`scripts/axiom-query` always sets `startTime` and `endTime` from its required `--since` or `--from`/`--to` flags.
+
 ---
 
 ## Datasets

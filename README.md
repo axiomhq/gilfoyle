@@ -68,7 +68,7 @@ Auth options per deployment:
 
 ```bash
 # Query logs
-scripts/axiom-query prod "['dataset'] | where _time > ago(1h) | where status >= 500 | project _time, message, status | take 10"
+scripts/axiom-query prod --since 1h <<< "['dataset'] | where status >= 500 | project _time, message, status | take 10"
 
 # Check what's on fire
 scripts/grafana-alerts prod firing

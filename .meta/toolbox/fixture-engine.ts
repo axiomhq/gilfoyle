@@ -10,7 +10,7 @@
 
 import type { LogRow, MetricSeries, ScenarioFixtures, } from '../harness/types.js';
 import { validateAPLSyntax, validatePromQLSyntax } from './apl-validator.js';
-import { analyzeAxiomQueryTimeBounds, axiomTimeBoundError } from './axiom-time-bounds.js';
+import { parseAxiomTimeWindowArgs } from './axiom-time-bounds.js';
 
 // ─── APL Parser ──────────────────────────────────────────────────────────
 
@@ -82,13 +82,6 @@ export function validateAPL(query: string, fixtures: ScenarioFixtures): APLValid
   for (const stage of stages) {
     if (stage.type === 'raw') {
       errors.push(`Unsupported APL stage: "${stage.text}". Supported: where, summarize, take, sort, project, distinct, getschema, extend, top`);
-    }
-  }
-
-  if (errors.length === 0) {
-    const timeBoundAnalysis = analyzeAxiomQueryTimeBounds(trimmed);
-    if (timeBoundAnalysis.valid && timeBoundAnalysis.requiresTimeBound && !timeBoundAnalysis.hasExplicitTimeBound) {
-      errors.push(axiomTimeBoundError());
     }
   }
 
@@ -227,8 +220,13 @@ function parseAPLStage(text: string): APLStage {
 
 // ─── APL Executor ────────────────────────────────────────────────────────
 
-export function executeAPL(parsed: ParsedAPL, fixtures: ScenarioFixtures): LogRow[] {
+export function executeAPL(
+  parsed: ParsedAPL,
+  fixtures: ScenarioFixtures,
+  timeWindow?: Pick<CLIValidation, 'startTime' | 'endTime'>,
+): LogRow[] {
   let rows = [...(fixtures.datasets[parsed.dataset] ?? [])];
+  rows = filterRowsByTimeWindow(rows, fixtures, timeWindow);
 
   for (const stage of parsed.stages) {
     switch (stage.type) {
@@ -554,6 +552,51 @@ function valueToEpochMs(value: unknown): number | null {
   return Number.isFinite(epoch) ? epoch : null;
 }
 
+function latestFixtureEpochMs(fixtures: ScenarioFixtures): number | null {
+  let latest: number | null = null;
+  for (const rows of Object.values(fixtures.datasets)) {
+    for (const row of rows) {
+      const epoch = valueToEpochMs(row._time);
+      if (epoch == null) continue;
+      latest = latest == null ? epoch : Math.max(latest, epoch);
+    }
+  }
+  return latest;
+}
+
+function resolveTimeExpression(value: string, fixtures: ScenarioFixtures): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed === 'now') return latestFixtureEpochMs(fixtures);
+
+  const relativeMatch = trimmed.match(/^now-(.+)$/i);
+  if (relativeMatch) {
+    const now = latestFixtureEpochMs(fixtures);
+    const duration = parseDurationMs(relativeMatch[1] ?? '');
+    if (now == null || duration == null) return null;
+    return now - duration;
+  }
+
+  return valueToEpochMs(trimmed);
+}
+
+function filterRowsByTimeWindow(
+  rows: LogRow[],
+  fixtures: ScenarioFixtures,
+  timeWindow?: Pick<CLIValidation, 'startTime' | 'endTime'>,
+): LogRow[] {
+  if (!timeWindow?.startTime || !timeWindow.endTime) return rows;
+
+  const start = resolveTimeExpression(timeWindow.startTime, fixtures);
+  const end = resolveTimeExpression(timeWindow.endTime, fixtures);
+  if (start == null || end == null) return rows;
+
+  return rows.filter((row) => {
+    const epoch = valueToEpochMs(row._time);
+    return epoch != null && epoch >= start && epoch <= end;
+  });
+}
+
 function executeDistinct(rows: LogRow[], fields: string[]): LogRow[] {
   if (fields.length === 0) return [];
   const seen = new Set<string>();
@@ -776,6 +819,8 @@ export interface CLIValidation {
   deployment?: string;
   datasourceUid?: string;
   query?: string;
+  startTime?: string;
+  endTime?: string;
 }
 
 interface CLIValidationOptions {
@@ -894,15 +939,24 @@ export function validateAxiomCLI(
     errors.push('No query provided. Pipe query via stdin or pass --query/--query-file.');
   }
 
+  const timeWindowCheck = parseAxiomTimeWindowArgs(args);
+  errors.push(...timeWindowCheck.errors);
+
   // Check for invalid args
-  const validFlags = ['--raw', '--ndjson', '--full', '--trace', '--query', '--query-file'];
+  const validFlags = ['--raw', '--ndjson', '--full', '--trace', '--query', '--query-file', '--since', '--from', '--to'];
   for (let i = 1; i < args.length; i++) {
     const arg = args[i];
-    if (arg === '--query' || arg === '--query-file') {
+    if (arg === '--query' || arg === '--query-file' || arg === '--since' || arg === '--from' || arg === '--to') {
       i += 1;
       continue;
     }
-    if (arg.startsWith('--query=') || arg.startsWith('--query-file=')) {
+    if (
+      arg.startsWith('--query=')
+      || arg.startsWith('--query-file=')
+      || arg.startsWith('--since=')
+      || arg.startsWith('--from=')
+      || arg.startsWith('--to=')
+    ) {
       continue;
     }
     if (arg.startsWith('--') && !validFlags.includes(arg)) {
@@ -915,6 +969,8 @@ export function validateAxiomCLI(
     errors,
     deployment,
     query,
+    startTime: timeWindowCheck.timeWindow?.startTime,
+    endTime: timeWindowCheck.timeWindow?.endTime,
   };
 }
 
