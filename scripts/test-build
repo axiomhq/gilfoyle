@@ -27,28 +27,28 @@ fi
 
 # Test 2: axiom-sre build has no persona
 OUTPUT=$("$SCRIPT_DIR/build-skill" axiom-sre)
-if echo "$OUTPUT" | grep -q "Bertram Gilfoyle"; then
+if [[ "$OUTPUT" == *"Bertram Gilfoyle"* ]]; then
     fail "axiom-sre build contains Gilfoyle persona"
 else
     pass "axiom-sre build has no Gilfoyle persona"
 fi
 
 # Test 3: axiom-sre build has neutral intro
-if echo "$OUTPUT" | grep -q "You are an expert SRE"; then
+if [[ "$OUTPUT" == *"You are an expert SRE"* ]]; then
     pass "axiom-sre build has neutral intro"
 else
     fail "axiom-sre build missing neutral intro"
 fi
 
 # Test 4: correct frontmatter name
-if echo "$OUTPUT" | head -3 | grep -q "name: axiom-sre"; then
+if [[ "$(sed -n '1,3p' <<< "$OUTPUT")" == *"name: axiom-sre"* ]]; then
     pass "axiom-sre frontmatter name correct"
 else
     fail "axiom-sre frontmatter name wrong"
 fi
 
 # Test 5: correct memory path
-if echo "$OUTPUT" | grep -q "config/amp/memory/personal/axiom-sre"; then
+if [[ "$OUTPUT" == *"config/amp/memory/personal/axiom-sre"* ]]; then
     pass "axiom-sre memory path correct"
 else
     fail "axiom-sre memory path wrong"
@@ -56,30 +56,30 @@ fi
 
 # Test 6: gilfoyle build has correct memory path
 GILFOYLE_OUTPUT=$("$SCRIPT_DIR/build-skill" gilfoyle)
-if echo "$GILFOYLE_OUTPUT" | grep -q "config/gilfoyle/memory"; then
+if [[ "$GILFOYLE_OUTPUT" == *"config/gilfoyle/memory"* ]]; then
     pass "gilfoyle memory path correct"
 else
     fail "gilfoyle memory path wrong"
 fi
 
 # Test 7: gilfoyle build has persona
-if echo "$GILFOYLE_OUTPUT" | grep -q "Bertram Gilfoyle"; then
+if [[ "$GILFOYLE_OUTPUT" == *"Bertram Gilfoyle"* ]]; then
     pass "gilfoyle build has persona"
 else
     fail "gilfoyle build missing persona"
 fi
 
 # Test 8: no unresolved placeholders
-if echo "$OUTPUT" | grep -q '{{'; then
+if [[ "$OUTPUT" == *'{{'* ]]; then
     fail "axiom-sre build has unresolved placeholders"
-    echo "$OUTPUT" | grep '{{'
+    printf '%s\n' "$OUTPUT" | grep '{{'
 else
     pass "no unresolved placeholders in axiom-sre"
 fi
 
-if echo "$GILFOYLE_OUTPUT" | grep -q '{{'; then
+if [[ "$GILFOYLE_OUTPUT" == *'{{'* ]]; then
     fail "gilfoyle build has unresolved placeholders"
-    echo "$GILFOYLE_OUTPUT" | grep '{{'
+    printf '%s\n' "$GILFOYLE_OUTPUT" | grep '{{'
 else
     pass "no unresolved placeholders in gilfoyle"
 fi
@@ -101,7 +101,7 @@ fi
 
 # Test 11: both builds have all major sections
 for section in "Golden Rules" "MANDATORY INITIALIZATION" "EMERGENCY TRIAGE" "INVESTIGATION PROTOCOL" "CONCLUSION VALIDATION" "TOOL REFERENCE" "MEMORY SYSTEM" "APL ESSENTIALS"; do
-    if echo "$OUTPUT" | grep -q "$section"; then
+    if [[ "$OUTPUT" == *"$section"* ]]; then
         pass "axiom-sre has section: $section"
     else
         fail "axiom-sre missing section: $section"
