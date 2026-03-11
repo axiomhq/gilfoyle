@@ -141,6 +141,18 @@ PAYLOAD=$(jq -cn \
 # shellcheck disable=SC1090
 eval "$("$SCRIPT_DIR/config" axiom "$DEPLOYMENT")"
 
+# Auto-resolve edge URL
+QUERY_URL="$AXIOM_URL"
+QUERY_PATH="/v1/datasets/_apl?format=tabular"
+DATASET=$(echo "$APL" | grep -oE "^\['[^']+'\]|^\[\"[^\"]+\"\]|^\[[a-zA-Z0-9_-]+\]" | head -1 | tr -d "[]'\"" || true)
+if [[ -n "$DATASET" ]]; then
+  RESOLVED=$("$SCRIPT_DIR/resolve-url" "$DEPLOYMENT" "$DATASET" 2>/dev/null || true)
+  if [[ -n "$RESOLVED" && "$RESOLVED" != "$AXIOM_URL" ]]; then
+    QUERY_URL="$RESOLVED"
+    QUERY_PATH="/v1/query/_apl?format=tabular"
+  fi
+fi
+
 RESP_HEADERS=$(mktemp)
 RESP_BODY=$(mktemp)
 cleanup() {
@@ -150,7 +162,7 @@ trap cleanup EXIT
 
 # Execute query and pipe to formatter
 HTTP_CODE=$(curl -sS -o "$RESP_BODY" -D "$RESP_HEADERS" -w "%{http_code}" \
-  -X POST "$AXIOM_URL/v1/datasets/_apl?format=tabular" \
+  -X POST "$QUERY_URL$QUERY_PATH" \
   -H "Authorization: Bearer $AXIOM_TOKEN" \
   -H "X-Axiom-Org-Id: $AXIOM_ORG_ID" \
   -H "Content-Type: application/json" \
