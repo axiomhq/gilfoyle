@@ -44,6 +44,8 @@ REGION=$("$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X GET "${AXIOM_URL}/v1/dat
     | jq -r --arg name "$DATASET" '.[] | select(.name == $name) | .edgeDeployment // .region // empty' 2>/dev/null)
 
 if [[ -z "$REGION" || "$REGION" == "null" ]]; then
+    mkdir -p "$CACHE_DIR"
+    echo "$AXIOM_URL" > "$DATASET_CACHE"
     echo "$AXIOM_URL"
     exit 0
 fi
@@ -81,6 +83,8 @@ if [[ -n "$REGIONS_JSON" ]]; then
 fi
 
 if [[ -z "$EDGE_DOMAIN" ]]; then
+    mkdir -p "$CACHE_DIR"
+    echo "$AXIOM_URL" > "$DATASET_CACHE"
     echo "$AXIOM_URL"
     exit 0
 fi
