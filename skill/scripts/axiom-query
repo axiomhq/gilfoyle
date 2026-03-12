@@ -142,15 +142,40 @@ PAYLOAD=$(jq -cn \
 eval "$("$SCRIPT_DIR/config" axiom "$DEPLOYMENT")"
 
 # Auto-resolve edge URL
-QUERY_URL="$AXIOM_URL"
-QUERY_PATH="/v1/datasets/_apl?format=tabular"
+QUERY_URL=""
 DATASET=$(echo "$APL" | grep -oE "^\['[^']+'\]|^\[\"[^\"]+\"\]|^\[[a-zA-Z0-9_-]+\]" | head -1 | tr -d "[]'\"" || true)
 if [[ -n "$DATASET" ]]; then
   RESOLVED=$("$SCRIPT_DIR/resolve-url" "$DEPLOYMENT" "$DATASET" 2>/dev/null || true)
   if [[ -n "$RESOLVED" && "$RESOLVED" != "$AXIOM_URL" ]]; then
     QUERY_URL="$RESOLVED"
-    QUERY_PATH="/v1/query/_apl?format=tabular"
   fi
+fi
+
+CACHE_DIR="${TMPDIR:-/tmp}/axiom-edge-cache"
+REGIONS_CACHE="$CACHE_DIR/regions__${DEPLOYMENT}"
+if [[ ! -f "$REGIONS_CACHE" ]]; then
+  if [[ "$AXIOM_URL" == *"cloud.axiom.co"* ]]; then
+    APP_URL="https://app.axiom.co"
+  else
+    APP_URL="${AXIOM_URL/api./app.}"
+  fi
+  REGIONS_JSON=$("$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X GET "${APP_URL}/api/internal/regions/axiom" 2>/dev/null) || true
+  if [[ -n "$REGIONS_JSON" ]]; then
+    mkdir -p "$CACHE_DIR"
+    echo "$REGIONS_JSON" > "$REGIONS_CACHE"
+  fi
+fi
+
+# If no resolved edge URL, pick the first edge region
+if [[ -z "$QUERY_URL" && -f "$REGIONS_CACHE" ]]; then
+  QUERY_URL=$(jq -r '.axiom[0].domain // empty' "$REGIONS_CACHE" 2>/dev/null)
+fi
+
+if [[ -z "$QUERY_URL" ]]; then
+  QUERY_URL="$AXIOM_URL"
+  QUERY_PATH="/v1/datasets/_apl?format=tabular"
+else
+  QUERY_PATH="/v1/query/_apl?format=tabular"
 fi
 
 RESP_HEADERS=$(mktemp)
@@ -160,7 +185,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Execute query and pipe to formatter
+# Execute query
 HTTP_CODE=$(curl -sS -o "$RESP_BODY" -D "$RESP_HEADERS" -w "%{http_code}" \
   -X POST "$QUERY_URL$QUERY_PATH" \
   -H "Authorization: Bearer $AXIOM_TOKEN" \
@@ -170,12 +195,35 @@ HTTP_CODE=$(curl -sS -o "$RESP_BODY" -D "$RESP_HEADERS" -w "%{http_code}" \
 
 if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
   msg=$(jq -r '.message // empty' "$RESP_BODY" 2>/dev/null)
-  trace=$(grep -i '^x-axiom-trace-id:' "$RESP_HEADERS" | tail -1 | awk '{print $2}' | tr -d '\r')
-  echo "error: ${msg:-http $HTTP_CODE}" >&2
-  if [[ -n "$trace" ]]; then
-    echo "trace_id: $trace" >&2
+
+  # Try other edge region
+  RETRIED=false
+  if [[ -f "$REGIONS_CACHE" ]]; then
+    EDGE_URLS=$(jq -r '.axiom[].domain // empty' "$REGIONS_CACHE" 2>/dev/null | grep -v "^${QUERY_URL}$" || true)
+    for RETRY_URL in $EDGE_URLS; do
+      HTTP_CODE=$(curl -sS -o "$RESP_BODY" -D "$RESP_HEADERS" -w "%{http_code}" \
+        -X POST "${RETRY_URL}/v1/query/_apl?format=tabular" \
+        -H "Authorization: Bearer $AXIOM_TOKEN" \
+        -H "X-Axiom-Org-Id: $AXIOM_ORG_ID" \
+        -H "Content-Type: application/json" \
+        -d "$PAYLOAD")
+      if [[ "$HTTP_CODE" -ge 200 && "$HTTP_CODE" -lt 300 ]]; then
+        if [[ -n "$DATASET" ]]; then
+          mkdir -p "$CACHE_DIR"
+          echo "$RETRY_URL" > "$CACHE_DIR/edge__${DEPLOYMENT}__${DATASET}"
+        fi
+        RETRIED=true
+        break
+      fi
+    done
   fi
-  exit 1
+
+  if [[ "$RETRIED" != true ]]; then
+    trace=$(grep -i '^x-axiom-trace-id:' "$RESP_HEADERS" | tail -1 | awk '{print $2}' | tr -d '\r')
+    echo "error: ${msg:-http $HTTP_CODE}" >&2
+    [[ -n "${trace:-}" ]] && echo "trace_id: $trace" >&2
+    exit 1
+  fi
 fi
 
 if [[ "$PRINT_TRACE" == true ]]; then

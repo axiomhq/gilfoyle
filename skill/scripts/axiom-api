@@ -2,8 +2,8 @@
 # Axiom API helper - uses unified config
 # Usage: axiom-api <deployment> <method> <endpoint> [body]
 # Examples:
-#   axiom-api dev POST "/v1/datasets/_apl?format=tabular" '{"apl": "..."}'
 #   axiom-api dev GET "/v1/datasets"
+#   axiom-api dev GET "/v1/datasets/my-dataset"
 
 set -euo pipefail
 
@@ -20,29 +20,19 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 eval "$("$SCRIPT_DIR/config" axiom "$DEPLOYMENT")"
 
-# Auto-resolve edge URL for query and ingest endpoints
+# Auto-resolve edge URL for ingest endpoints
 REQUEST_URL="$AXIOM_URL"
 REQUEST_ENDPOINT="$ENDPOINT"
-case "$ENDPOINT" in
-  /v1/datasets/_apl*|/v1/ingest/*)
-    DATASET=""
-    if [[ "$ENDPOINT" == /v1/ingest/* ]]; then
-      DATASET="${ENDPOINT#/v1/ingest/}"
-      DATASET="${DATASET%%[?/]*}"
-    elif [[ -n "$BODY" ]]; then
-      DATASET=$(echo "$BODY" | jq -r '.apl // empty' 2>/dev/null | grep -oE "^\['[^']+'\]|^\[\"[^\"]+\"\]|^\[[a-zA-Z0-9_-]+\]" | head -1 | tr -d "[]'\"" || true)
+if [[ "$ENDPOINT" == /v1/ingest/* ]]; then
+  DATASET="${ENDPOINT#/v1/ingest/}"
+  DATASET="${DATASET%%[?/]*}"
+  if [[ -n "$DATASET" ]]; then
+    RESOLVED=$("$SCRIPT_DIR/resolve-url" "$DEPLOYMENT" "$DATASET" 2>/dev/null || true)
+    if [[ -n "$RESOLVED" && "$RESOLVED" != "$AXIOM_URL" ]]; then
+      REQUEST_URL="$RESOLVED"
     fi
-    if [[ -n "$DATASET" ]]; then
-      RESOLVED=$("$SCRIPT_DIR/resolve-url" "$DEPLOYMENT" "$DATASET" 2>/dev/null || true)
-      if [[ -n "$RESOLVED" && "$RESOLVED" != "$AXIOM_URL" ]]; then
-        REQUEST_URL="$RESOLVED"
-        if [[ "$ENDPOINT" == /v1/datasets/_apl* ]]; then
-          REQUEST_ENDPOINT="/v1/query/_apl${ENDPOINT#/v1/datasets/_apl}"
-        fi
-      fi
-    fi
-    ;;
-esac
+  fi
+fi
 
 if [[ -n "$BODY" ]]; then
   "$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X "$METHOD" -d "$BODY" "${REQUEST_URL}${REQUEST_ENDPOINT}"
