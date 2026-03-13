@@ -141,6 +141,34 @@ PAYLOAD=$(jq -cn \
 # shellcheck disable=SC1090
 eval "$("$SCRIPT_DIR/config" axiom "$DEPLOYMENT")"
 
+CACHE_DIR="${TMPDIR:-/tmp}/axiom-edge-cache"
+REGIONS_CACHE="$CACHE_DIR/regions__${DEPLOYMENT}"
+if [[ ! -f "$REGIONS_CACHE" ]]; then
+  if [[ "$AXIOM_URL" == *"cloud.axiom.co"* ]]; then
+    APP_URL="https://app.axiom.co"
+  else
+    APP_URL="${AXIOM_URL/api./app.}"
+  fi
+  REGIONS_JSON=$("$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X GET "${APP_URL}/api/internal/regions/axiom" 2>/dev/null) || true
+  if [[ -n "$REGIONS_JSON" ]]; then
+    mkdir -p "$CACHE_DIR"
+    echo "$REGIONS_JSON" > "$REGIONS_CACHE"
+  fi
+fi
+
+LAST_EDGE_CACHE="$CACHE_DIR/last-edge__${DEPLOYMENT}"
+if [[ -f "$LAST_EDGE_CACHE" ]]; then
+  FIRST_EDGE=$(cat "$LAST_EDGE_CACHE")
+elif [[ -f "$REGIONS_CACHE" ]]; then
+  FIRST_EDGE=$(jq -r '.axiom[] | select(.environmentDefault == true) | .domain // empty' "$REGIONS_CACHE" 2>/dev/null)
+fi
+EDGE_URLS="${FIRST_EDGE:-}"
+if [[ -f "$REGIONS_CACHE" ]]; then
+  OTHER_URLS=$(jq -r '.axiom[].domain // empty' "$REGIONS_CACHE" 2>/dev/null | grep -v "^${FIRST_EDGE:-}$" || true)
+  EDGE_URLS="$EDGE_URLS
+$OTHER_URLS"
+fi
+
 RESP_HEADERS=$(mktemp)
 RESP_BODY=$(mktemp)
 cleanup() {
@@ -148,21 +176,26 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Execute query and pipe to formatter
-HTTP_CODE=$(curl -sS -o "$RESP_BODY" -D "$RESP_HEADERS" -w "%{http_code}" \
-  -X POST "$AXIOM_URL/v1/datasets/_apl?format=tabular" \
-  -H "Authorization: Bearer $AXIOM_TOKEN" \
-  -H "X-Axiom-Org-Id: $AXIOM_ORG_ID" \
-  -H "Content-Type: application/json" \
-  -d "$PAYLOAD")
+QUERY_OK=false
+for QUERY_URL in $EDGE_URLS; do
+  HTTP_CODE=$(curl -sS -o "$RESP_BODY" -D "$RESP_HEADERS" -w "%{http_code}" \
+    -X POST "${QUERY_URL}/v1/query/_apl?format=tabular" \
+    -H "Authorization: Bearer $AXIOM_TOKEN" \
+    -H "X-Axiom-Org-Id: $AXIOM_ORG_ID" \
+    -H "Content-Type: application/json" \
+    -d "$PAYLOAD")
+  if [[ "$HTTP_CODE" -ge 200 && "$HTTP_CODE" -lt 300 ]]; then
+    echo "$QUERY_URL" > "$LAST_EDGE_CACHE"
+    QUERY_OK=true
+    break
+  fi
+done
 
-if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
+if [[ "$QUERY_OK" != true ]]; then
   msg=$(jq -r '.message // empty' "$RESP_BODY" 2>/dev/null)
   trace=$(grep -i '^x-axiom-trace-id:' "$RESP_HEADERS" | tail -1 | awk '{print $2}' | tr -d '\r')
   echo "error: ${msg:-http $HTTP_CODE}" >&2
-  if [[ -n "$trace" ]]; then
-    echo "trace_id: $trace" >&2
-  fi
+  [[ -n "${trace:-}" ]] && echo "trace_id: $trace" >&2
   exit 1
 fi
 
