@@ -20,9 +20,9 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 eval "$("$SCRIPT_DIR/config" axiom "$DEPLOYMENT")"
 
-# Auto-resolve edge URL for ingest endpoints
+# edge URL for ingest endpoints
 REQUEST_URL="$AXIOM_URL"
-REQUEST_ENDPOINT="$ENDPOINT"
+
 if [[ "$ENDPOINT" == /v1/ingest/* ]]; then
   DATASET="${ENDPOINT#/v1/ingest/}"
   DATASET="${DATASET%%[?/]*}"
@@ -35,7 +35,7 @@ if [[ "$ENDPOINT" == /v1/ingest/* ]]; then
 fi
 
 if [[ -n "$BODY" ]]; then
-  "$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X "$METHOD" -d "$BODY" "${REQUEST_URL}${REQUEST_ENDPOINT}"
+  "$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X "$METHOD" -d "$BODY" "${REQUEST_URL}${ENDPOINT}"
 else
-  "$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X "$METHOD" "${REQUEST_URL}${REQUEST_ENDPOINT}"
+  "$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X "$METHOD" "${REQUEST_URL}${ENDPOINT}"
 fi

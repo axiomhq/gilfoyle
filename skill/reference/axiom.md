@@ -3,7 +3,7 @@
 Summary of all operations available via Axiom API.
 
 **Base URL:** `https://api.axiom.co` (for management endpoints)  
-**Query & Ingest URL:** Auto-resolved per dataset via `scripts/resolve-url`
+**Query & Ingest URL:** Use edge deployment domain (e.g., `https://us-east-1.aws.edge.axiom.co`)
 
 **Authentication:**
 - `Authorization: Bearer $API_TOKEN` — use an advanced API token with minimal privileges
@@ -14,8 +14,8 @@ Summary of all operations available via Axiom API.
 
 | Operation | Endpoint | Description |
 |-----------|----------|-------------|
-| Run APL query | `POST /v1/datasets/_apl?format=tabular` | Execute APL query with tabular output |
-| Run APL query (legacy) | `POST /v1/datasets/_apl?format=legacy` | Execute APL query with legacy output |
+| Run APL query (edge) | `POST /v1/query/_apl?format=tabular` | Execute APL query with tabular output |
+| Run APL query (legacy) | `POST /v1/query/_apl?format=legacy` | Execute APL query with legacy output |
 | Run query (legacy) | `POST /v1/datasets/{dataset_name}/query` | Legacy query endpoint with filter/aggregation model |
 
 **Query parameters:** `apl`, `startTime`, `endTime`, `cursor`, `includeCursor`, `queryOptions`, `variables`
