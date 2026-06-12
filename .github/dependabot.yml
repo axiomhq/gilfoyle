@@ -1,0 +1,9 @@
+version: 2
+updates:
+  - package-ecosystem: "npm" # also covers bun.lock
+    directory: "/.meta"
+    schedule:
+      interval: "weekly"
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]

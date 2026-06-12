@@ -23,22 +23,22 @@
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.37",
     "@ai-sdk/google": "3.0.24",
-    "@ai-sdk/openai": "^2.0.0",
-    "@ai-sdk/xai": "^1.0.0",
-    "@anthropic-ai/claude-agent-sdk": "^0.2.31",
+    "@ai-sdk/openai": "^2.0.107",
+    "@ai-sdk/xai": "^1.2.18",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.141",
     "@anthropic-ai/sdk": "0.73.0",
     "@mariozechner/pi-ai": "0.55.1",
     "@mariozechner/pi-coding-agent": "0.55.1",
     "@openai/codex-sdk": "0.101.0",
-    "@opencode-ai/sdk": "^1.1.53",
+    "@opencode-ai/sdk": "^1.17.4",
     "@sourcegraph/amp-sdk": "0.1.0-20260205201419-gbab39ed",
-    "ai": "^6.0.0",
-    "axiom": "^0.38.0",
-    "zod": "^3.23.0"
+    "ai": "^6.0.203",
+    "axiom": "^0.38.1",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.14",
-    "@types/node": "^22.0.0",
-    "typescript": "^5.7.0"
+    "@types/node": "^22.19.21",
+    "typescript": "^5.9.3"
   }
 }

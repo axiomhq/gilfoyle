@@ -67,14 +67,14 @@ Summary view shows: Samples, Range, **Min/Max with timestamps**, Avg
 
 ## Integration with Axiom
 
-Use Grafana alongside Axiom queries for complete incident investigation. Axiom provides logs, Grafana provides infrastructure metrics.
+Grafana covers Prometheus-native metrics not shipped to Axiom and provides alerts/dashboards. For OTel metrics (application and infrastructure), Axiom MetricsDB (`[MPL]` datasets) is available.
 
-### Typical Workflow
+### Available Data Sources
 
-1. **Axiom**: Find errors/anomalies in application logs
-2. **Grafana**: Correlate with infrastructure metrics from Prometheus
-3. **Grafana**: Check what alerts fired during the incident window
-4. **Pyroscope**: If CPU/memory issue, get flame graphs
+- **Axiom MetricsDB**: OTel metrics — application and infrastructure (MPL)
+- **Axiom EventDB**: Logs, traces, error events (APL)
+- **Grafana**: Prometheus-native metrics, alerts, dashboards
+- **Pyroscope**: CPU and memory flame graphs
 
 ### Example: Investigating High Latency
 
