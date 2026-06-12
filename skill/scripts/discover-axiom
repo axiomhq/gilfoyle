@@ -64,7 +64,9 @@ get_catalog() {
     local data
     data=$("$SCRIPT_DIR/axiom-api" "$dep" GET "/v1/datasets" 2>/dev/null || echo "")
 
-    if [[ -n "$data" ]]; then
+    # Only cache valid JSON arrays. Error payloads (objects or plain text)
+    # must not poison the cache and mask a healthy org for the full TTL.
+    if [[ -n "$data" ]] && printf '%s' "$data" | jq -e 'type == "array"' >/dev/null 2>&1; then
         mkdir -p "$CACHE_DIR/$dep"
         local tmp_file="$cache_file.tmp.$$"
         printf '%s' "$data" > "$tmp_file"
