@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# resolve-url: Resolve the regional edge URL for a dataset
+#
+# Usage: resolve-url <deployment> <dataset>
+#
+# Two-step resolution:
+#   1. GET /v1/datasets → find dataset's region (e.g. cloud.us-east-1.aws)
+#   2. GET /api/internal/regions/axiom → map region to edge domain
+#
+# Both steps are cached to avoid repeated API calls.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+DEPLOYMENT="${1:-}"
+DATASET="${2:-}"
+
+if [[ -z "$DEPLOYMENT" || -z "$DATASET" ]]; then
+    echo "Usage: resolve-url <deployment> <dataset>" >&2
+    exit 1
+fi
+
+CACHE_DIR="${TMPDIR:-/tmp}/axiom-edge-cache"
+
+# Check dataset edge URL cache (valid for 1 hour)
+DATASET_CACHE="$CACHE_DIR/edge__${DEPLOYMENT}__${DATASET}"
+if [[ -f "$DATASET_CACHE" ]]; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        AGE=$(( $(date +%s) - $(stat -f %m "$DATASET_CACHE") ))
+    else
+        AGE=$(( $(date +%s) - $(stat -c %Y "$DATASET_CACHE") ))
+    fi
+    if [[ $AGE -lt 3600 ]]; then
+        cat "$DATASET_CACHE"
+        exit 0
+    fi
+fi
+
+eval "$("$SCRIPT_DIR/config" axiom "$DEPLOYMENT")"
+
+# Step 1: get dataset region
+REGION=$("$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X GET "${AXIOM_URL}/v1/datasets" \
+    | jq -r --arg name "$DATASET" '.[] | select(.name == $name) | .edgeDeployment // .region // empty' 2>/dev/null)
+
+if [[ -z "$REGION" || "$REGION" == "null" ]]; then
+    mkdir -p "$CACHE_DIR"
+    echo "$AXIOM_URL" > "$DATASET_CACHE"
+    echo "$AXIOM_URL"
+    exit 0
+fi
+
+# Step 2: look up edge domain from regions API (cached 24h per deployment)
+REGIONS_CACHE="$CACHE_DIR/regions__${DEPLOYMENT}"
+REGIONS_JSON=""
+if [[ -f "$REGIONS_CACHE" ]]; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        AGE=$(( $(date +%s) - $(stat -f %m "$REGIONS_CACHE") ))
+    else
+        AGE=$(( $(date +%s) - $(stat -c %Y "$REGIONS_CACHE") ))
+    fi
+    if [[ $AGE -lt 86400 ]]; then
+        REGIONS_JSON=$(cat "$REGIONS_CACHE")
+    fi
+fi
+
+if [[ -z "$REGIONS_JSON" ]]; then
+    if [[ "$AXIOM_URL" == *"cloud.axiom.co"* ]]; then
+        APP_URL="https://app.axiom.co"
+    else
+        APP_URL="${AXIOM_URL/api./app.}"
+    fi
+    REGIONS_JSON=$("$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X GET "${APP_URL}/api/internal/regions/axiom" 2>/dev/null) || true
+    if [[ -n "$REGIONS_JSON" ]]; then
+        mkdir -p "$CACHE_DIR"
+        echo "$REGIONS_JSON" > "$REGIONS_CACHE"
+    fi
+fi
+
+EDGE_DOMAIN=""
+if [[ -n "$REGIONS_JSON" ]]; then
+    EDGE_DOMAIN=$(echo "$REGIONS_JSON" | jq -r --arg region "$REGION" '.axiom[] | select(.id == $region) | .domain // empty' 2>/dev/null)
+fi
+
+if [[ -z "$EDGE_DOMAIN" ]]; then
+    mkdir -p "$CACHE_DIR"
+    echo "$AXIOM_URL" > "$DATASET_CACHE"
+    echo "$AXIOM_URL"
+    exit 0
+fi
+
+# Cache the resolved edge URL
+mkdir -p "$CACHE_DIR"
+if [[ "$EDGE_DOMAIN" != https://* ]]; then
+    EDGE_DOMAIN="https://${EDGE_DOMAIN}"
+fi
+echo "$EDGE_DOMAIN" > "$DATASET_CACHE"
+
+echo "$EDGE_DOMAIN"

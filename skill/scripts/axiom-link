@@ -37,10 +37,10 @@ fi
 # Derive web UI URL from configured API URL
 # Replace "api." with "app." in the domain
 # Examples:
+#   https://api.axiom.co → https://app.axiom.co
 #   https://api.staging.axiom.co → https://app.staging.axiom.co
 #   https://api.dev.axiom.co → https://app.dev.axiom.co
 #   https://cloud.axiom.co → https://app.axiom.co
-#   https://api.axiom.co → https://app.axiom.co
 if [[ "$URL" == *"cloud.axiom.co"* ]]; then
   BASE_URL="https://app.axiom.co"
 elif [[ "$URL" == https://api.* ]]; then
