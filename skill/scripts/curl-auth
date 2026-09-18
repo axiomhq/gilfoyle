@@ -81,12 +81,16 @@ run_curl() {
 case "$TOOL" in
     grafana)
         if [[ -n "${GRAFANA_ACCESS_CMD:-}" ]]; then
-            # cloudflared access curl requires URL as the first positional argument
+            # cloudflared access curl requires URL as the first positional argument.
+            # Cloudflare Access only proves who you are to the tunnel, so a Grafana
+            # instance that also wants an API token still needs the bearer header here.
+            access_args=($GRAFANA_ACCESS_CMD "$URL")
+            [[ -n "${GRAFANA_TOKEN:-}" ]] && access_args+=(-H "Authorization: Bearer $GRAFANA_TOKEN")
+            access_args+=(--connect-timeout 10 --max-time 30)
             if [[ -n "$DATA" ]]; then
-                $GRAFANA_ACCESS_CMD "$URL" -s -X "$METHOD" -H "Content-Type: application/json" -d "$DATA" "$@"
-            else
-                $GRAFANA_ACCESS_CMD "$URL" -s "$@"
+                access_args+=(-X "$METHOD" -H "Content-Type: application/json" -d "$DATA")
             fi
+            "${access_args[@]}" -s "$@"
         elif [[ -n "${GRAFANA_CF_ACCESS_CLIENT_ID:-}" && -n "${GRAFANA_CF_ACCESS_CLIENT_SECRET:-}" ]]; then
             curl "${CURL_ARGS[@]}" \
                 -H "CF-Access-Client-Id: $GRAFANA_CF_ACCESS_CLIENT_ID" \
