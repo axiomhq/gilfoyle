@@ -151,6 +151,25 @@ CF_ACCESS_CLIENT_SECRET=$(extract_value "$SECTION" "cf_access_client_secret")
 USERNAME=$(extract_value "$SECTION" "username")
 PASSWORD=$(extract_value "$SECTION" "password")
 
+# Preserve existing double-quoted assignment escapes without evaluating values.
+emit_assignment() {
+    local name="$1" remaining="$2" decoded="" character
+    while [[ -n "$remaining" ]]; do
+        character="${remaining:0:1}"
+        remaining="${remaining:1}"
+        if [[ "$character" == '\' ]]; then
+            case "${remaining:0:1}" in
+                '\'|'$'|'`'|'"')
+                    character="${remaining:0:1}"
+                    remaining="${remaining:1}"
+                    ;;
+            esac
+        fi
+        decoded+="$character"
+    done
+    printf '%s=%q\n' "$name" "$decoded"
+}
+
 # Tool-specific handling
 case "$TOOL" in
     axiom)
@@ -164,9 +183,9 @@ case "$TOOL" in
             echo "Hint: Run scripts/init to discover available resources." >&2
             exit 1
         fi
-        echo "AXIOM_URL=\"$URL\""
-        echo "AXIOM_TOKEN=\"$TOKEN\""
-        echo "AXIOM_ORG_ID=\"$ORG_ID\""
+        emit_assignment AXIOM_URL "$URL"
+        emit_assignment AXIOM_TOKEN "$TOKEN"
+        emit_assignment AXIOM_ORG_ID "$ORG_ID"
         ;;
     
     grafana)
@@ -180,14 +199,14 @@ case "$TOOL" in
             echo "Hint: Run scripts/init to discover available resources." >&2
             exit 1
         fi
-        echo "GRAFANA_URL=\"$URL\""
-        [[ -n "$TOKEN" ]] && echo "GRAFANA_TOKEN=\"$TOKEN\"" || true
-        [[ -n "$ORG_ID" ]] && echo "GRAFANA_ORG_ID=\"$ORG_ID\"" || true
-        [[ -n "$ACCESS_CMD" ]] && echo "GRAFANA_ACCESS_CMD=\"$ACCESS_CMD\"" || true
-        [[ -n "$CF_ACCESS_CLIENT_ID" ]] && echo "GRAFANA_CF_ACCESS_CLIENT_ID=\"$CF_ACCESS_CLIENT_ID\"" || true
-        [[ -n "$CF_ACCESS_CLIENT_SECRET" ]] && echo "GRAFANA_CF_ACCESS_CLIENT_SECRET=\"$CF_ACCESS_CLIENT_SECRET\"" || true
-        [[ -n "$USERNAME" ]] && echo "GRAFANA_USERNAME=\"$USERNAME\"" || true
-        [[ -n "$PASSWORD" ]] && echo "GRAFANA_PASSWORD=\"$PASSWORD\"" || true
+        emit_assignment GRAFANA_URL "$URL"
+        [[ -n "$TOKEN" ]] && emit_assignment GRAFANA_TOKEN "$TOKEN" || true
+        [[ -n "$ORG_ID" ]] && emit_assignment GRAFANA_ORG_ID "$ORG_ID" || true
+        [[ -n "$ACCESS_CMD" ]] && emit_assignment GRAFANA_ACCESS_CMD "$ACCESS_CMD" || true
+        [[ -n "$CF_ACCESS_CLIENT_ID" ]] && emit_assignment GRAFANA_CF_ACCESS_CLIENT_ID "$CF_ACCESS_CLIENT_ID" || true
+        [[ -n "$CF_ACCESS_CLIENT_SECRET" ]] && emit_assignment GRAFANA_CF_ACCESS_CLIENT_SECRET "$CF_ACCESS_CLIENT_SECRET" || true
+        [[ -n "$USERNAME" ]] && emit_assignment GRAFANA_USERNAME "$USERNAME" || true
+        [[ -n "$PASSWORD" ]] && emit_assignment GRAFANA_PASSWORD "$PASSWORD" || true
         ;;
     
     pyroscope)
@@ -200,13 +219,13 @@ case "$TOOL" in
             echo "Hint: Run scripts/init to discover available resources." >&2
             exit 1
         fi
-        echo "PYROSCOPE_URL=\"$URL\""
-        [[ -n "$TOKEN" ]] && echo "PYROSCOPE_TOKEN=\"$TOKEN\"" || true
-        [[ -n "$ACCESS_CMD" ]] && echo "PYROSCOPE_ACCESS_CMD=\"$ACCESS_CMD\"" || true
-        [[ -n "$CF_ACCESS_CLIENT_ID" ]] && echo "PYROSCOPE_CF_ACCESS_CLIENT_ID=\"$CF_ACCESS_CLIENT_ID\"" || true
-        [[ -n "$CF_ACCESS_CLIENT_SECRET" ]] && echo "PYROSCOPE_CF_ACCESS_CLIENT_SECRET=\"$CF_ACCESS_CLIENT_SECRET\"" || true
-        [[ -n "$USERNAME" ]] && echo "PYROSCOPE_USERNAME=\"$USERNAME\"" || true
-        [[ -n "$PASSWORD" ]] && echo "PYROSCOPE_PASSWORD=\"$PASSWORD\"" || true
+        emit_assignment PYROSCOPE_URL "$URL"
+        [[ -n "$TOKEN" ]] && emit_assignment PYROSCOPE_TOKEN "$TOKEN" || true
+        [[ -n "$ACCESS_CMD" ]] && emit_assignment PYROSCOPE_ACCESS_CMD "$ACCESS_CMD" || true
+        [[ -n "$CF_ACCESS_CLIENT_ID" ]] && emit_assignment PYROSCOPE_CF_ACCESS_CLIENT_ID "$CF_ACCESS_CLIENT_ID" || true
+        [[ -n "$CF_ACCESS_CLIENT_SECRET" ]] && emit_assignment PYROSCOPE_CF_ACCESS_CLIENT_SECRET "$CF_ACCESS_CLIENT_SECRET" || true
+        [[ -n "$USERNAME" ]] && emit_assignment PYROSCOPE_USERNAME "$USERNAME" || true
+        [[ -n "$PASSWORD" ]] && emit_assignment PYROSCOPE_PASSWORD "$PASSWORD" || true
         ;;
 
     sentry)
@@ -224,10 +243,10 @@ case "$TOOL" in
         if [[ -z "$URL" ]]; then
             URL="https://sentry.io"
         fi
-        echo "SENTRY_URL=\"$URL\""
-        [[ -n "$TOKEN" ]] && echo "SENTRY_TOKEN=\"$TOKEN\"" || true
-        [[ -n "$SENTRY_ORG_SLUG" ]] && echo "SENTRY_ORG_SLUG=\"$SENTRY_ORG_SLUG\"" || true
-        [[ -n "$SENTRY_PROJECT_SLUG" ]] && echo "SENTRY_PROJECT_SLUG=\"$SENTRY_PROJECT_SLUG\"" || true
+        emit_assignment SENTRY_URL "$URL"
+        [[ -n "$TOKEN" ]] && emit_assignment SENTRY_TOKEN "$TOKEN" || true
+        [[ -n "$SENTRY_ORG_SLUG" ]] && emit_assignment SENTRY_ORG_SLUG "$SENTRY_ORG_SLUG" || true
+        [[ -n "$SENTRY_PROJECT_SLUG" ]] && emit_assignment SENTRY_PROJECT_SLUG "$SENTRY_PROJECT_SLUG" || true
         ;;
     
     slack)
@@ -240,7 +259,7 @@ case "$TOOL" in
             echo "Hint: Run scripts/init to discover available resources." >&2
             exit 1
         fi
-        echo "SLACK_TOKEN=\"$TOKEN\""
+        emit_assignment SLACK_TOKEN "$TOKEN"
         ;;
     
     *)

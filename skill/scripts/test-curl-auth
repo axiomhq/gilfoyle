@@ -147,4 +147,18 @@ result=$("$SCRIPT_DIR/slack" 2>&1 || true)
 [[ "$result" != *"xoxb-test"* ]] && echo "OK" || { echo "FAIL: token leaked"; exit 1; }
 
 echo ""
+echo "=== Literal credentials reach curl unchanged ==="
+export CONFIG_TEST_MARKER="$TEST_DIR/command-ran"
+credential='literal-$(touch $CONFIG_TEST_MARKER)-`touch $CONFIG_TEST_MARKER`'
+cat >> "$GILFOYLE_CONFIG" <<EOF
+[grafana.deployments.literal]
+url = "http://localhost:3000"
+token = "$credential"
+EOF
+result=$("$SCRIPT_DIR/curl-auth" grafana literal "http://localhost:3000/api/health" --compressed)
+[[ "$result" == *"Authorization: Bearer $credential"* ]] || { echo "FAIL: credential changed"; exit 1; }
+[[ ! -e "$CONFIG_TEST_MARKER" ]] || { echo "FAIL: config executed a command"; exit 1; }
+[[ "$result" == *"http://localhost:3000/api/health --compressed"* ]] || { echo "FAIL: URL or curl options changed"; exit 1; }
+echo "OK: literal credential, HTTP URL and curl options preserved"
+
 echo "=== All tests passed ==="

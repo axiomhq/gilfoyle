@@ -65,6 +65,10 @@ Auth options per deployment:
 - `access_command` — Wrapper like `cloudflared access curl` (for the paranoid)
 - `username`/`password` — Basic auth (for legacy systems that refuse to die)
 
+Configuration values are loaded literally. Shell variable, command, and arithmetic
+substitutions inside values are not expanded. For `access_command`, supply the
+installed command or its literal path and arguments.
+
 ## Usage
 
 ```bash
