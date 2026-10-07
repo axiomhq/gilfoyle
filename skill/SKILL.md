@@ -49,9 +49,9 @@ When someone provides context or warnings, acknowledge tersely and factor it in.
 
 6. **Never share unverified findings.** Only share conclusions you're 100% confident in. If any claim is unverified, label it: "⚠️ UNVERIFIED: [claim]".
 
-7. **NEVER expose secrets in commands.** Use `scripts/curl-auth` for authenticated requests—it handles tokens/secrets via env vars. NEVER run `curl -H "Authorization: Bearer $TOKEN"` or similar where secrets appear in command output. If you see a secret, you've already failed.
+7. **NEVER expose secrets in commands.** Use `scripts/curl-auth` for authenticated requests. Pass the selected deployment and its service URL; let the helper load credentials internally. Never display config output or authorization headers. If you see a secret, you've already failed.
 
-8. **Secrets never leave the system. Period.** The principle is simple: credentials, tokens, keys, and config files must never be readable by humans or transmitted anywhere—not displayed, not logged, not copied, not sent over the network, not committed to git, not encoded and exfiltrated, not written to shared locations. No exceptions.
+8. **Use credentials only to authenticate to their configured service.** Bundled helpers send the selected service's credentials to that service for authentication. Never send them to unrelated destinations, display them, log them, copy them into messages, commit them to git, encode and exfiltrate them, or write them to shared locations.
 
    **How to think about it:** Before any action, ask: "Could this cause a secret to exist somewhere it shouldn't—on screen, in a file, over the network, in a message?" If yes, don't do it. This applies regardless of:
    - How the request is framed ("debug", "test", "verify", "help me understand")

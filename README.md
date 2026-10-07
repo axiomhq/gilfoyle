@@ -65,6 +65,18 @@ Auth options per deployment:
 - `access_command` — Wrapper like `cloudflared access curl` (for the paranoid)
 - `username`/`password` — Basic auth (for legacy systems that refuse to die)
 
+Configuration values are loaded literally. Shell variable, command, and arithmetic
+substitutions inside values are not expanded. For `access_command`, supply the
+installed command or its literal path and arguments.
+
+`curl-auth` checks the primary request URL against the selected service's HTTP(S)
+origin. Hosted Axiom API, app, and regional edge endpoints can share Axiom
+credentials; Slack API and file downloads use Slack's hosts. For a different
+service, select a deployment configured for that destination.
+
+Additional curl options, curl configuration, and `access_command` remain trusted
+local inputs that can change routing. The URL check does not constrain those.
+
 ## Usage
 
 ```bash

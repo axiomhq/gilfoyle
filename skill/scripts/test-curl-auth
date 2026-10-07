@@ -147,4 +147,71 @@ result=$("$SCRIPT_DIR/slack" 2>&1 || true)
 [[ "$result" != *"xoxb-test"* ]] && echo "OK" || { echo "FAIL: token leaked"; exit 1; }
 
 echo ""
+echo "=== Literal credentials reach curl unchanged ==="
+export CONFIG_TEST_MARKER="$TEST_DIR/command-ran"
+credential='literal-$(touch $CONFIG_TEST_MARKER)-`touch $CONFIG_TEST_MARKER`'
+cat >> "$GILFOYLE_CONFIG" <<EOF
+[grafana.deployments.literal]
+url = "http://localhost:3000"
+token = "$credential"
+EOF
+result=$("$SCRIPT_DIR/curl-auth" grafana literal "http://localhost:3000/api/health" --compressed)
+[[ "$result" == *"Authorization: Bearer $credential"* ]] || { echo "FAIL: credential changed"; exit 1; }
+[[ ! -e "$CONFIG_TEST_MARKER" ]] || { echo "FAIL: config executed a command"; exit 1; }
+[[ "$result" == *"http://localhost:3000/api/health --compressed"* ]] || { echo "FAIL: URL or curl options changed"; exit 1; }
+echo "OK: literal credential, HTTP URL and curl options preserved"
+
+echo "=== Requests stay on the selected primary destination ==="
+cat >> "$GILFOYLE_CONFIG" <<EOF
+[axiom.deployments.hosted]
+url = "https://api.axiom.co"
+token = "dummy-token"
+org_id = "dummy-org"
+[grafana.deployments.ipv6]
+url = "http://[::1]:3000/grafana"
+[grafana.deployments.wrapped]
+url = "https://grafana.test"
+access_command = "$TEST_DIR/auth-wrapper --example"
+EOF
+cat > "$TEST_DIR/auth-wrapper" <<'EOF'
+#!/bin/bash
+echo "WRAPPER_ARGS: $*"
+EOF
+chmod +x "$TEST_DIR/auth-wrapper"
+
+result=$("$SCRIPT_DIR/curl-auth" grafana test "HTTPS://GRAFANA.TEST:443/api/health" --compressed -H 'X-Test: unchanged')
+[[ "$result" == *"--compressed -H X-Test: unchanged"* ]] || { echo "FAIL: normal curl options changed"; exit 1; }
+"$SCRIPT_DIR/curl-auth" grafana ipv6 "http://[::1]:3000/api/health" >/dev/null
+"$SCRIPT_DIR/curl-auth" axiom hosted "https://eu-central-1.aws.edge.axiom.co/v1/query/_mpl" >/dev/null
+"$SCRIPT_DIR/curl-auth" slack test "https://files.slack.com/files-pri/example" -o "$TEST_DIR/file" >/dev/null
+result=$("$SCRIPT_DIR/curl-auth" grafana wrapped "https://grafana.test/api/health")
+[[ "$result" == "WRAPPER_ARGS: --example https://grafana.test/api/health -s" ]] || { echo "FAIL: wrapper arguments changed"; exit 1; }
+echo "OK: configured origins, Axiom edges, Slack files and wrappers work"
+
+for target in \
+    'https://unrelated.invalid/api/health' \
+    'https://grafana.test.unrelated.invalid/api/health' \
+    'https://grafana.test@unrelated.invalid/api/health' \
+    'https://grafana.test:444/api/health' \
+    'http://grafana.test/api/health'; do
+    if result=$("$SCRIPT_DIR/curl-auth" grafana test "$target" 2>&1); then
+        echo "FAIL: accepted a different primary destination"
+        exit 1
+    fi
+    [[ "$result" != *CURL_ARGS:* && "$result" != *WRAPPER_ARGS:* ]] || { echo "FAIL: request ran before validation"; exit 1; }
+done
+for request in 'grafana wrapped' 'slack test' 'axiom hosted' 'axiom test'; do
+    read -r tool deployment <<< "$request"
+    if result=$("$SCRIPT_DIR/curl-auth" "$tool" "$deployment" "https://unrelated.invalid/path" 2>&1); then
+        echo "FAIL: accepted an unrelated service"
+        exit 1
+    fi
+    [[ "$result" != *CURL_ARGS:* && "$result" != *WRAPPER_ARGS:* ]] || { echo "FAIL: request ran before validation"; exit 1; }
+done
+if "$SCRIPT_DIR/curl-auth" axiom test "https://eu-central-1.aws.edge.axiom.co/v1/query/_mpl" >/dev/null 2>&1; then
+    echo "FAIL: private deployment credentials reached a hosted edge"
+    exit 1
+fi
+echo "OK: unrelated primary destinations rejected before requests"
+
 echo "=== All tests passed ==="

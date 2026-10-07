@@ -6,8 +6,7 @@ Summary of all operations available via Axiom API with a personal access token (
 **Ingest URL:** Use edge deployment domain (e.g., `https://us-east-1.aws.edge.axiom.co`)
 
 **Authentication:**
-- PAT: `Authorization: Bearer $PAT` + `x-axiom-org-id: $ORG_ID`
-- API Token: `Authorization: Bearer $API_TOKEN`
+Use `scripts/axiom-api` or `scripts/curl-auth axiom <deployment> <url>` with the configured Axiom service URL. These helpers load the selected deployment's token and organization internally; do not read or construct authorization headers in the agent conversation.
 
 ---
 

@@ -233,6 +233,63 @@ result=$("$SCRIPT_DIR/config" --list slack)
 assert_eq "lists default workspace (indented)" "default" "$result"
 
 echo ""
+echo "=== config values are data, not shell commands ==="
+export CONFIG_TEST_MARKER="$TEST_DIR/command-ran"
+credential='literal-$(touch $CONFIG_TEST_MARKER)-`touch $CONFIG_TEST_MARKER`'
+cat > "$TEST_DIR/literal.toml" <<EOF
+[axiom.deployments.test]
+url = "http://localhost:8080"
+token = "$credential"
+org_id = "org-test"
+[grafana.deployments.test]
+url = "http://localhost:3000"
+token = "$credential"
+access_command = "cloudflared access curl"
+[pyroscope.deployments.test]
+url = "https://profiles.example.test"
+username = "test-user"
+password = "$credential"
+[sentry.deployments.test]
+token = "$credential"
+[slack.workspaces.test]
+token = "$credential"
+EOF
+export GILFOYLE_CONFIG="$TEST_DIR/literal.toml"
+for pair in axiom:AXIOM_TOKEN grafana:GRAFANA_TOKEN pyroscope:PYROSCOPE_PASSWORD sentry:SENTRY_TOKEN slack:SLACK_TOKEN; do
+    tool="${pair%%:*}"
+    field="${pair#*:}"
+    result=$(eval "$("$SCRIPT_DIR/config" "$tool" test)" && printf '%s' "${!field}")
+    assert_eq "$tool preserves literal credential" "$credential" "$result"
+done
+assert_eq "loading config does not execute substitutions" "absent" "$(if [[ -e "$CONFIG_TEST_MARKER" ]]; then echo present; else echo absent; fi)"
+result=$(eval "$("$SCRIPT_DIR/config" axiom test)" && printf '%s' "$AXIOM_URL")
+assert_eq "existing HTTP deployment remains supported" "http://localhost:8080" "$result"
+result=$(eval "$("$SCRIPT_DIR/config" grafana test)" && printf '%s' "$GRAFANA_ACCESS_CMD")
+assert_eq "access wrapper arguments are preserved" "cloudflared access curl" "$result"
+result=$(eval "$("$SCRIPT_DIR/config" sentry test)" && printf '%s' "$SENTRY_URL")
+assert_eq "Sentry default URL is preserved" "https://sentry.io" "$result"
+
+cat > "$TEST_DIR/optional.toml" <<'EOF'
+[grafana.deployments.test]
+url = "https://grafana.example.test"
+EOF
+export GILFOYLE_CONFIG="$TEST_DIR/optional.toml"
+result=$(GRAFANA_TOKEN=inherited-token; eval "$("$SCRIPT_DIR/config" grafana test)" && printf '%s' "$GRAFANA_TOKEN")
+assert_eq "omitted optional token preserves inherited value" "inherited-token" "$result"
+
+echo ""
+echo "=== literal values retain existing backslash escaping ==="
+for pair in 'path\\segment|path\segment' 'path\segment|path\segment' '\$CONFIG_TEST_VALUE|$CONFIG_TEST_VALUE' '\`literal\`|`literal`' 'price$5|price$5' '$CONFIG_TEST_VALUE|$CONFIG_TEST_VALUE' '${CONFIG_TEST_VALUE}|${CONFIG_TEST_VALUE}' '$((2+2))|$((2+2))' '\\\$CONFIG_TEST_VALUE|\$CONFIG_TEST_VALUE' 'literal\n|literal\n' 'ends\\|ends\'; do
+    input="${pair%%|*}"
+    expected="${pair#*|}"
+    printf '[slack.workspaces.test]\ntoken = "%s"\n' "$input" > "$TEST_DIR/escaping.toml"
+    export GILFOYLE_CONFIG="$TEST_DIR/escaping.toml"
+    export CONFIG_TEST_VALUE="must-not-expand"
+    result=$(eval "$("$SCRIPT_DIR/config" slack test)" && printf '%s' "$SLACK_TOKEN")
+    assert_eq "literal value: $input" "$expected" "$result"
+done
+
+echo ""
 echo "==========================="
 echo "Results: $PASS passed, $FAIL failed"
 if [[ $FAIL -gt 0 ]]; then
