@@ -65,6 +65,48 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_OUTPUT="$("$SCRIPT_DIR/config" "$TOOL" "$DEPLOYMENT")" || exit 1
 eval "$CONFIG_OUTPUT"
 
+# Compare HTTP(S) origins without changing the supplied request URL.
+url_origin() {
+    [[ "$1" == *://* ]] || return 1
+    local scheme="${1%%://*}" authority="${1#*://}"
+    scheme=$(printf '%s' "$scheme" | tr '[:upper:]' '[:lower:]')
+    authority="${authority%%[/?#]*}"
+    authority=$(printf '%s' "$authority" | tr '[:upper:]' '[:lower:]')
+    [[ "$scheme" == http || "$scheme" == https ]] || return 1
+    [[ "$authority" =~ ^([a-z0-9._-]+|\[[a-z0-9:.%_-]+\])(:[0-9]+)?$ ]] || return 1
+    case "$scheme:$authority" in
+        http:*:80) authority="${authority%:80}" ;;
+        https:*:443) authority="${authority%:443}" ;;
+    esac
+    printf '%s://%s\n' "$scheme" "$authority"
+}
+
+hosted_axiom_origin() {
+    [[ "$1" =~ ^https://(api\.axiom\.co|app\.axiom\.co|([a-z0-9-]+\.)+edge\.axiom\.co)$ ]]
+}
+
+# Guard the primary URL; extra curl options and local wrappers remain trusted.
+TARGET_ORIGIN=$(url_origin "$URL") || { echo "Error: Invalid HTTP(S) request URL." >&2; exit 1; }
+case "$TOOL" in
+    axiom) SERVICE_URL="$AXIOM_URL" ;;
+    grafana) SERVICE_URL="$GRAFANA_URL" ;;
+    pyroscope) SERVICE_URL="$PYROSCOPE_URL" ;;
+    sentry) SERVICE_URL="$SENTRY_URL" ;;
+    slack) SERVICE_URL="https://slack.com" ;;
+    *) echo "Error: Unknown tool '$TOOL'" >&2; exit 1 ;;
+esac
+SERVICE_ORIGIN=$(url_origin "$SERVICE_URL") || { echo "Error: Invalid configured service URL." >&2; exit 1; }
+if [[ "$TARGET_ORIGIN" != "$SERVICE_ORIGIN" ]]; then
+    if [[ "$TOOL" == axiom ]] && hosted_axiom_origin "$SERVICE_ORIGIN" && hosted_axiom_origin "$TARGET_ORIGIN"; then
+        : # Hosted Axiom API and regional edges use the same service credentials.
+    elif [[ "$TOOL" == slack && "$TARGET_ORIGIN" == https://files.slack.com ]]; then
+        : # Slack private file downloads use the workspace token.
+    else
+        echo "Error: Request URL does not match the selected service. Choose a deployment configured for that destination." >&2
+        exit 1
+    fi
+fi
+
 # Build base curl args
 CURL_ARGS=(-s --connect-timeout 10 --max-time 30 -X "$METHOD")
 if [[ -n "$DATA" ]]; then
