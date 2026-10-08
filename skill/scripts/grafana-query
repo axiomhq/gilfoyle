@@ -286,16 +286,27 @@ if [[ "$ds_type" == "cloudwatch" ]]; then
 fi
 
 # Prometheus/Loki: Build the API URL
+# Loki serves the query API under loki/api/v1, Prometheus under api/v1
+case "$ds_type" in
+    prometheus) api_prefix="api/v1" ;;
+    loki)       api_prefix="loki/api/v1" ;;
+    *)
+        echo "Error: unsupported datasource type '${ds_type}' for ${datasource}" >&2
+        echo "Supported: prometheus, loki, cloudwatch" >&2
+        exit 1
+        ;;
+esac
+
 if [[ -n "$range_duration" || -n "$start_time" ]]; then
     params="query=$(printf '%s' "$query" | jq -sRr @uri)&start=${start}&end=${end}&step=${step}"
-    url="${GRAFANA_URL}/api/datasources/proxy/uid/${datasource}/api/v1/query_range?${params}"
+    url="${GRAFANA_URL}/api/datasources/proxy/uid/${datasource}/${api_prefix}/query_range?${params}"
 else
     # Instant query
     params="query=$(printf '%s' "$query" | jq -sRr @uri)"
     if [[ -n "$eval_time" ]]; then
         params="${params}&time=$(printf '%s' "$eval_time" | jq -sRr @uri)"
     fi
-    url="${GRAFANA_URL}/api/datasources/proxy/uid/${datasource}/api/v1/query?${params}"
+    url="${GRAFANA_URL}/api/datasources/proxy/uid/${datasource}/${api_prefix}/query?${params}"
 fi
 
 result=$(grafana_curl GET "$url")
