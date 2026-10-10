@@ -6,8 +6,14 @@
 # - Analyze duplicate/type drift
 # - Optionally apply deterministic cleanup (dedupe + supersede + type normalization)
 # - Optionally commit/push org memory repos
+#
+# The project tier is never a target: its files are committed to the project's
+# repo, and compaction would turn every run into a noisy diff.
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib-memory"
 
 CONFIG_DIR="${GILFOYLE_CONFIG_DIR:-$HOME/.config/gilfoyle}"
 MEMORY_DIR="$CONFIG_DIR/memory"
@@ -41,11 +47,14 @@ Modes:
   --dry-run                Analyze + print prompt only (no apply/share)
 
 Options:
-  --org <name>             Target a specific org memory only (default: all tiers)
+  --org <name>             Target a specific org memory only (default: personal + all orgs)
   --days <n>               Review window in days (default: 7)
   --dry-run                Equivalent to: --deep --prompt --no-review
   --auto                   Explicit full preset (optional; default behavior)
   -h, --help               Show this help
+
+The project tier is never touched: its files are committed to the project's repo.
+Dedupe those by hand, in a normal change.
 
 Examples:
   scripts/sleep
@@ -383,6 +392,10 @@ while [[ $# -gt 0 ]]; do
       [[ -n "$ORG" ]] || { echo "Error: --org requires a value" >&2; exit 1; }
       shift 2
       ;;
+    --project)
+      echo "Error: sleep never touches the project tier. Its files are committed; edit them in a normal change." >&2
+      exit 1
+      ;;
     --days)
       DAYS="${2:-}"
       [[ -n "$DAYS" ]] || { echo "Error: --days requires a value" >&2; exit 1; }
@@ -484,6 +497,9 @@ fi
 phase "=== Sleep Cycle ==="
 echo "Config: $CONFIG_DIR"
 echo "Memory: $MEMORY_DIR"
+if resolve_project_memory_dir "$MEMORY_DIR"; then
+  echo "Project: $PROJECT_MEMORY_DIR (skipped: committed files are never rewritten)"
+fi
 if [[ "$AUTO" == true ]]; then
   echo "Mode: auto preset"
 elif [[ "$DRY_RUN" == true ]]; then

@@ -7,13 +7,16 @@ Validates:
 2. Entry format is parseable
 3. All required files exist
 4. Sample workflow produces valid output
+5. Project tier: written without git side effects, resolved, reported, never compacted
 
 Usage:
     memory-test [--verbose]
 """
 
+import contextlib
 import os
 import re
+import subprocess
 import sys
 import json
 import tempfile
@@ -23,6 +26,11 @@ from datetime import datetime
 
 SKILL_DIR = Path(__file__).parent.parent
 TEMPLATES_DIR = SKILL_DIR / "templates"
+SCRIPTS_DIR = SKILL_DIR / "scripts"
+
+# Where the project tier lives inside a repo, and the environment the scripts read.
+PROJECT_MEMORY_REL = Path(".gilfoyle/memory")
+SCRUBBED_ENV = ("GILFOYLE_CONFIG_DIR", "GILFOYLE_PROJECT_MEMORY_DIR", "MEMORY_ORG_NAME")
 
 # Required structure
 REQUIRED_DIRS = ["journal", "kb", "archive"]
@@ -328,6 +336,435 @@ def test_timestamp_format(result: TestResult, verbose: bool) -> bool:
     return result.failed == 0
 
 
+class Sandbox:
+    """Throwaway HOME, config dir and git repos. Nothing here touches the real ~/.config."""
+
+    def __init__(self):
+        # resolve(): macOS temp dirs sit behind a symlink and git reports real paths.
+        self.root = Path(tempfile.mkdtemp(prefix="axiom-project-memory-test-")).resolve()
+        self.home = self.root / "home"
+        self.config = self.root / "config"
+        self.personal_kb = self.config / "memory" / "kb"
+        self.home.mkdir()
+        self.personal_kb.mkdir(parents=True)
+
+    def env(self, extra: dict = None) -> dict:
+        env = {k: v for k, v in os.environ.items()
+               if k not in SCRUBBED_ENV and not k.startswith("GIT_")}
+        env.update({
+            "HOME": str(self.home),
+            "GILFOYLE_CONFIG_DIR": str(self.config),
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CEILING_DIRECTORIES": str(self.root),
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_AUTHOR_NAME": "Test", "GIT_AUTHOR_EMAIL": "test@example.com",
+            "GIT_COMMITTER_NAME": "Test", "GIT_COMMITTER_EMAIL": "test@example.com",
+        })
+        env.update(extra or {})
+        return env
+
+    def run(self, script: str, *args: str, cwd: Path = None, extra_env: dict = None):
+        return subprocess.run(
+            [str(SCRIPTS_DIR / script), *args],
+            cwd=str(cwd or self.root), env=self.env(extra_env),
+            capture_output=True, text=True, timeout=120,
+        )
+
+    def git(self, *args: str, cwd: Path) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=str(cwd), env=self.env(),
+            capture_output=True, text=True, check=True,
+        ).stdout
+
+    def make_repo(self, name: str = "repo") -> Path:
+        repo = self.root / name
+        repo.mkdir()
+        self.git("init", "-q", cwd=repo)
+        self.git("commit", "-q", "--allow-empty", "-m", "initial", cwd=repo)
+        return repo
+
+    def make_project_memory(self, repo: Path) -> Path:
+        project = repo / PROJECT_MEMORY_REL
+        (project / "kb").mkdir(parents=True)
+        return project
+
+    def make_org(self, name: str = "testorg"):
+        """An org tier backed by a local bare remote, so pushes are observable."""
+        remote = self.root / f"{name}-remote.git"
+        org_dir = self.config / "memory" / "orgs" / name
+        self.git("init", "-q", "--bare", str(remote), cwd=self.root)
+        self.git("clone", "-q", str(remote), str(org_dir), cwd=self.root)
+        (org_dir / "kb").mkdir()
+        (org_dir / "kb" / "facts.md").write_text("# facts\n\n")
+        self.git("add", "-A", cwd=org_dir)
+        self.git("commit", "-q", "-m", "seed", cwd=org_dir)
+        self.git("push", "-q", "-u", "origin", "HEAD", cwd=org_dir)
+        return org_dir, remote
+
+    def git_shim(self):
+        """A git on PATH that logs the subcommand of every call, then runs the real one."""
+        bin_dir = self.root / "shim"
+        bin_dir.mkdir()
+        log = self.root / "git-calls.log"
+        shim = bin_dir / "git"
+        shim.write_text(f'#!/bin/sh\necho "$1" >> "{log}"\nexec "{shutil.which("git")}" "$@"\n')
+        shim.chmod(0o755)
+        return {"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"}, log
+
+
+@contextlib.contextmanager
+def sandbox():
+    box = Sandbox()
+    try:
+        yield box
+    finally:
+        shutil.rmtree(box.root, ignore_errors=True)
+
+
+def entry_count(path: Path, entry_id: str) -> int:
+    if not path.exists():
+        return 0
+    return len(re.findall(rf"^## M-\S+ {re.escape(entry_id)}$", path.read_text(), re.MULTILINE))
+
+
+def commit_count(repo: Path, box: Sandbox) -> int:
+    return int(box.git("rev-list", "--all", "--count", cwd=repo).strip())
+
+
+def bash_supports_sleep() -> bool:
+    """scripts/sleep uses namerefs (bash >= 4.3). macOS ships 3.2."""
+    out = subprocess.run(
+        ["bash", "-c", 'echo "${BASH_VERSINFO[0]} ${BASH_VERSINFO[1]}"'],
+        capture_output=True, text=True,
+    ).stdout.split()
+    return (int(out[0]), int(out[1])) >= (4, 3)
+
+
+def test_project_write_locations(result: TestResult, verbose: bool) -> bool:
+    """mem-write --project resolves from the env var or the git toplevel."""
+    print("\n[Project Tier: Write Locations]")
+
+    with sandbox() as box:
+        # Env var, from a directory that is not a git repo at all.
+        project = box.root / "shared" / "memory"
+        (project / "kb").mkdir(parents=True)
+        plain = box.root / "plain"
+        plain.mkdir()
+        proc = box.run("mem-write", "--project", "--tags", "env", "facts", "env-entry",
+                       "written via the env var", cwd=plain,
+                       extra_env={"GILFOYLE_PROJECT_MEMORY_DIR": str(project)})
+        target = project / "kb" / "facts.md"
+        result.test("env var: exits 0", proc.returncode == 0, proc.stderr, verbose)
+        result.test("env var: entry lands in the env var directory",
+                    entry_count(target, "env-entry") == 1, "entry missing", verbose)
+        result.test("env var: entry carries its tags and content",
+                    "- tags: env" in target.read_text() and "written via the env var" in target.read_text(),
+                    "metadata or content missing", verbose)
+        result.test("env var: tier is reported as [project]",
+                    "[project]" in proc.stdout, proc.stdout, verbose)
+        result.test("env var: personal tier untouched",
+                    not (box.personal_kb / "facts.md").exists(), "personal facts.md written", verbose)
+
+    with sandbox() as box:
+        # Default location, from a subdirectory: proves toplevel, not cwd.
+        repo = box.make_repo()
+        project = box.make_project_memory(repo)
+        deep = repo / "src" / "deep"
+        deep.mkdir(parents=True)
+        shim_env, git_log = box.git_shim()
+        proc = box.run("mem-write", "--project", "patterns", "default-entry",
+                       "written via the git toplevel", cwd=deep, extra_env=shim_env)
+        target = project / "kb" / "patterns.md"
+        result.test("default location: exits 0", proc.returncode == 0, proc.stderr, verbose)
+        result.test("default location: entry lands in <toplevel>/" + PROJECT_MEMORY_REL.as_posix(),
+                    entry_count(target, "default-entry") == 1, "entry missing", verbose)
+        result.test("default location: nothing written under the subdirectory",
+                    not any(deep.iterdir()), "cwd was written to", verbose)
+        calls = set(git_log.read_text().split()) if git_log.exists() else set()
+        result.test("default location: git is only asked where the toplevel is",
+                    calls == {"rev-parse"}, f"git calls: {sorted(calls)}", verbose)
+
+    with sandbox() as box:
+        # The env var beats the default location when both exist.
+        repo = box.make_repo()
+        default_project = box.make_project_memory(repo)
+        elsewhere = box.root / "elsewhere"
+        (elsewhere / "kb").mkdir(parents=True)
+        proc = box.run("mem-write", "--project", "facts", "precedence-entry", "which one?",
+                       cwd=repo, extra_env={"GILFOYLE_PROJECT_MEMORY_DIR": str(elsewhere)})
+        result.test("env var beats the default location",
+                    proc.returncode == 0
+                    and entry_count(elsewhere / "kb" / "facts.md", "precedence-entry") == 1
+                    and not (default_project / "kb" / "facts.md").exists(),
+                    proc.stderr or "wrote to the wrong directory", verbose)
+
+    return result.failed == 0
+
+
+def test_project_write_never_commits(result: TestResult, verbose: bool) -> bool:
+    """mem-write --project writes the file and does nothing else."""
+    print("\n[Project Tier: No Git Side Effects]")
+
+    with sandbox() as box:
+        repo = box.make_repo()
+        project = box.make_project_memory(repo)
+        (project / "kb" / "facts.md").write_text("# facts\n\n")
+        box.git("add", "-A", cwd=repo)
+        box.git("commit", "-q", "-m", "seed project memory", cwd=repo)
+        # An org default is the trap: it would route the write to a repo that pushes.
+        org_dir, remote = box.make_org()
+        org_before = commit_count(remote, box)
+        repo_before = commit_count(repo, box)
+        shim_env, git_log = box.git_shim()
+        shim_env["MEMORY_ORG_NAME"] = "testorg"
+
+        first = box.run("mem-write", "--project", "facts", "tracked-file", "appends to a tracked file",
+                        cwd=repo, extra_env=shim_env)
+        second = box.run("mem-write", "--project", "patterns", "new-file", "creates an untracked file",
+                         cwd=repo, extra_env=shim_env)
+        rel = PROJECT_MEMORY_REL.as_posix()
+        status = box.git("status", "--porcelain", cwd=repo)
+        calls = set(git_log.read_text().split()) if git_log.exists() else set()
+
+        result.test("both writes exit 0", first.returncode == 0 and second.returncode == 0,
+                    first.stderr + second.stderr, verbose)
+        result.test("no commit was created", commit_count(repo, box) == repo_before,
+                    "HEAD moved", verbose)
+        result.test("nothing was staged", box.git("diff", "--cached", "--name-only", cwd=repo) == "",
+                    "index is not empty", verbose)
+        result.test("tracked file shows as modified, unstaged",
+                    f" M {rel}/kb/facts.md" in status, status, verbose)
+        result.test("new file shows as untracked",
+                    f"?? {rel}/kb/patterns.md" in status, status, verbose)
+        result.test("git never saw add, commit or push",
+                    calls <= {"rev-parse"}, f"git calls: {sorted(calls)}", verbose)
+        result.test("--project beats $MEMORY_ORG_NAME: org remote untouched",
+                    commit_count(remote, box) == org_before, "org remote got a commit", verbose)
+        result.test("--project beats $MEMORY_ORG_NAME: org working tree clean",
+                    box.git("status", "--porcelain", cwd=org_dir) == "", "org tier was written", verbose)
+        result.test("output says the change is left to the user",
+                    "No git add, no commit, no push" in first.stdout, first.stdout, verbose)
+
+    return result.failed == 0
+
+
+def test_project_write_unresolvable(result: TestResult, verbose: bool) -> bool:
+    """With no project directory, mem-write --project fails loudly and writes nothing."""
+    print("\n[Project Tier: Unresolvable]")
+
+    def personal_untouched(box: Sandbox) -> bool:
+        return not any(box.personal_kb.iterdir())
+
+    with sandbox() as box:
+        plain = box.root / "plain"
+        plain.mkdir()
+        proc = box.run("mem-write", "--project", "facts", "orphan", "nowhere to go", cwd=plain)
+        result.test("not in a repo, env var unset: exits non-zero", proc.returncode != 0,
+                    "should have failed", verbose)
+        result.test("not in a repo, env var unset: names the env var",
+                    "GILFOYLE_PROJECT_MEMORY_DIR" in proc.stderr, proc.stderr, verbose)
+        result.test("not in a repo, env var unset: no silent fallback to personal",
+                    personal_untouched(box), "personal tier was written", verbose)
+        result.test("not in a repo, env var unset: nothing created",
+                    not any(plain.iterdir()), "cwd was written to", verbose)
+
+    with sandbox() as box:
+        plain = box.root / "plain"
+        plain.mkdir()
+        nowhere = box.root / "nowhere"
+        proc = box.run("mem-write", "--project", "facts", "orphan", "nowhere to go", cwd=plain,
+                       extra_env={"GILFOYLE_PROJECT_MEMORY_DIR": str(nowhere)})
+        result.test("env var points nowhere: exits non-zero", proc.returncode != 0,
+                    "should have failed", verbose)
+        result.test("env var points nowhere: says so", str(nowhere) in proc.stderr, proc.stderr, verbose)
+        result.test("env var points nowhere: directory not created", not nowhere.exists(),
+                    "directory was created", verbose)
+        result.test("env var points nowhere: no silent fallback to personal",
+                    personal_untouched(box), "personal tier was written", verbose)
+
+    with sandbox() as box:
+        # The env var is authoritative: a valid default in the repo is not a second chance.
+        repo = box.make_repo()
+        project = box.make_project_memory(repo)
+        proc = box.run("mem-write", "--project", "facts", "orphan", "typo protection", cwd=repo,
+                       extra_env={"GILFOYLE_PROJECT_MEMORY_DIR": str(box.root / "typo")})
+        result.test("bad env var in a repo with a default: exits non-zero", proc.returncode != 0,
+                    "should have failed", verbose)
+        result.test("bad env var in a repo with a default: default left alone",
+                    not (project / "kb" / "facts.md").exists(), "fell back to the default", verbose)
+
+    with sandbox() as box:
+        # In a repo, but the project never opted in. We do not opt in for it.
+        repo = box.make_repo()
+        proc = box.run("mem-write", "--project", "facts", "orphan", "not opted in", cwd=repo)
+        result.test("repo without project memory: exits non-zero", proc.returncode != 0,
+                    "should have failed", verbose)
+        result.test("repo without project memory: directory not created",
+                    not (repo / PROJECT_MEMORY_REL.parent).exists(), "tier was auto-created", verbose)
+        result.test("repo without project memory: no silent fallback to personal",
+                    personal_untouched(box), "personal tier was written", verbose)
+
+    with sandbox() as box:
+        # A memory directory without kb/ is not a tier.
+        repo = box.make_repo()
+        (repo / PROJECT_MEMORY_REL).mkdir(parents=True)
+        proc = box.run("mem-write", "--project", "facts", "orphan", "no kb", cwd=repo)
+        result.test("memory directory without kb/: exits non-zero", proc.returncode != 0,
+                    "should have failed", verbose)
+        result.test("memory directory without kb/: kb/ not created",
+                    not (repo / PROJECT_MEMORY_REL / "kb").exists(), "kb/ was auto-created", verbose)
+
+    with sandbox() as box:
+        # Pointing the tier at the personal directory is not a second tier.
+        proc = box.run("mem-write", "--project", "facts", "loop", "same place twice",
+                       extra_env={"GILFOYLE_PROJECT_MEMORY_DIR": str(box.config / "memory")})
+        result.test("env var is the personal directory: exits non-zero", proc.returncode != 0,
+                    "should have failed", verbose)
+        result.test("env var is the personal directory: says so", "personal" in proc.stderr,
+                    proc.stderr, verbose)
+
+    return result.failed == 0
+
+
+def test_existing_tiers_unchanged(result: TestResult, verbose: bool) -> bool:
+    """Personal and org writes behave as before, project tier present or not."""
+    print("\n[Project Tier: Personal and Org Unchanged]")
+
+    with sandbox() as box:
+        repo = box.make_repo()
+        project = box.make_project_memory(repo)
+        org_dir, remote = box.make_org()
+        env = {"GILFOYLE_PROJECT_MEMORY_DIR": str(project)}
+
+        # Personal: the default, even with a project tier in reach.
+        proc = box.run("mem-write", "facts", "personal-entry", "personal content", cwd=repo, extra_env=env)
+        result.test("personal: exits 0", proc.returncode == 0, proc.stderr, verbose)
+        result.test("personal: entry in the personal kb",
+                    entry_count(box.personal_kb / "facts.md", "personal-entry") == 1, "entry missing", verbose)
+        result.test("personal: tier is reported as [personal]", "[personal]" in proc.stdout, proc.stdout, verbose)
+        result.test("personal: project tier untouched",
+                    not (project / "kb" / "facts.md").exists(), "project tier was written", verbose)
+
+        # Org via flag: commits and pushes, as ever.
+        before = commit_count(remote, box)
+        proc = box.run("mem-write", "--org", "testorg", "facts", "org-entry", "org content", cwd=repo, extra_env=env)
+        pushed = box.git("--git-dir", str(remote), "log", "--all", "--format=%s", cwd=box.root)
+        result.test("org flag: exits 0", proc.returncode == 0, proc.stderr, verbose)
+        result.test("org flag: tier is reported as [org:testorg]", "[org:testorg]" in proc.stdout, proc.stdout, verbose)
+        result.test("org flag: entry in the org kb",
+                    entry_count(org_dir / "kb" / "facts.md", "org-entry") == 1, "entry missing", verbose)
+        result.test("org flag: committed and pushed to the remote",
+                    commit_count(remote, box) == before + 1 and "Added: org-entry" in pushed.splitlines(),
+                    pushed, verbose)
+        result.test("org flag: reports the share", "committed + pushed" in proc.stdout, proc.stdout, verbose)
+        result.test("org flag: project tier untouched",
+                    not (project / "kb" / "facts.md").exists(), "project tier was written", verbose)
+
+        # Org via $MEMORY_ORG_NAME: the default, still pushing.
+        before = commit_count(remote, box)
+        env_with_org = dict(env, MEMORY_ORG_NAME="testorg")
+        proc = box.run("mem-write", "facts", "org-default-entry", "org by environment", cwd=repo,
+                       extra_env=env_with_org)
+        result.test("org via $MEMORY_ORG_NAME: still pushes",
+                    proc.returncode == 0 and commit_count(remote, box) == before + 1,
+                    proc.stderr or "no commit reached the remote", verbose)
+
+        # Combined with --project: refused, nothing written anywhere.
+        before = commit_count(remote, box)
+        for args in (("--org", "testorg", "--project"), ("--project", "--org", "testorg")):
+            proc = box.run("mem-write", *args, "facts", "both", "pick one", cwd=repo, extra_env=env)
+            result.test(f"{' '.join(args)}: refused", proc.returncode != 0 and "mutually exclusive" in proc.stderr,
+                        proc.stderr, verbose)
+        result.test("--org with --project: nothing written",
+                    entry_count(org_dir / "kb" / "facts.md", "both") == 0
+                    and not (project / "kb" / "facts.md").exists()
+                    and commit_count(remote, box) == before,
+                    "an entry or commit slipped through", verbose)
+
+    return result.failed == 0
+
+
+def test_project_reporting(result: TestResult, verbose: bool) -> bool:
+    """init and mem-doctor report the project tier when it exists, and stay quiet when not."""
+    print("\n[Project Tier: init and mem-doctor]")
+
+    with sandbox() as box:
+        (box.config / "config.toml").write_text(
+            '[axiom.deployments.prod]\nurl = "https://api.axiom.co"\ntoken = "xaat-test"\n')
+        repo = box.make_repo()
+
+        doctor = box.run("mem-doctor", cwd=repo)
+        summary_without_tier = doctor.stdout.strip().splitlines()[-1]
+        init = box.run("init", cwd=repo)
+        result.test("no tier: init exits 0", init.returncode == 0, init.stderr, verbose)
+        result.test("no tier: init says nothing about project memory",
+                    "Project memory" not in init.stdout, init.stdout, verbose)
+        result.test("no tier: init does not create it",
+                    not (repo / PROJECT_MEMORY_REL.parent).exists(), "tier was auto-created", verbose)
+        result.test("no tier: mem-doctor says nothing about project memory",
+                    "Project" not in doctor.stdout, doctor.stdout, verbose)
+
+        project = box.make_project_memory(repo)
+        box.run("mem-write", "--project", "facts", "reported", "counted by doctor", cwd=repo)
+        doctor = box.run("mem-doctor", cwd=repo)
+        init = box.run("init", cwd=repo)
+        result.test("tier present: mem-doctor reports it",
+                    "Project Tier:" in doctor.stdout and str(project) in doctor.stdout, doctor.stdout, verbose)
+        result.test("tier present: mem-doctor counts its entries and uncommitted changes",
+                    "1 entries, 1 uncommitted changes" in doctor.stdout, doctor.stdout, verbose)
+        result.test("tier present: uncommitted project changes are not a warning",
+                    doctor.stdout.strip().splitlines()[-1] == summary_without_tier,
+                    f"{summary_without_tier!r} became {doctor.stdout.strip().splitlines()[-1]!r}", verbose)
+        result.test("tier present: init reports it",
+                    "Project memory" in init.stdout and str(project) in init.stdout, init.stdout, verbose)
+
+        broken = box.run("mem-doctor", cwd=repo, extra_env={"GILFOYLE_PROJECT_MEMORY_DIR": str(box.root / "typo")})
+        result.test("bad env var: mem-doctor warns",
+                    "misconfigured" in broken.stdout and "GILFOYLE_PROJECT_MEMORY_DIR" in broken.stdout,
+                    broken.stdout, verbose)
+
+    return result.failed == 0
+
+
+def test_sleep_skips_project(result: TestResult, verbose: bool) -> bool:
+    """scripts/sleep compacts personal and org memory, never the committed project tier."""
+    print("\n[Project Tier: Sleep]")
+
+    if not bash_supports_sleep():
+        print("  ~ skipped: scripts/sleep needs bash >= 4.3 and this one is older")
+        return True
+
+    duplicated = (
+        "# facts\n\n"
+        "## M-2025-01-01T00:00:00Z same-key\n\n- type: fact\n\nolder\n\n"
+        "## M-2025-01-02T00:00:00Z same-key\n\n- type: fact\n\nnewer\n"
+    )
+
+    with sandbox() as box:
+        repo = box.make_repo()
+        project = box.make_project_memory(repo)
+        project_file = project / "kb" / "facts.md"
+        project_file.write_text(duplicated)
+        personal_file = box.personal_kb / "facts.md"
+        personal_file.write_text(duplicated)
+
+        proc = box.run("sleep", cwd=repo)
+        result.test("sleep: exits 0", proc.returncode == 0, proc.stderr, verbose)
+        result.test("sleep: control, personal duplicates were compacted",
+                    entry_count(personal_file, "same-key") == 1, personal_file.read_text(), verbose)
+        result.test("sleep: project file is byte-for-byte unchanged",
+                    project_file.read_text() == duplicated, project_file.read_text(), verbose)
+        result.test("sleep: says it skipped the project tier",
+                    "Project:" in proc.stdout and "skipped" in proc.stdout, proc.stdout, verbose)
+
+        proc = box.run("sleep", "--project", cwd=repo)
+        result.test("sleep --project: rejected", proc.returncode != 0 and "project tier" in proc.stderr,
+                    proc.stderr, verbose)
+
+    return result.failed == 0
+
+
 def main():
     verbose = "--verbose" in sys.argv
     result = TestResult()
@@ -341,6 +778,12 @@ def main():
     test_readme_instructions(result, verbose)
     test_workflow_simulation(result, verbose)
     test_timestamp_format(result, verbose)
+    test_project_write_locations(result, verbose)
+    test_project_write_never_commits(result, verbose)
+    test_project_write_unresolvable(result, verbose)
+    test_existing_tiers_unchanged(result, verbose)
+    test_project_reporting(result, verbose)
+    test_sleep_skips_project(result, verbose)
     
     print("\n" + "=" * 40)
     print(f"Tests: {result.passed + result.failed} | Passed: {result.passed} | Failed: {result.failed}")

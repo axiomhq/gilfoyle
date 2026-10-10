@@ -135,6 +135,16 @@ scripts/mem-write facts "hidden-dataset" "axiomdb-metrics is queryable but unlis
 scripts/mem-doctor
 ```
 
+Three tiers: personal, project, org. Project memory lives in the repo it describes and goes through your normal review:
+
+```bash
+mkdir -p .gilfoyle/memory/kb    # once, at the repo root. Nothing creates it for you
+scripts/mem-write --project facts "payments-dataset" "Payments logs live in ['payments-prod']"
+git status                      # there it is. No commit, no push. Those are yours
+```
+
+It resolves from `GILFOYLE_PROJECT_MEMORY_DIR`, else `<git-toplevel>/.gilfoyle/memory`. Credentials (`config.toml`) and `cache/` stay in `~/.config/gilfoyle/`. `scripts/sleep` leaves the tier alone: committed files don't need me rewriting them.
+
 See `reference/memory-system.md` for the full system. It's elegant. Obviously.
 
 ---

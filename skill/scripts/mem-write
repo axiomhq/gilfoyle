@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
-# Write an entry to memory (personal or org tier)
-# Usage: mem-write [--org <name>] <file> <id> "<content>"
+# Write an entry to memory (personal, project or org tier)
+# Usage: mem-write [--org <name> | --project] <file> <id> "<content>"
 #        mem-write facts "dataset-discovery" "Description of the finding"
 #        mem-write --org axiom patterns "timeout-pattern" "How to detect timeouts"
+#        mem-write --project facts "payments-dataset" "Payments logs live in ['payments-prod']"
 #        echo "multi-line content" | mem-write facts "my-entry" -
 #
 # Options:
-#   --org <name>    Write to org tier instead of personal
+#   --org <name>    Write to org tier instead of personal (commits and pushes)
+#   --project       Write to project tier instead of personal. Writes the file and
+#                   nothing else: no git add, no commit, no push. The change is
+#                   yours to review and commit like any other change in the repo.
+#                   Location: $GILFOYLE_PROJECT_MEMORY_DIR, else
+#                   <git-toplevel>/.gilfoyle/memory. Must already exist (with kb/).
 #   --type <type>   Entry type: fact, pattern, query, incident, note (default: fact)
 #   --tags <tags>   Comma-separated tags (default: none)
 #   --pin           Mark entry as pinned (won't be auto-archived)
@@ -20,6 +26,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib-memory"
+
 CONFIG_DIR="${GILFOYLE_CONFIG_DIR:-$HOME/.config/gilfoyle}"
 MEMORY_DIR="$CONFIG_DIR/memory"
 KB_DIR="$MEMORY_DIR/kb"
@@ -27,6 +36,8 @@ ORGS_DIR="$MEMORY_DIR/orgs"
 
 # Defaults
 ORG="${MEMORY_ORG_NAME:-}"
+ORG_FLAG=""
+PROJECT="false"
 TYPE="fact"
 TAGS=""
 PINNED="false"
@@ -36,7 +47,12 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --org)
       ORG="$2"
+      ORG_FLAG="true"
       shift 2
+      ;;
+    --project)
+      PROJECT="true"
+      shift
       ;;
     --type)
       TYPE="$2"
@@ -60,11 +76,21 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "$PROJECT" == "true" ]]; then
+  if [[ -n "$ORG_FLAG" ]]; then
+    echo "Error: --org and --project are mutually exclusive. Pick a tier." >&2
+    exit 1
+  fi
+  # An explicit --project beats the $MEMORY_ORG_NAME default. Org writes push.
+  ORG=""
+fi
+
 if [[ $# -lt 3 ]]; then
   echo "Usage: mem-write [options] <file> <id> <content|->"
   echo ""
   echo "Options:"
   echo "  --org <name>    Write to org tier (default: \$MEMORY_ORG_NAME or personal)"
+  echo "  --project       Write to project tier (working tree only: no add, commit or push)"
   echo "  --type <type>   fact, pattern, query, incident, note (default: fact)"
   echo "  --tags <tags>   Comma-separated tags"
   echo "  --pin           Mark as pinned"
@@ -102,7 +128,18 @@ case "$TYPE" in
 esac
 
 # Determine target directory
-if [[ -n "$ORG" ]]; then
+if [[ "$PROJECT" == "true" ]]; then
+  if ! resolve_project_memory_dir "$MEMORY_DIR"; then
+    {
+      echo "Error: Project memory not found."
+      project_memory_problem
+      echo "Nothing was written."
+    } >&2
+    exit 1
+  fi
+  TARGET_DIR="$PROJECT_MEMORY_DIR"
+  TIER="project"
+elif [[ -n "$ORG" ]]; then
   TARGET_DIR="$ORGS_DIR/$ORG"
   if [[ ! -d "$TARGET_DIR/kb" ]]; then
     echo "Error: Org memory not found at $TARGET_DIR"
@@ -153,6 +190,11 @@ EOF
 echo "✓ Written to [$TIER] kb/${FILE}.md"
 echo "  Entry: ${ID}"
 echo "  Path: ${TARGET_FILE}"
+
+if [[ "$TIER" == "project" ]]; then
+  echo ""
+  echo "Left in the working tree. No git add, no commit, no push. Review it like any other change."
+fi
 
 if [[ -n "$ORG" ]] && [[ -d "$TARGET_DIR/.git" ]]; then
   echo ""

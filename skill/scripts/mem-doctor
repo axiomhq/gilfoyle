@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # Memory system health check
 # Usage: scripts/mem-doctor
+#
+# Checks the personal, org and (when it exists) project tiers.
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib-memory"
 
 CONFIG_DIR="${GILFOYLE_CONFIG_DIR:-$HOME/.config/gilfoyle}"
 MEMORY_DIR="$CONFIG_DIR/memory"
@@ -89,6 +94,30 @@ else
 fi
 
 echo ""
+
+# --- Check project tier ---
+# Reported only when it exists (or is misconfigured). Uncommitted changes are the
+# normal state of project memory between writing it and merging the PR: not a warning.
+if resolve_project_memory_dir "$MEMORY_DIR"; then
+  echo "Project Tier:"
+  entries=$(count_entries "$PROJECT_MEMORY_DIR")
+  if git -C "$PROJECT_MEMORY_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    uncommitted=$(git -C "$PROJECT_MEMORY_DIR" status --porcelain -- . | wc -l | tr -d ' ')
+    if [[ "$uncommitted" -gt 0 ]]; then
+      check_ok "$PROJECT_MEMORY_DIR: $entries entries, $uncommitted uncommitted changes (commit them with the project)"
+    else
+      check_ok "$PROJECT_MEMORY_DIR: $entries entries (committed)"
+    fi
+  else
+    check_ok "$PROJECT_MEMORY_DIR: $entries entries (not in a git repository)"
+  fi
+  echo ""
+elif [[ "$PROJECT_MEMORY_STATUS" == "env-missing" || "$PROJECT_MEMORY_STATUS" == "same-as-personal" ]]; then
+  echo "Project Tier:"
+  check_warn "Ignored: project memory is misconfigured"
+  project_memory_problem
+  echo ""
+fi
 
 # --- Summary ---
 echo "=== Summary ==="

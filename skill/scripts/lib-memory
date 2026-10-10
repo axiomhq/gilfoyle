@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Shared memory-tier helpers for Gilfoyle scripts
+# Source this file: source "$SCRIPT_DIR/lib-memory"
+
+# resolve_project_memory_dir [personal-memory-dir]
+#
+# Locates the project tier: a memory directory with the personal layout (kb/...)
+# that lives in the project's own repository and is committed with it.
+#
+#   1. $GILFOYLE_PROJECT_MEMORY_DIR, when set. It is authoritative: if it names
+#      no usable directory that is an error, not a cue to look somewhere else.
+#   2. <git-toplevel>/.gilfoyle/memory, found from the current directory.
+#
+# The tier exists only if its kb/ directory does. This never creates anything.
+#
+# Sets PROJECT_MEMORY_DIR (empty if nothing to point at) and PROJECT_MEMORY_STATUS:
+#   ok | env-missing | not-git | default-missing | same-as-personal
+# Returns 0 only for "ok". Callers run under set -e: call it from an `if`.
+resolve_project_memory_dir() {
+  local personal_dir="${1:-}"
+  local configured="${GILFOYLE_PROJECT_MEMORY_DIR:-}"
+  local toplevel=""
+
+  PROJECT_MEMORY_DIR=""
+  PROJECT_MEMORY_STATUS="ok"
+
+  if [[ -n "$configured" ]]; then
+    PROJECT_MEMORY_DIR="${configured%/}"
+    if [[ ! -d "$PROJECT_MEMORY_DIR/kb" ]]; then
+      PROJECT_MEMORY_STATUS="env-missing"
+      return 1
+    fi
+  else
+    toplevel=$(git rev-parse --show-toplevel 2>/dev/null) || toplevel=""
+    if [[ -z "$toplevel" ]]; then
+      PROJECT_MEMORY_STATUS="not-git"
+      return 1
+    fi
+    PROJECT_MEMORY_DIR="$toplevel/.gilfoyle/memory"
+    if [[ ! -d "$PROJECT_MEMORY_DIR/kb" ]]; then
+      PROJECT_MEMORY_STATUS="default-missing"
+      return 1
+    fi
+  fi
+
+  # Pointing the tier at the personal directory would read it twice and let
+  # sleep rewrite it. It is the personal tier; don't pretend otherwise.
+  if [[ -n "$personal_dir" ]] && [[ "$PROJECT_MEMORY_DIR" -ef "$personal_dir" ]]; then
+    PROJECT_MEMORY_STATUS="same-as-personal"
+    return 1
+  fi
+
+  return 0
+}
+
+# project_memory_problem
+# Explains why the last resolve_project_memory_dir failed. One indented line per fact.
+project_memory_problem() {
+  case "${PROJECT_MEMORY_STATUS:-}" in
+    env-missing)
+      echo "  GILFOYLE_PROJECT_MEMORY_DIR is set to '$PROJECT_MEMORY_DIR', which has no kb/ directory."
+      echo "  Create it (mkdir -p '$PROJECT_MEMORY_DIR/kb') or unset the variable."
+      ;;
+    not-git)
+      echo "  Not inside a git repository, and GILFOYLE_PROJECT_MEMORY_DIR is not set."
+      echo "  Run from inside the project, or point GILFOYLE_PROJECT_MEMORY_DIR at a directory containing kb/."
+      ;;
+    default-missing)
+      echo "  No project memory at $PROJECT_MEMORY_DIR/kb."
+      echo "  Opt in once: mkdir -p '$PROJECT_MEMORY_DIR/kb'. This tool does not create it for you."
+      ;;
+    same-as-personal)
+      echo "  $PROJECT_MEMORY_DIR is the personal memory directory. That is not a second tier."
+      ;;
+  esac
+}

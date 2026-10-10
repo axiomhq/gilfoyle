@@ -2,20 +2,24 @@
 
 This is your working memory for investigations. Append freely, consolidate periodically.
 
-## 2-Tier Memory System
+## 3-Tier Memory System
 
-Memory is organized in two tiers, merged when reading:
+Memory is organized in three tiers, merged when reading:
 
 | Tier | Location | Scope | Sync |
 |------|----------|-------|------|
 | Personal | `~/.config/gilfoyle/memory/` | Just me | None |
-| Org | `~/.config/gilfoyle/memory/orgs/{org}/` | Team-wide | Git repo |
+| Project | `$GILFOYLE_PROJECT_MEMORY_DIR`, else `<git-toplevel>/.gilfoyle/memory/` | Everyone working on this repo | The project's own git (normal PRs) |
+| Org | `~/.config/gilfoyle/memory/orgs/{org}/` | Team-wide | Own git repo |
 
-**Read order:** Both tiers merged, tagged by source. Conflicts: Personal > Org.
+**Read order:** All tiers merged, tagged by source (`[personal]`, `[project]`, `[org:name]`). Conflicts: Personal > Project > Org.
 
 **Write defaults:**
 - "remember this" → Personal
+- "save for this project" → Project (`mem-write --project`: file only, no git add, commit or push)
 - "save for the team" → Org (+ git commit)
+
+The project tier exists only if the project created it (`mkdir -p .gilfoyle/memory/kb` at the repo root). Nothing here creates it. `scripts/sleep` never rewrites it. See `reference/memory-system.md`.
 
 ## Directory Structure
 
@@ -101,6 +105,10 @@ cat ~/.config/gilfoyle/memory/kb/*.md
 for org in ~/.config/gilfoyle/memory/orgs/*/kb; do
   cat "$org"/*.md 2>/dev/null
 done
+
+# Project tier (only if it exists; scripts/init prints the resolved path)
+project_dir="${GILFOYLE_PROJECT_MEMORY_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)/.gilfoyle/memory}"
+cat "$project_dir"/kb/*.md 2>/dev/null
 ```
 
 ### End of Incident
@@ -125,7 +133,7 @@ This will:
 
 **Promote:** Move valuable journal entries to appropriate `kb/*.md` file.
 
-**Share:** Org writes are automatically committed and pushed by `mem-write --org`.
+**Share:** Org writes are automatically committed and pushed by `mem-write --org`. Project writes (`mem-write --project`) are left in the working tree for you to commit with the project.
 
 ---
 
@@ -146,9 +154,9 @@ When an entry is critical and should never be archived:
 |---------|---------|
 | `scripts/init` | Initialize memory + config |
 | `scripts/org-add` | Add an org for shared memory |
-| `scripts/mem-sync` | Pull org memory updates |
+| `scripts/mem-sync` | Pull org memory updates (org repos only; the project tier is plain git) |
 | `scripts/mem-share` | Batch commit and push org changes (rarely needed — `mem-write --org` auto-shares) |
-| `scripts/sleep` | Consolidation pass |
+| `scripts/sleep` | Consolidation pass (personal + org; never the project tier) |
 | `scripts/mem-doctor` | Health check |
 
 ---
@@ -160,4 +168,4 @@ When an entry is critical and should never be archived:
 - **Over-structuring during incidents**: Just append to journal
 - **Forgetting to update used/last_used**: Track what actually helped
 - **Keeping stale entries**: Archive aggressively (but pin critical ones)
-- **Secrets in org memory**: Never commit credentials or sensitive data
+- **Secrets in org or project memory**: Never commit credentials or sensitive data. Both tiers are shared; project memory is committed to the repo

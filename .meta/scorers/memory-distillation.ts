@@ -144,6 +144,10 @@ function parseMemWriteCliArgs(input: string): { category: string; key: string; c
     else return null;
   }
 
+  if (cleaned.startsWith('--project')) {
+    cleaned = cleaned.replace(/^--project\s+/, '');
+  }
+
   const parts = cleaned.match(/^(\S+)\s+("[^"]+"|'[^']+'|\S+)\s+(.+)/);
   if (!parts) {
     const simpleParts = cleaned.split(/\s+/);

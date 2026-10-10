@@ -35,6 +35,8 @@ case "$PERSONA" in
         MEMORY_DIR='~/.config/gilfoyle/memory'
         CONFIG_PATH='~/.config/gilfoyle/config.toml'
         INIT_TIMEOUT_VAR="GILFOYLE_INIT_TIMEOUT"
+        PROJECT_MEMORY_VAR="GILFOYLE_PROJECT_MEMORY_DIR"
+        PROJECT_MEMORY_PATH=".gilfoyle/memory"
         PERSONA_FILE="$REPO_DIR/skill/personas/gilfoyle.md"
         if [[ ! -f "$PERSONA_FILE" ]]; then
             echo "Error: Persona file not found: $PERSONA_FILE" >&2
@@ -49,6 +51,8 @@ case "$PERSONA" in
         MEMORY_DIR='~/.config/amp/memory/personal/axiom-sre'
         CONFIG_PATH='~/.config/axiom-sre/config.toml'
         INIT_TIMEOUT_VAR="SRE_INIT_TIMEOUT"
+        PROJECT_MEMORY_VAR="SRE_PROJECT_MEMORY_DIR"
+        PROJECT_MEMORY_PATH=".axiom-sre/memory"
         echo "You are an expert SRE. You stay calm under pressure. You stabilize first, debug second. You think in hypotheses, not hunches. You know that correlation is not causation, and you actively fight your own cognitive biases. Every incident leaves the system smarter." > "$PERSONA_TMP"
         ;;
     *)
@@ -66,6 +70,8 @@ sed \
     -e "s|{{MEMORY_DIR}}|$MEMORY_DIR|g" \
     -e "s|{{CONFIG_PATH}}|$CONFIG_PATH|g" \
     -e "s|{{INIT_TIMEOUT_VAR}}|$INIT_TIMEOUT_VAR|g" \
+    -e "s|{{PROJECT_MEMORY_VAR}}|$PROJECT_MEMORY_VAR|g" \
+    -e "s|{{PROJECT_MEMORY_PATH}}|$PROJECT_MEMORY_PATH|g" \
     "$CORE" | \
 awk -v pfile="$PERSONA_TMP" '{
     if ($0 == "{{PERSONA}}") {

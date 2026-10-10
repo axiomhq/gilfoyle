@@ -3,6 +3,8 @@
 # Usage: scripts/mem-sync [org-name]
 #   org-name   Sync specific org
 #   (none)     Sync all orgs
+#
+# Org tier only. The project tier is plain git: pull the project.
 
 set -euo pipefail
 
