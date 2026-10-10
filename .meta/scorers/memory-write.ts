@@ -39,6 +39,7 @@ export const MemoryWriteScorer = Scorer<{
     // Parse mem-write calls to check category and content
     // Expected format: scripts/mem-write <category> <key> <content>
     // or with --org: scripts/mem-write --org <name> <category> <key> <content>
+    // or with --project: scripts/mem-write --project <category> <key> <content>
     const validWrites: { category: string; key: string; contentLength: number }[] = [];
     const invalidWrites: { input: string; reason: string }[] = [];
 
@@ -152,6 +153,11 @@ function parseMemWriteCliArgs(input: string): { category: string; key: string; c
     } else {
       return null;
     }
+  }
+
+  // Handle --project flag (takes no argument)
+  if (cleaned.startsWith('--project')) {
+    cleaned = cleaned.replace(/^--project\s+/, '');
   }
 
   // Split into category, key, content

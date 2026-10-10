@@ -62,6 +62,21 @@ else
     fail "gilfoyle memory path wrong"
 fi
 
+# Test 6b: project memory names are per-persona (SKILL.md is never sed-rewritten by sync)
+if [[ "$OUTPUT" == *"SRE_PROJECT_MEMORY_DIR"* && "$OUTPUT" == *".axiom-sre/memory"* \
+      && "$OUTPUT" != *"GILFOYLE_PROJECT"* && "$OUTPUT" != *".gilfoyle/memory"* ]]; then
+    pass "axiom-sre build names SRE_PROJECT_MEMORY_DIR and .axiom-sre/memory"
+else
+    fail "axiom-sre build has wrong project memory names"
+fi
+
+if [[ "$GILFOYLE_OUTPUT" == *"GILFOYLE_PROJECT_MEMORY_DIR"* && "$GILFOYLE_OUTPUT" == *".gilfoyle/memory"* \
+      && "$GILFOYLE_OUTPUT" != *"SRE_PROJECT"* && "$GILFOYLE_OUTPUT" != *".axiom-sre/memory"* ]]; then
+    pass "gilfoyle build names GILFOYLE_PROJECT_MEMORY_DIR and .gilfoyle/memory"
+else
+    fail "gilfoyle build has wrong project memory names"
+fi
+
 # Test 7: gilfoyle build has persona
 if [[ "$GILFOYLE_OUTPUT" == *"Bertram Gilfoyle"* ]]; then
     pass "gilfoyle build has persona"
@@ -116,6 +131,29 @@ if [[ "$BUILD1" == "$BUILD2" ]]; then
 else
     fail "build-skill is NOT idempotent"
 fi
+
+# Test 13: project memory names survive the sync rename (own temp target, always runs)
+SYNC_TMP=$(mktemp -d)
+mkdir -p "$SYNC_TMP/scripts" "$SYNC_TMP/reference" "$SYNC_TMP/templates"
+cp "$SKILL_DIR/scripts/"* "$SYNC_TMP/scripts/"
+if "$SCRIPT_DIR/sync-to-skills" "$SYNC_TMP" >/dev/null 2>&1; then
+    if grep -rq "SRE_PROJECT_MEMORY_DIR" "$SYNC_TMP/scripts/mem-write" "$SYNC_TMP/scripts/lib-memory" "$SYNC_TMP/reference/memory-system.md" \
+       && grep -rq "\.axiom-sre/memory" "$SYNC_TMP/scripts/lib-memory" "$SYNC_TMP/reference/memory-system.md"; then
+        pass "synced output uses SRE_PROJECT_MEMORY_DIR and .axiom-sre/memory"
+    else
+        fail "synced output is missing SRE_PROJECT_MEMORY_DIR or .axiom-sre/memory"
+    fi
+    LEAKED=$(grep -rn "GILFOYLE_PROJECT\|\.gilfoyle/memory" "$SYNC_TMP" 2>/dev/null || true)
+    if [[ -z "$LEAKED" ]]; then
+        pass "no GILFOYLE_PROJECT or .gilfoyle/memory in synced output"
+    else
+        fail "project memory names leaked through sync:"
+        echo "$LEAKED" | head -10
+    fi
+else
+    fail "sync-to-skills failed on a temp target"
+fi
+rm -rf "$SYNC_TMP"
 
 echo ""
 

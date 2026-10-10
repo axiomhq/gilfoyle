@@ -84,6 +84,8 @@ Steps 1-2 must pass. Step 3 produces a comparison against baseline — review th
 - Bash scripts: `set -euo pipefail`, use `${VAR:-}` for optional vars
 - Config path: `${GILFOYLE_CONFIG_DIR:-$HOME/.config/gilfoyle}`
 - Memory path: `$CONFIG_DIR/memory/`
+- Project memory path: `${GILFOYLE_PROJECT_MEMORY_DIR:-<git-toplevel>/.gilfoyle/memory}`, resolved by `skill/scripts/lib-memory`. Committed by the project, never by us
+- Write gilfoyle names in source (`GILFOYLE_*`, `.gilfoyle/memory`); `scripts/sync-to-skills` rewrites them to `SRE_*` / `.axiom-sre/memory`. A new `GILFOYLE_*` variable needs its own rule there, and `SKILL.core.md` gets placeholders, not literals, because `SKILL.md` is never sed-rewritten
 - No secrets in code. Ever. I will find them.
 
 ## File Organization

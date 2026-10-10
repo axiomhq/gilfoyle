@@ -4,6 +4,8 @@
 #
 # Example:
 #   scripts/mem-share axiom "Add pattern: connection pool exhaustion"
+#
+# Org tier only. Project memory is committed with the project, by you.
 
 set -euo pipefail
 

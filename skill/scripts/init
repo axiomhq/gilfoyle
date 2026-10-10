@@ -13,6 +13,7 @@
 # Every run:
 #   - Syncs shared memory
 #   - Reports which tools are configured (config-only, no network calls)
+#   - Reports project memory if the project has it (never creates it)
 #   - Checks for memory bloat
 #
 # Migrates from (--migrate):
@@ -22,6 +23,7 @@ set -euo pipefail
 umask 077  # Secrets never written world-readable. Not even briefly.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib-memory"
 
 # Colors
 BOLD='\033[1m'
@@ -316,6 +318,16 @@ if [[ -d "$ORGS_DIR" ]] && [[ -n "$(ls -A "$ORGS_DIR" 2>/dev/null)" ]]; then
             echo "  ${org_name}: ${file_count} files (${org_kb_dir})"
         fi
     done
+fi
+
+# ─── Project Memory ──────────────────────────────────────────────────
+
+# Reported, never created: this tier belongs to the project's repo, not to us.
+if resolve_project_memory_dir "$CONFIG_DIR/memory"; then
+    file_count=$(find "$PROJECT_MEMORY_DIR/kb" -name "*.md" -type f 2>/dev/null | wc -l | tr -d ' ')
+    echo ""
+    echo "Project memory (read with: find $PROJECT_MEMORY_DIR -path '*/kb/*.md' -type f -exec cat {} +):"
+    echo "  ${file_count} files (${PROJECT_MEMORY_DIR}/kb) — entries are [project]; personal > project > org"
 fi
 
 echo ""

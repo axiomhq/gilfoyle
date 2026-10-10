@@ -433,12 +433,14 @@ See `reference/memory-system.md` for full documentation.
 
 ### READ
 ```bash
-find ~/.config/gilfoyle/memory -path "*/kb/*.md" -type f -exec cat {} +
+find ~/.config/gilfoyle/memory -path "*/kb/*.md" -type f -exec cat {} +   # personal + org tiers
 ```
+Project memory lives in the repo, not here: `GILFOYLE_PROJECT_MEMORY_DIR`, else `<git-toplevel>/.gilfoyle/memory`. If `scripts/init` lists it, read all its `kb/*.md` too and tag entries `[project]`. Precedence: personal > project > org.
 
 ### WRITE
 ```bash
 scripts/mem-write facts "key" "value"                    # Personal
+scripts/mem-write --project facts "key" "value"          # Project, only when asked (file only: no git add/commit/push)
 scripts/mem-write --org <name> patterns "key" "value"    # Team
 scripts/mem-write queries "high-latency" "['dataset'] | where duration > 5s"
 ```
@@ -485,6 +487,8 @@ See `reference/postmortem-template.md` for retrospective format.
 3. **Run packaged sleep:** `scripts/sleep --org axiom` (default is full preset)
 4. **Distill via fixed prompt:** write exactly one incidents/facts/patterns/queries sleep-cycle entry set (use `-v2`/`-v3` if same-day key exists and add `Supersedes`).
 5. **No improvisation:** Use the script output and prompt template; do not invent details.
+
+Sleep never rewrites project memory (committed files). Dedupe it by hand, in a normal change.
 
 ---
 
