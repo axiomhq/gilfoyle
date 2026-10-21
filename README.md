@@ -45,6 +45,7 @@ First run creates `~/.config/gilfoyle/config.toml`, initializes the memory syste
 
 [axiom.deployments.prod]
 url = "https://api.axiom.co"
+edge_url = "https://us-east-1.aws.edge.axiom.co" # Settings → General → Edge deployment
 token = "xaat-xxx"
 org_id = "your-org"
 
@@ -72,7 +73,9 @@ installed command or its literal path and arguments.
 `curl-auth` checks the primary request URL against the selected service's HTTP(S)
 origin. Hosted Axiom API, app, and regional edge endpoints can share Axiom
 credentials; Slack API and file downloads use Slack's hosts. For a different
-service, select a deployment configured for that destination.
+service, select a deployment configured for that destination. Hosted APL runs
+on the regional edge (`POST /v1/query/_apl`). Set `edge_url` when the token
+cannot list datasets, which is required once that token has query cost limits.
 
 Additional curl options, curl configuration, and `access_command` remain trusted
 local inputs that can change routing. The URL check does not constrain those.

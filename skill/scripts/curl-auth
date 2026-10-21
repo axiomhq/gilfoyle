@@ -60,6 +60,8 @@ if [[ -z "$TOOL" || -z "$DEPLOYMENT" || -z "$URL" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib-query-edge"
 
 # Load config
 CONFIG_OUTPUT="$("$SCRIPT_DIR/config" "$TOOL" "$DEPLOYMENT")" || exit 1
@@ -81,10 +83,6 @@ url_origin() {
     printf '%s://%s\n' "$scheme" "$authority"
 }
 
-hosted_axiom_origin() {
-    [[ "$1" =~ ^https://(api\.axiom\.co|app\.axiom\.co|([a-z0-9-]+\.)+edge\.axiom\.co)$ ]]
-}
-
 # Guard the primary URL; extra curl options and local wrappers remain trusted.
 TARGET_ORIGIN=$(url_origin "$URL") || { echo "Error: Invalid HTTP(S) request URL." >&2; exit 1; }
 case "$TOOL" in
@@ -97,7 +95,7 @@ case "$TOOL" in
 esac
 SERVICE_ORIGIN=$(url_origin "$SERVICE_URL") || { echo "Error: Invalid configured service URL." >&2; exit 1; }
 if [[ "$TARGET_ORIGIN" != "$SERVICE_ORIGIN" ]]; then
-    if [[ "$TOOL" == axiom ]] && hosted_axiom_origin "$SERVICE_ORIGIN" && hosted_axiom_origin "$TARGET_ORIGIN"; then
+    if [[ "$TOOL" == axiom ]] && axiom_same_cloud "$SERVICE_ORIGIN" "$TARGET_ORIGIN"; then
         : # Hosted Axiom API and regional edges use the same service credentials.
     elif [[ "$TOOL" == slack && "$TARGET_ORIGIN" == https://files.slack.com ]]; then
         : # Slack private file downloads use the workspace token.

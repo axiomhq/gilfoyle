@@ -1,0 +1,305 @@
+#!/usr/bin/env bash
+# Resolve where an APL or metrics query must run.
+#
+# Hosted Axiom meters token query cost limits on the regional edge. Those tokens
+# are rejected by POST /v1/datasets/_apl on the API host. Query calls go to
+# POST /v1/query/_apl, using the same edge order as the MCP client. A configured
+# URL outside Axiom cloud is used as-is; there is no second query path.
+#
+# Expects AXIOM_URL, AXIOM_TOKEN, AXIOM_ORG_ID, and DEPLOYMENT. Optional:
+# AXIOM_EDGE_URL, for a query-only token that cannot list datasets or edges.
+# SCRIPT_DIR must be the directory containing resolve-query-edge.py.
+
+# Prints the cloud family (axiom.co, dev.axiomtestlabs.co, ...) or returns 1.
+axiom_cloud_scope() {
+  local host="${1#https://}"
+  host="${host#http://}"
+  host="${host%%/*}"
+  host="${host%%\?*}"
+  host="${host%%:*}"
+  host=$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')
+
+  if [[ "$host" == "api.axiom.co" || "$host" == "app.axiom.co" || "$host" == *.edge.axiom.co ]]; then
+    printf 'axiom.co'
+    return 0
+  fi
+  if [[ "$host" == api.axiomtestlabs.co || "$host" == app.axiomtestlabs.co || "$host" == api.*.axiomtestlabs.co || "$host" == app.*.axiomtestlabs.co ]]; then
+    local rest="${host#api.}"
+    rest="${rest#app.}"
+    printf '%s' "$rest"
+    return 0
+  fi
+  if [[ "$host" == *.axiomtestlabs.co && "$host" =~ \.edge\.(.+)$ ]]; then
+    printf '%s' "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  return 1
+}
+
+axiom_same_cloud() {
+  local left right
+  left=$(axiom_cloud_scope "$1") || return 1
+  right=$(axiom_cloud_scope "$2") || return 1
+  [[ "$left" == "$right" ]]
+}
+
+axiom_is_hosted() {
+  axiom_cloud_scope "$1" >/dev/null
+}
+
+axiom_is_edge_url() {
+  local host="${1#https://}"
+  host="${host%%/*}"
+  host="${host%%\?*}"
+  host="${host%%:*}"
+  [[ "$host" == *.edge.axiom.co || "$host" == *.edge.*.axiomtestlabs.co || "$host" == *.edge.axiomtestlabs.co ]]
+}
+
+# Management routes stay on the API host. An edge configured as `url` maps back
+# to api.<environment>, including api.dev.axiomtestlabs.co.
+axiom_management_base() {
+  local url="${AXIOM_URL%/}"
+  if [[ "$url" =~ ^https://.+\.edge\.(.+)$ ]]; then
+    printf 'https://api.%s' "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  printf '%s' "$url"
+}
+
+axiom_cache_dir() {
+  printf '%s/cache/axiom/%s' "${GILFOYLE_CONFIG_DIR:-$HOME/.config/gilfoyle}" "$DEPLOYMENT"
+}
+
+axiom_http_get() {
+  local url="$1"
+  local dest="$2"
+  curl -sS --connect-timeout 10 --max-time 30 \
+    -o "$dest" -w "%{http_code}" \
+    -H "Authorization: Bearer ${AXIOM_TOKEN}" \
+    -H "X-Axiom-Org-Id: ${AXIOM_ORG_ID}" \
+    -H "Accept: application/json" \
+    "$url" || true
+}
+
+# Prints a cached JSON document, refreshing it when missing or older than 10 minutes.
+axiom_cached_get() {
+  local path="$1"
+  local name="$2"
+  local cache_dir body tmp now mtime age
+  cache_dir="$(axiom_cache_dir)"
+  local cache_file="$cache_dir/$name"
+
+  if [[ "${GILFOYLE_NO_CACHE:-}" != "1" && -f "$cache_file" ]]; then
+    now=$(date +%s)
+    mtime=$(stat -c %Y "$cache_file" 2>/dev/null || stat -f %m "$cache_file" 2>/dev/null || echo 0)
+    age=$((now - mtime))
+    if [[ "$age" -lt 600 ]] && jq -e . "$cache_file" >/dev/null 2>&1; then
+      cat "$cache_file"
+      return 0
+    fi
+  fi
+
+  local resp_file http_code body
+  resp_file=$(mktemp)
+  http_code=$(axiom_http_get "$(axiom_management_base)$path" "$resp_file")
+  http_code=$(printf '%s' "$http_code" | tr -d '[:space:]')
+  body=$(cat "$resp_file" 2>/dev/null || true)
+  rm -f "$resp_file"
+  if [[ "$http_code" == "401" || "$http_code" == "403" ]]; then
+    axiom_lookup_note denied
+    return 1
+  fi
+  if [[ ! "$http_code" =~ ^2 ]]; then
+    axiom_lookup_note error
+    return 1
+  fi
+  if ! printf '%s' "$body" | jq -e . >/dev/null 2>&1; then
+    axiom_lookup_note error
+    return 1
+  fi
+  local api_code
+  api_code=$(printf '%s' "$body" | jq -r 'if type == "object" then (.code // empty) else empty end')
+  if [[ "$api_code" == "401" || "$api_code" == "403" ]]; then
+    axiom_lookup_note denied
+    return 1
+  fi
+  if [[ -n "$api_code" ]]; then
+    axiom_lookup_note error
+    return 1
+  fi
+  if [[ "$path" == *"/v2/edge-deployments/axiom" ]]; then
+    if ! printf '%s' "$body" | jq -e 'type == "object" and (.axiom | type == "array")' >/dev/null 2>&1; then
+      axiom_lookup_note error
+      return 1
+    fi
+  elif [[ "$path" == *"/v2/datasets" ]]; then
+    if ! printf '%s' "$body" | jq -e 'type == "array"' >/dev/null 2>&1; then
+      axiom_lookup_note error
+      return 1
+    fi
+  fi
+  axiom_lookup_note ok
+
+  mkdir -p "$cache_dir" 2>/dev/null || true
+  tmp="$cache_file.tmp.$$"
+  if printf '%s' "$body" >"$tmp" 2>/dev/null; then
+    chmod 600 "$tmp" 2>/dev/null || true
+    mv "$tmp" "$cache_file" 2>/dev/null || true
+  fi
+  printf '%s' "$body"
+}
+
+axiom_remember_edge() {
+  local base="${1%/}"
+  local cache_dir
+  cache_dir="$(axiom_cache_dir)"
+  mkdir -p "$cache_dir" 2>/dev/null || true
+  printf '%s\n' "$base" >"$cache_dir/last-edge-base" 2>/dev/null || true
+  chmod 600 "$cache_dir/last-edge-base" 2>/dev/null || true
+}
+
+axiom_lookup_note() {
+  local dir
+  dir="$(axiom_cache_dir)"
+  mkdir -p "$dir" 2>/dev/null || true
+  printf '%s\n' "$1" >"$dir/lookup-status" 2>/dev/null || true
+}
+
+axiom_discovery_denied() {
+  [[ "${GILFOYLE_NO_CACHE:-}" == "1" ]] && return 1
+  local file now mtime age
+  file="$(axiom_cache_dir)/discovery-denied"
+  [[ -f "$file" ]] || return 1
+  now=$(date +%s)
+  mtime=$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file" 2>/dev/null || echo 0)
+  age=$((now - mtime))
+  [[ "$age" -lt 600 ]]
+}
+
+axiom_mark_discovery_denied() {
+  [[ "${GILFOYLE_NO_CACHE:-}" == "1" ]] && return 0
+  local dir
+  dir="$(axiom_cache_dir)"
+  mkdir -p "$dir" 2>/dev/null || true
+  : >"$dir/discovery-denied"
+  chmod 600 "$dir/discovery-denied" 2>/dev/null || true
+}
+
+axiom_clear_discovery_denied() {
+  rm -f "$(axiom_cache_dir)/discovery-denied"
+}
+
+axiom_forget_edge() {
+  local base="${1%/}"
+  local cache_file remembered
+  cache_file="$(axiom_cache_dir)/last-edge-base"
+  [[ -f "$cache_file" ]] || return 0
+  remembered=$(tr -d '[:space:]' <"$cache_file" || true)
+  if [[ "$remembered" == "$base" ]]; then
+    rm -f "$cache_file"
+  fi
+}
+
+axiom_should_retry_edge() {
+  local code="$1"
+  local message="$2"
+  [[ "$code" == "400" || "$code" == "404" || "$code" == "422" ]] || return 1
+  [[ "$message" =~ different\ region|wrong\ region|dataset\ in\ region|deployment\ region|edge\ deployment|dataset.+not\ found|dataset.+does\ not\ exist|not\ found.+dataset|unable\ to\ find\ dataset ]]
+}
+
+axiom_dataset_from_path() {
+  local endpoint="$1"
+  local encoded=""
+  if [[ "$endpoint" =~ /datasets/([^/?]+) ]]; then
+    encoded="${BASH_REMATCH[1]}"
+  fi
+  [[ -n "$encoded" ]] || return 0
+  python3 -c 'import sys, urllib.parse; print(urllib.parse.unquote(sys.argv[1]))' "$encoded"
+}
+
+# Prints "edge<TAB>base" lines. A URL outside Axiom cloud is that configured URL.
+# Hosted failures print a hint and return 1 instead of falling back to
+# /v1/datasets/_apl.
+axiom_query_bases() {
+  local apl="${1:-}"
+  local explicit="${2:-}"
+  local base="${AXIOM_URL%/}"
+  local edge_url="${AXIOM_EDGE_URL:-}"
+  edge_url="${edge_url%/}"
+
+  if ! axiom_is_hosted "$base"; then
+    printf 'edge\t%s\n' "$base"
+    return 0
+  fi
+
+  if axiom_is_edge_url "$base"; then
+    printf 'edge\t%s\n' "$base"
+    return 0
+  fi
+
+  # A query-only token cannot list edges. Remember the rejection and keep using
+  # edge_url so later queries do not repeat that forbidden lookup for 10 minutes.
+  if [[ -n "$edge_url" ]] && axiom_same_cloud "$base" "$edge_url" && axiom_discovery_denied; then
+    printf 'edge\t%s\n' "$edge_url"
+    return 0
+  fi
+
+  local regions_body datasets_body cache_dir regions_file datasets_file cached=""
+  cache_dir="$(axiom_cache_dir)"
+  if [[ -f "$cache_dir/last-edge-base" ]]; then
+    cached=$(tr -d '[:space:]' <"$cache_dir/last-edge-base" || true)
+  fi
+
+  if ! regions_body=$(axiom_cached_get "/v2/edge-deployments/axiom" "edge-deployments.json"); then
+    if [[ -n "$edge_url" ]] && axiom_same_cloud "$base" "$edge_url"; then
+      if [[ "$(cat "$(axiom_cache_dir)/lookup-status" 2>/dev/null || true)" == "denied" ]]; then
+        axiom_mark_discovery_denied
+      fi
+      printf 'edge\t%s\n' "$edge_url"
+      return 0
+    fi
+    echo "error: could not resolve the regional edge for this query" >&2
+    echo "hint: a token with query cost limits must call POST /v1/query/_apl on the edge deployment, not ${base}/v1/datasets/_apl. Set edge_url when this token cannot call GET /v2/datasets or GET /v2/edge-deployments/axiom (Settings → General → Edge deployment)." >&2
+    return 1
+  fi
+
+  axiom_clear_discovery_denied
+  datasets_body=$(axiom_cached_get "/v2/datasets" "datasets.json" || true)
+  regions_file=$(mktemp)
+  datasets_file=$(mktemp)
+  printf '%s' "$regions_body" >"$regions_file"
+  if [[ -n "$datasets_body" ]]; then
+    printf '%s' "$datasets_body" >"$datasets_file"
+  else
+    printf '[]' >"$datasets_file"
+  fi
+
+  local resolved="" line
+  resolved=$(python3 "$SCRIPT_DIR/resolve-query-edge.py" \
+    --apl "$apl" \
+    --dataset "$explicit" \
+    --regions-file "$regions_file" \
+    --datasets-file "$datasets_file" \
+    --cached-base "$cached" || true)
+  rm -f "$regions_file" "$datasets_file"
+
+  local printed=0
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    if axiom_same_cloud "$base" "$line"; then
+      printf 'edge\t%s\n' "${line%/}"
+      printed=1
+    fi
+  done <<<"$resolved"
+
+  if [[ "$printed" -eq 1 ]]; then
+    return 0
+  fi
+  if [[ -n "$edge_url" ]] && axiom_same_cloud "$base" "$edge_url"; then
+    printf 'edge\t%s\n' "$edge_url"
+    return 0
+  fi
+  echo "error: could not resolve the regional edge for this query" >&2
+  echo "hint: a token with query cost limits must call POST /v1/query/_apl on the edge deployment, not ${base}/v1/datasets/_apl. Set edge_url when dataset discovery does not return an edge (Settings → General → Edge deployment)." >&2
+  return 1
+}

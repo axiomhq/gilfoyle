@@ -10,7 +10,7 @@ Axiom has two query engines with distinct query languages and endpoints.
 | **Datasets** | Standard datasets | `otel-metrics-v1` datasets |
 | **Query language** | APL | MPL |
 | **Query script** | `scripts/axiom-query` | `scripts/axiom-metrics-query` |
-| **API endpoint** | `POST /v1/datasets/_apl` | `POST /v1/query/_metrics` |
+| **API endpoint** | `POST /v1/query/_apl` on the regional edge | `POST /v1/query/_metrics` on the regional edge |
 | **Time expressions** | `ago()`, `now()`, absolute | RFC3339 timestamps only — no relative expressions |
 
 EventDB is general-purpose event storage. MetricsDB is purpose-built for time-series metrics — optimized for aggregation, alignment, and high-cardinality tag queries on counter/gauge/histogram data.

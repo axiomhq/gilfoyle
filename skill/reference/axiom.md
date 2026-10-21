@@ -2,8 +2,8 @@
 
 Summary of all operations available via Axiom API with a personal access token (PAT).
 
-**Base URL:** `https://api.axiom.co` (for all endpoints except ingestion)  
-**Ingest URL:** Use edge deployment domain (e.g., `https://us-east-1.aws.edge.axiom.co`)
+**Management API:** `https://api.axiom.co` (datasets, monitors, notifiers, annotations)  
+**Query and ingest:** the deployment's regional edge (for example `https://us-east-1.aws.edge.axiom.co`). `scripts/axiom-query` resolves that edge from `GET /v2/edge-deployments/axiom` and the dataset's `edgeDeployment`. Tokens with query cost limits must use this edge; set `edge_url` when the token cannot list datasets.
 
 **Authentication:**
 Use `scripts/axiom-api` or `scripts/curl-auth axiom <deployment> <url>` with the configured Axiom service URL. These helpers load the selected deployment's token and organization internally; do not read or construct authorization headers in the agent conversation.
@@ -14,13 +14,13 @@ Use `scripts/axiom-api` or `scripts/curl-auth axiom <deployment> <url>` with the
 
 | Operation | Endpoint | Description |
 |-----------|----------|-------------|
-| Run APL query | `POST /v1/datasets/_apl?format=tabular` | Execute APL query with tabular output |
-| Run APL query (legacy) | `POST /v1/datasets/_apl?format=legacy` | Execute APL query with legacy output |
+| Run APL query | `POST /v1/query/_apl?format=tabular` on the regional edge | Execute APL. Required for tokens with query cost limits |
+| Run APL query (legacy API) | `POST /v1/datasets/_apl?format=tabular` on `api.axiom.co` | Not used by these scripts. Rejects tokens with query cost limits with HTTP 430 |
 | Run query (legacy) | `POST /v1/datasets/{dataset_name}/query` | Legacy query endpoint with filter/aggregation model |
 
 **Query parameters:** `apl`, `startTime`, `endTime`, `cursor`, `includeCursor`, `queryOptions`, `variables`
 
-`scripts/axiom-query` always sets `startTime` and `endTime` from its required `--since` or `--from`/`--to` flags.
+`scripts/axiom-query` sends APL to `POST /v1/query/_apl` on the dataset's regional edge and always sets `startTime` and `endTime` from its required `--since` or `--from`/`--to` flags.
 
 ---
 

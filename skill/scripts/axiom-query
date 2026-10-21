@@ -140,6 +140,8 @@ PAYLOAD=$(jq -cn \
 # Load config from unified config file
 # shellcheck disable=SC1090
 eval "$("$SCRIPT_DIR/config" axiom "$DEPLOYMENT")"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib-query-edge"
 
 RESP_HEADERS=$(mktemp)
 RESP_BODY=$(mktemp)
@@ -148,26 +150,62 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Execute query and pipe to formatter
-HTTP_CODE=$(curl -sS -o "$RESP_BODY" -D "$RESP_HEADERS" -w "%{http_code}" \
-  -X POST "$AXIOM_URL/v1/datasets/_apl?format=tabular" \
-  -H "Authorization: Bearer $AXIOM_TOKEN" \
-  -H "X-Axiom-Org-Id: $AXIOM_ORG_ID" \
-  -H "Content-Type: application/json" \
-  -d "$PAYLOAD")
+bases_output=$(axiom_query_bases "$APL") || exit 1
+query_mode=""
+query_bases=()
+while IFS=$'\t' read -r item_mode item_base; do
+  [[ -n "${item_base:-}" ]] || continue
+  query_mode="$item_mode"
+  query_bases+=("$item_base")
+done <<<"$bases_output"
 
-if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
-  msg=$(jq -r '.message // empty' "$RESP_BODY" 2>/dev/null)
-  trace=$(grep -i '^x-axiom-trace-id:' "$RESP_HEADERS" | tail -1 | awk '{print $2}' | tr -d '\r')
+if [[ ${#query_bases[@]} -eq 0 ]]; then
+  echo "error: could not resolve an APL query endpoint" >&2
+  exit 1
+fi
+
+query_path="/v1/query/_apl?format=tabular"
+
+attempt=0
+query_ok=false
+for query_base in "${query_bases[@]}"; do
+  attempt=$((attempt + 1))
+  HTTP_CODE=$(curl -sS -o "$RESP_BODY" -D "$RESP_HEADERS" -w "%{http_code}" \
+    -X POST "${query_base}${query_path}" \
+    -H "Authorization: Bearer $AXIOM_TOKEN" \
+    -H "X-Axiom-Org-Id: $AXIOM_ORG_ID" \
+    -H "Content-Type: application/json" \
+    -d "$PAYLOAD")
+  msg=$(jq -r '.message // empty' "$RESP_BODY" 2>/dev/null || true)
+
+  if [[ "$HTTP_CODE" -ge 200 && "$HTTP_CODE" -lt 300 ]]; then
+    if [[ "$query_mode" == "edge" ]]; then
+      axiom_remember_edge "$query_base"
+    fi
+    query_ok=true
+    break
+  fi
+
+  if [[ "$attempt" -lt ${#query_bases[@]} ]] && axiom_should_retry_edge "$HTTP_CODE" "$msg"; then
+    axiom_forget_edge "$query_base"
+    continue
+  fi
+
+  trace=$(grep -i '^x-axiom-trace-id:' "$RESP_HEADERS" | tail -1 | awk '{print $2}' | tr -d '\r' || true)
   echo "error: ${msg:-http $HTTP_CODE}" >&2
   if [[ -n "$trace" ]]; then
     echo "trace_id: $trace" >&2
   fi
   exit 1
+done
+
+if [[ "$query_ok" != true ]]; then
+  echo "error: APL query failed on every edge" >&2
+  exit 1
 fi
 
 if [[ "$PRINT_TRACE" == true ]]; then
-  trace=$(grep -i '^x-axiom-trace-id:' "$RESP_HEADERS" | tail -1 | awk '{print $2}' | tr -d '\r')
+  trace=$(grep -i '^x-axiom-trace-id:' "$RESP_HEADERS" | tail -1 | awk '{print $2}' | tr -d '\r' || true)
   if [[ -n "$trace" ]]; then
     echo "trace_id: $trace" >&2
   fi

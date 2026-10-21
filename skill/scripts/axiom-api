@@ -2,7 +2,7 @@
 # Axiom API helper - uses unified config
 # Usage: axiom-api <deployment> <method> <endpoint> [body]
 # Examples:
-#   axiom-api dev POST "/v1/datasets/_apl?format=tabular" '{"apl": "..."}'
+#   axiom-api dev POST "/v1/query/_apl?format=tabular" '{"apl": "..."}'
 #   axiom-api dev GET "/v1/datasets"
 
 set -euo pipefail
@@ -19,9 +19,69 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 eval "$("$SCRIPT_DIR/config" axiom "$DEPLOYMENT")"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib-query-edge"
+
+TARGET_BASE="$(axiom_management_base)"
+TARGET_ENDPOINT="$ENDPOINT"
+apl=""
+if [[ -n "$BODY" ]]; then
+  apl=$(printf '%s' "$BODY" | jq -r '.apl // empty' 2>/dev/null || true)
+fi
+
+if [[ "$ENDPOINT" == /v1/query/* || "$ENDPOINT" == /v1/datasets/_apl* ]]; then
+  dataset=$(axiom_dataset_from_path "$ENDPOINT")
+  bases_output=$(axiom_query_bases "$apl" "$dataset") || exit 1
+  query_mode=""
+  query_bases=()
+  while IFS=$'\t' read -r item_mode item_base; do
+    [[ -n "${item_base:-}" ]] || continue
+    query_mode="$item_mode"
+    query_bases+=("$item_base")
+  done <<<"$bases_output"
+  if [[ ${#query_bases[@]} -eq 0 ]]; then
+    echo "error: could not resolve an APL query endpoint" >&2
+    exit 1
+  fi
+  if [[ "$TARGET_ENDPOINT" == /v1/datasets/_apl* ]]; then
+    TARGET_ENDPOINT="/v1/query/_apl${TARGET_ENDPOINT#/v1/datasets/_apl}"
+  fi
+
+  RESP_BODY=$(mktemp)
+  RESP_HEADERS=$(mktemp)
+  trap 'rm -f "$RESP_BODY" "$RESP_HEADERS"' EXIT
+  attempt=0
+  for query_base in "${query_bases[@]}"; do
+    attempt=$((attempt + 1))
+    if [[ -n "$BODY" ]]; then
+      http_code=$("$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X "$METHOD" -d "$BODY" "${query_base}${TARGET_ENDPOINT}" -o "$RESP_BODY" -D "$RESP_HEADERS" -w "%{http_code}" || true)
+    else
+      http_code=$("$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X "$METHOD" "${query_base}${TARGET_ENDPOINT}" -o "$RESP_BODY" -D "$RESP_HEADERS" -w "%{http_code}" || true)
+    fi
+    http_code=$(printf '%s' "$http_code" | tr -d '[:space:]')
+    if [[ -z "$http_code" ]]; then
+      echo "error: query request failed" >&2
+      exit 1
+    fi
+    msg=$(jq -r '.message // empty' "$RESP_BODY" 2>/dev/null || true)
+    if [[ "$http_code" =~ ^2 ]]; then
+      if [[ "$query_mode" == "edge" ]]; then
+        axiom_remember_edge "$query_base"
+      fi
+      cat "$RESP_BODY"
+      exit 0
+    fi
+    if [[ "$attempt" -lt ${#query_bases[@]} ]] && axiom_should_retry_edge "$http_code" "$msg"; then
+      axiom_forget_edge "$query_base"
+      continue
+    fi
+    cat "$RESP_BODY"
+    exit 0
+  done
+fi
 
 if [[ -n "$BODY" ]]; then
-  "$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X "$METHOD" -d "$BODY" "${AXIOM_URL}${ENDPOINT}"
+  "$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X "$METHOD" -d "$BODY" "${TARGET_BASE}${TARGET_ENDPOINT}"
 else
-  "$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X "$METHOD" "${AXIOM_URL}${ENDPOINT}"
+  "$SCRIPT_DIR/curl-auth" axiom "$DEPLOYMENT" -X "$METHOD" "${TARGET_BASE}${TARGET_ENDPOINT}"
 fi

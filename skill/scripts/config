@@ -7,7 +7,7 @@
 # Config file: ~/.config/gilfoyle/config.toml
 #
 # Returns environment variables based on tool:
-#   axiom:    AXIOM_URL, AXIOM_TOKEN, AXIOM_ORG_ID
+#   axiom:    AXIOM_URL, AXIOM_TOKEN, AXIOM_ORG_ID, AXIOM_EDGE_URL
 #   grafana:  GRAFANA_URL, GRAFANA_TOKEN, GRAFANA_ORG_ID, GRAFANA_ACCESS_CMD, GRAFANA_USERNAME, GRAFANA_PASSWORD,
 #             GRAFANA_CF_ACCESS_CLIENT_ID, GRAFANA_CF_ACCESS_CLIENT_SECRET
 #   pyroscope: PYROSCOPE_URL, PYROSCOPE_TOKEN, PYROSCOPE_ACCESS_CMD, PYROSCOPE_USERNAME, PYROSCOPE_PASSWORD,
@@ -174,6 +174,7 @@ emit_assignment() {
 case "$TOOL" in
     axiom)
         ORG_ID=$(extract_value "$SECTION" "org_id")
+        EDGE_URL=$(extract_value "$SECTION" "edge_url")
         if [[ -z "$URL" ]]; then
             echo "Error: Deployment '$DEPLOYMENT' not found in [axiom.deployments.$DEPLOYMENT]" >&2
             echo "" >&2
@@ -183,9 +184,16 @@ case "$TOOL" in
             echo "Hint: Run scripts/init to discover available resources." >&2
             exit 1
         fi
+        if [[ -n "$EDGE_URL" ]]; then
+            if [[ "$EDGE_URL" != *://* ]]; then
+                EDGE_URL="https://$EDGE_URL"
+            fi
+            EDGE_URL="${EDGE_URL%/}"
+        fi
         emit_assignment AXIOM_URL "$URL"
         emit_assignment AXIOM_TOKEN "$TOKEN"
         emit_assignment AXIOM_ORG_ID "$ORG_ID"
+        [[ -n "$EDGE_URL" ]] && emit_assignment AXIOM_EDGE_URL "$EDGE_URL" || true
         ;;
     
     grafana)
