@@ -1,5 +1,8 @@
 # Gilfoyle
 
+> [!IMPORTANT]
+> This repository is archived. Use the `axiom-sre` skill in [axiomhq/skills](https://github.com/axiomhq/skills) instead.
+
 [![Evals](https://img.shields.io/badge/evals-live_dashboard-blue)](https://play.axiom.co/axiom-play-qf1k/dashboards/2NztOZ2QWMNZtU83pv)
 
 ![Gilfoyle - SRE Debugging Agent](site/assets/hero.png)
@@ -19,7 +22,7 @@ You're welcome.
 ## Installation
 
 ```bash
-npx skills add axiomhq/gilfoyle/skill
+npx skills add axiomhq/skills --skill axiom-sre
 ```
 
 ### Requirements
